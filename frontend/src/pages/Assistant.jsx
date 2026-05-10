@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Sparkles, Send, Database, Wand2, Check, X, AlertCircle } from "lucide-react";
+import { Sparkles, Send, Database, Wand2, Check, X, AlertCircle, FlaskConical, TrendingUp, TrendingDown } from "lucide-react";
+
+import { fmtSLE } from "../lib/api";
 
 const GENERAL_SUGGESTIONS = [
   "How is PAYE calculated in Sierra Leone?",
@@ -21,6 +23,8 @@ const ACTION_SUGGESTIONS = [
   "Approve all pending leave requests.",
   "Run payroll for next month.",
   "Reject any leave request longer than 14 days.",
+  "Simulate a 10% raise for the Engineering department.",
+  "What if we add a SLE 200 transport allowance for everyone?",
 ];
 
 const STEP_LABELS = {
@@ -28,7 +32,67 @@ const STEP_LABELS = {
   payroll_run: "Run payroll",
   attendance_log: "Log attendance",
   leave_create: "Create leave request",
+  payroll_simulate: "Simulate payroll scenario",
 };
+
+function SimResultCard({ sim, title }) {
+  const positive = (sim.delta?.employer_total_cost ?? 0) >= 0;
+  const TrendIcon = positive ? TrendingUp : TrendingDown;
+  return (
+    <div className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-4 mt-2">
+      <div className="flex items-center gap-2 mb-3">
+        <FlaskConical className="w-4 h-4 text-[#D1603D]" strokeWidth={1.5} />
+        <span className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Simulation result</span>
+        {title && <span className="text-xs text-[#1A1C1E] font-medium">· {title}</span>}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="bg-white border border-[#E2DFD6] rounded p-2">
+          <div className="text-[10px] uppercase tracking-wider text-[#525860]">Current/mo</div>
+          <div className="font-data font-semibold text-[#1A1C1E]">{fmtSLE(sim.current.employer_total_cost)}</div>
+        </div>
+        <div className="bg-white border border-[#E2DFD6] rounded p-2">
+          <div className="text-[10px] uppercase tracking-wider text-[#525860]">Projected/mo</div>
+          <div className="font-data font-semibold text-[#1A1C1E]">{fmtSLE(sim.projected.employer_total_cost)}</div>
+        </div>
+        <div className={`rounded p-2 ${positive ? "bg-[#FBE9DF]" : "bg-[#E6F4EC]"}`}>
+          <div className="text-[10px] uppercase tracking-wider text-[#525860] inline-flex items-center gap-1">
+            <TrendIcon className="w-3 h-3" /> Δ employer
+          </div>
+          <div className={`font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#2D7A5D]"}`}>
+            {positive ? "+" : ""}{fmtSLE(sim.delta.employer_total_cost)}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+        <div className="bg-white border border-[#E2DFD6] rounded p-2">
+          <div className="text-[10px] uppercase tracking-wider text-[#525860]">Annualized</div>
+          <div className={`font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#2D7A5D]"}`}>
+            {positive ? "+" : ""}{fmtSLE(sim.annualized_delta_employer_cost)}/yr
+          </div>
+        </div>
+        <div className="bg-white border border-[#E2DFD6] rounded p-2">
+          <div className="text-[10px] uppercase tracking-wider text-[#525860]">Affected</div>
+          <div className="font-data font-semibold text-[#1A1C1E]">{sim.affected_employees_count} employees</div>
+        </div>
+      </div>
+      {sim.employees?.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-xs text-[#525860] cursor-pointer hover:text-[#1A1C1E]">View top 5 affected</summary>
+          <div className="mt-2 space-y-1 text-xs font-data">
+            {sim.employees.slice(0, 5).map((e) => (
+              <div key={e.id} className="flex justify-between">
+                <span>{e.name} <span className="text-[#686D76]">· {e.department}</span></span>
+                <span className={e.delta_gross >= 0 ? "text-[#2D7A5D]" : "text-[#B83A3A]"}>
+                  {e.delta_gross >= 0 ? "+" : ""}{fmtSLE(e.delta_gross)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function PlanCard({ plan, onConfirm, onCancel, busy, results }) {
   const finished = results?.length > 0;
@@ -66,6 +130,7 @@ function PlanCard({ plan, onConfirm, onCancel, busy, results }) {
                       {status === "ok" ? "✓ " : status === "error" ? "✗ " : "• "}{result.detail}
                     </div>
                   )}
+                  {result?.simulation && <SimResultCard sim={result.simulation} title={step.title} />}
                 </div>
               </div>
             </li>

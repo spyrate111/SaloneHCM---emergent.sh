@@ -59,6 +59,11 @@ def _totals(slips: List[dict]) -> dict:
 
 @router.post("/simulate")
 async def simulate(body: SimIn, _: dict = Depends(require_admin)):
+    return await _do_simulate(body)
+
+
+async def _do_simulate(body: SimIn) -> dict:
+    """Pure simulation — callable from both the API route and the AI executor."""
     emps = await db.employees.find({"status": "active"}, {"_id": 0}).to_list(2000)
     cur_slips = [calc_payslip(e) for e in emps]
     proj_slips = [calc_payslip(_apply(body.rules, e)) for e in emps]

@@ -118,9 +118,9 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
         sys_msg += (
             "\n\n--- ACTION MODE ENABLED ---\n"
             "When the admin asks you to perform an action (approve leave, run payroll, log attendance, "
-            "create leave requests), DO NOT execute it. Instead, respond with a SHORT one-line summary, "
-            "then output a JSON code block describing the proposed plan. The admin will review and confirm "
-            "before execution. Maximum 50 steps per plan.\n\n"
+            "create leave requests, or simulate a salary scenario), DO NOT execute it. Instead, respond "
+            "with a SHORT one-line summary, then output a JSON code block describing the proposed plan. "
+            "The admin will review and confirm before execution. Maximum 50 steps per plan.\n\n"
             "JSON schema:\n"
             "```json\n"
             "{\n"
@@ -129,10 +129,16 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
             '  "steps": [\n'
             '    {"type": "leave_decision", "leave_id": "<id>", "decision": "approved" | "rejected"},\n'
             '    {"type": "payroll_run", "year": 2026, "month": 3},\n'
-            '    {"type": "attendance_log", "employee_id": "<id>", "date": "YYYY-MM-DD", "hours": 8, "overtime_hours": 0}\n'
+            '    {"type": "attendance_log", "employee_id": "<id>", "date": "YYYY-MM-DD", "hours": 8, "overtime_hours": 0},\n'
+            '    {"type": "payroll_simulate", "title": "Eng +10%",\n'
+            '      "rules": [{"name":"Eng raise","target":"department","department":"Engineering","basic_pct_change":10}]}\n'
             "  ]\n"
             "}\n"
             "```\n"
+            "For payroll_simulate: target can be 'all' (no department/employee_id), 'department' "
+            "(set department), or 'employee' (set employee_id). Each rule supports basic_pct_change, "
+            "basic_flat_add, allowances_pct_change, allowances_flat_add. The simulation does NOT change "
+            "any data — it's a read-only what-if projection.\n"
             "Use real ids from the LIVE COMPANY DATA above. Only emit steps for actions that match the user's intent. "
             "If the user just asked a question (not an action), do NOT emit a JSON block."
         )
@@ -218,6 +224,20 @@ async def _exec_step(step, user: dict, plan_title: str) -> dict:
         await db.leave_requests.insert_one(doc)
         await audit("ai_leave_create", f"leave_requests/{doc['id']}", user, meta_base)
         return {"detail": f"Leave request created for {doc['employee_name']}"}
+
+    if t == "payroll_simulate":
+        # Read-only what-if — reuse simulator helper
+        from routers.simulator import _do_simulate, SimIn, SimRule
+        rules = [SimRule(**r.model_dump()) for r in step.rules]
+        sim_result = await _do_simulate(SimIn(rules=rules))
+        await audit("ai_payroll_simulate", "payroll/simulate", user,
+                    {**meta_base, "annualized_delta": sim_result["annualized_delta_employer_cost"],
+                     "affected": sim_result["affected_employees_count"]})
+        delta = sim_result["delta"]["employer_total_cost"]
+        return {
+            "detail": f"Δ employer cost SLE {delta:,.2f}/mo · annualized SLE {sim_result['annualized_delta_employer_cost']:,.2f}",
+            "simulation": sim_result,
+        }
 
     raise ValueError(f"Unknown step type: {t}")
 

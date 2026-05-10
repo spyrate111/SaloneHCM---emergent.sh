@@ -97,8 +97,25 @@ class _LeaveCreateStep(BaseModel):
     reason: Optional[str] = None
 
 
+class _SimRule(BaseModel):
+    name: Optional[str] = None
+    target: Literal["all", "department", "employee"] = "all"
+    department: Optional[str] = None
+    employee_id: Optional[str] = None
+    basic_pct_change: float = 0
+    basic_flat_add: float = 0
+    allowances_pct_change: float = 0
+    allowances_flat_add: float = 0
+
+
+class _PayrollSimulateStep(BaseModel):
+    type: Literal["payroll_simulate"]
+    title: Optional[str] = None
+    rules: List[_SimRule] = Field(..., min_length=1, max_length=20)
+
+
 PlanStep = Annotated[
-    Union[_LeaveDecisionStep, _PayrollRunStep, _AttendanceLogStep, _LeaveCreateStep],
+    Union[_LeaveDecisionStep, _PayrollRunStep, _AttendanceLogStep, _LeaveCreateStep, _PayrollSimulateStep],
     Field(discriminator="type"),
 ]
 
