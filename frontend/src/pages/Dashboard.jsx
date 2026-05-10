@@ -56,9 +56,9 @@ export default function Dashboard() {
               <h3 className="font-heading text-lg font-semibold text-[#1A1C1E]">Net payroll cost across periods</h3>
             </div>
           </div>
-          <div className="h-64">
+          <div className="h-64 w-full">
             {data.runs_history?.length ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                 <AreaChart data={data.runs_history}>
                   <defs>
                     <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
@@ -82,8 +82,8 @@ export default function Dashboard() {
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] mb-1">Headcount by department</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Departments</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={data.departments} layout="vertical" margin={{ left: 0 }}>
                 <CartesianGrid stroke="#EBE8E0" horizontal={false} />
                 <XAxis type="number" stroke="#686D76" fontSize={11} />

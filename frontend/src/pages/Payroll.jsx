@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import api, { fmtSLE } from "../lib/api";
-import { Calculator, Play, Check, FileText } from "lucide-react";
+import { Calculator, Play, Check, FileText, Download } from "lucide-react";
+import api, { fmtSLE, API } from "../lib/api";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -15,6 +15,26 @@ export default function Payroll() {
 
   const loadRuns = () => api.get("/payroll/runs").then((r) => setRuns(r.data));
   useEffect(() => { loadRuns(); }, []);
+
+  const downloadPdf = async (rid, eid, name) => {
+    const token = localStorage.getItem("salonehcm_token");
+    const res = await fetch(`${API}/payroll/runs/${rid}/payslip/${eid}.pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `payslip-${name.replace(/\s/g, "_")}.pdf`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadBank = async (rid, period) => {
+    const token = localStorage.getItem("salonehcm_token");
+    const res = await fetch(`${API}/payroll/runs/${rid}/bank-file`, { headers: { Authorization: `Bearer ${token}` } });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `bank-file-${period}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const doPreview = async () => {
     const { data } = await api.post("/payroll/preview");
@@ -144,7 +164,12 @@ export default function Payroll() {
                 <td className="py-3 px-4 font-data">{fmtSLE(r.totals.nassit_employee + r.totals.nassit_employer)}</td>
                 <td className="py-3 px-4 font-data font-semibold">{fmtSLE(r.totals.net)}</td>
                 <td className="py-3 px-4 text-right">
-                  <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs text-[#26547C] hover:underline"><FileText className="w-3.5 h-3.5" /> Export</a>
+                  <div className="inline-flex gap-1.5">
+                    <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded">
+                      <Download className="w-3.5 h-3.5" /> Bank file
+                    </button>
+                    <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#525860] px-2.5 py-1.5 rounded"><FileText className="w-3.5 h-3.5" /> NRA</a>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,0 +1,36 @@
+{
+  "summary": "SaloneHCM iteration 2 (Batch A polish & exports) — Backend 29/29 pytest tests PASSED (13 new in test_iter2_exports.py + 16 regression in test_salonehcm.py). Verified: payslip PDF returns valid %PDF-prefixed binary (admin any, employee own only, 403 for others), bank-file CSV returns correct header row 'bank_name,account_no,beneficiary,amount_sle,reference' (admin only, 403 for employee, 404 for unknown run), GET /api/audit returns audit_logs (admin only, 403 for employee), audit entries auto-created on employee create/delete and bank-file export, my-payslips returns list of {run_id, period, slip}, employees backfilled with bank_name + bank_account on startup. Frontend: Audit Log nav visible to admin only (hidden for employee), AuditLog page filter narrows 17→9 rows with 'payroll' filter, color action badges render, Payroll page shows 5 'Bank file' download buttons in run history, Self-Service /self-service shows Payslip history table with 5 PDF download buttons (download verified — 200 application/pdf response), Leave/Attendance/Employees forms have 0 native date inputs (DatePicker shadcn Popover+Calendar working — confirmed popover opens on hire-date click), Employees create form has emp-bank_name + emp-bank_account inputs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Dashboard charts (Recharts)", "issue": "Console warnings 'The width(-1) and height(-1) of chart should be greater than 0' STILL appear 4× on initial dashboard render despite minWidth/minHeight fix. Charts render correctly visually but the warning persists — likely because ResponsiveContainer is mounted inside a flex/grid parent that briefly reports 0 width before layout settles. Recommend wrapping in a div with fixed height (e.g., h-[320px]) or removing 100% width and using fixed pixel width.", "selector": ".recharts-responsive-container", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter2_exports.py",
+    "/app/backend/tests/test_salonehcm.py",
+    "/app/test_reports/pytest/iter2_full.xml",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [
+    "Recharts width(-1)/height(-1) warnings still occurring on Dashboard. ResponsiveContainer minHeight prop alone is not enough — wrap each ResponsiveContainer in a div with explicit pixel height (e.g., style={{height: 320}}) or remove width='100%' in favor of a fixed parent."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 789 lines — close to the 700-line file-size threshold. Consider splitting into routers/ modules (auth.py, employees.py, payroll.py, leave.py, audit.py, pdf.py) before next iteration.",
+    "audit() is fire-and-forget within the request handler; if the audit insert fails it would surface as a 500 to the caller. Consider wrapping in try/except and logging instead of raising.",
+    "/api/payroll/runs/{rid}/bank-file CSV: beneficiary names containing commas are quoted, but bank_name and other fields are not — if a bank name ever contains a comma it will break parsers. Consider using csv.writer.",
+    "/api/payroll/runs/{rid}/payslip/{eid}.pdf path uses a literal '.pdf' suffix in the route — this works but may confuse some HTTP clients that strip extensions. Consider returning via Content-Disposition only and removing '.pdf' from the path.",
+    "Seed backfill loop on startup is O(N) with await per employee — fine for 10 but should use update_many for scale.",
+    "CORS still allow_origins=['*'] with allow_credentials=False (carry-over from iter1)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter2_exports.py"],
+  "success_rate": {"backend": "100% (29/29)", "frontend": "95% (Recharts warning is the only outstanding issue)"},
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 ; aminata.kamara@salonehcm.sl / Employee@2026",
+  "seed_data_creation": "No new seed data needed — payroll runs already exist in DB from iteration 1 + new test runs. /api/audit had 17 entries at test time.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 2 fully validated. Only remaining UI nit: Recharts width(-1)/height(-1) console warnings still appear 4× on dashboard despite fix attempt — non-blocking, charts render correctly. Backend has zero issues. data-testid coverage from iter1 has been added: login, nav-*, audit-page, audit-filter, audit-row-{id}, payroll-page, payroll-month/year/preview-button/run-button, bank-{rid}, self-service-page, my-payslips, download-payslip-{rid}, emp-{field}, add-employee-button, logout-button.",
+  "rca of the issue": "Recharts -1 warning RCA: ResponsiveContainer queries parent dimensions on first paint via ResizeObserver. When mounted inside a grid/flex container that hasn't resolved its content size yet, the observer fires once with -1 before the second pass. The minHeight prop only sets the SVG min height after layout is known — it does not prevent the initial -1 read. Mitigation: give the immediate parent of ResponsiveContainer a fixed height in pixels (e.g., <div style={{height:320}}> wrapping <ResponsiveContainer width='100%' height='100%'>) or set width/height to fixed pixel values."
+}

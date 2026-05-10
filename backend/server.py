@@ -14,8 +14,14 @@ from typing import List, Optional, Literal
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
 # ---- DB ----
 mongo_url = os.environ["MONGO_URL"]
@@ -129,6 +135,8 @@ class EmployeeIn(BaseModel):
     allowances_sle: float = 0
     nassit_no: Optional[str] = ""
     tin: Optional[str] = ""
+    bank_name: Optional[str] = "Sierra Leone Commercial Bank"
+    bank_account: Optional[str] = ""
     hire_date: str  # YYYY-MM-DD
     status: Literal["active", "on_leave", "terminated"] = "active"
 
@@ -258,11 +266,12 @@ async def list_employees(user: dict = Depends(get_current_user)):
 
 
 @api.post("/employees")
-async def create_employee(body: EmployeeIn, _: dict = Depends(require_admin)):
+async def create_employee(body: EmployeeIn, user: dict = Depends(require_admin)):
     eid = str(uuid.uuid4())
     doc = {**body.model_dump(), "id": eid, "created_at": iso(now_utc())}
     await db.employees.insert_one(doc)
     doc.pop("_id", None)
+    await audit("create", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return doc
 
 
@@ -275,17 +284,19 @@ async def get_employee(eid: str, _: dict = Depends(get_current_user)):
 
 
 @api.put("/employees/{eid}")
-async def update_employee(eid: str, body: EmployeeIn, _: dict = Depends(require_admin)):
+async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(require_admin)):
     res = await db.employees.update_one({"id": eid}, {"$set": body.model_dump()})
     if not res.matched_count:
         raise HTTPException(404, "Not found")
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
+    await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return e
 
 
 @api.delete("/employees/{eid}")
-async def delete_employee(eid: str, _: dict = Depends(require_admin)):
+async def delete_employee(eid: str, user: dict = Depends(require_admin)):
     await db.employees.delete_one({"id": eid})
+    await audit("delete", f"employees/{eid}", user)
     return {"ok": True}
 
 
@@ -306,7 +317,7 @@ async def preview_payroll(_: dict = Depends(require_admin)):
 
 
 @api.post("/payroll/run")
-async def run_payroll(body: PayrollRunIn, _: dict = Depends(require_admin)):
+async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
     emps = await db.employees.find({"status": "active"}, {"_id": 0}).to_list(2000)
     slips = [calc_payslip(e) for e in emps]
     rid = str(uuid.uuid4())
@@ -330,6 +341,7 @@ async def run_payroll(body: PayrollRunIn, _: dict = Depends(require_admin)):
     }
     await db.payroll_runs.insert_one(doc)
     doc.pop("_id", None)
+    await audit("payroll_run", f"payroll_runs/{rid}", user, {"period": period, "net": doc["totals"]["net"]})
     return doc
 
 
@@ -356,6 +368,20 @@ async def my_payslip(user: dict = Depends(get_current_user)):
     if not e:
         return {"slip": None}
     return {"slip": calc_payslip(e)}
+
+
+@api.get("/payroll/my-payslips")
+async def my_payslips(user: dict = Depends(get_current_user)):
+    eid = user.get("employee_id")
+    if not eid:
+        return []
+    runs = await db.payroll_runs.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    out = []
+    for r in runs:
+        slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
+        if slip:
+            out.append({"run_id": r["id"], "period": r["period"], "slip": slip})
+    return out
 
 
 # ---------- Compliance ----------
@@ -425,10 +451,11 @@ async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
 
 
 @api.put("/leave/{lid}/decision")
-async def decide_leave(lid: str, body: LeaveDecision, _: dict = Depends(require_admin)):
+async def decide_leave(lid: str, body: LeaveDecision, user: dict = Depends(require_admin)):
     res = await db.leave_requests.update_one({"id": lid}, {"$set": {"status": body.status}})
     if not res.matched_count:
         raise HTTPException(404, "Not found")
+    await audit(f"leave_{body.status}", f"leave_requests/{lid}", user)
     return {"ok": True, "status": body.status}
 
 
@@ -540,6 +567,113 @@ async def assistant_history(sid: str, _: dict = Depends(get_current_user)):
     return rows
 
 
+# ---------- Audit Trail ----------
+async def audit(action: str, resource: str, user: dict, meta: Optional[dict] = None):
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": action,
+        "resource": resource,
+        "user_id": user.get("id"),
+        "user_email": user.get("email"),
+        "user_role": user.get("role"),
+        "meta": meta or {},
+        "ts": iso(now_utc()),
+    })
+
+
+@api.get("/audit")
+async def list_audit(_: dict = Depends(require_admin)):
+    rows = await db.audit_logs.find({}, {"_id": 0}).sort("ts", -1).to_list(500)
+    return rows
+
+
+# ---------- PDF Payslip ----------
+def _build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd.") -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    h = ParagraphStyle("h", parent=styles["Heading1"], fontSize=20, textColor=colors.HexColor("#133326"), spaceAfter=4)
+    sub = ParagraphStyle("s", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#525860"))
+    label = ParagraphStyle("l", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#525860"))
+    story = [
+        Paragraph("SaloneHCM", h),
+        Paragraph(f"{company} &nbsp;·&nbsp; Sierra Leone &nbsp;·&nbsp; Period {period}", sub),
+        Spacer(1, 16),
+        Paragraph(f"<b>Payslip — {slip['employee_name']}</b>", styles["Heading3"]),
+        Spacer(1, 8),
+    ]
+    rows = [
+        ["Description", "Amount (SLE)"],
+        ["Basic salary", f"{slip['basic']:,.2f}"],
+        ["Allowances", f"{slip['allowances']:,.2f}"],
+        ["Gross", f"{slip['gross']:,.2f}"],
+        ["NASSIT (employee 5%)", f"-{slip['nassit_employee']:,.2f}"],
+        ["PAYE (NRA)", f"-{slip['paye']:,.2f}"],
+        ["Net pay", f"{slip['net']:,.2f}"],
+    ]
+    t = Table(rows, colWidths=[300, 200])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#133326")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.HexColor("#F7F6F2"), colors.white]),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E6F4EC")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2DFD6")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 18))
+    story.append(Paragraph(
+        "<i>Calculated per Sierra Leone NRA PAYE bands and NASSIT (5% employee, 10% employer) on basic salary.</i>",
+        label,
+    ))
+    doc.build(story)
+    return buf.getvalue()
+
+
+@api.get("/payroll/runs/{rid}/payslip/{eid}.pdf")
+async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "admin" and user.get("employee_id") != eid:
+        raise HTTPException(403, "Forbidden")
+    r = await db.payroll_runs.find_one({"id": rid}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "Run not found")
+    slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
+    if not slip:
+        raise HTTPException(404, "Payslip not found")
+    pdf = _build_payslip_pdf(slip, r["period"])
+    fname = f"payslip-{slip['employee_name'].replace(' ', '_')}-{r['period']}.pdf"
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@api.get("/payroll/runs/{rid}/bank-file")
+async def bank_file(rid: str, user: dict = Depends(require_admin)):
+    """NRC clearing CSV — Bank Name, Account No, Beneficiary, Amount (SLE)."""
+    r = await db.payroll_runs.find_one({"id": rid}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "Run not found")
+    emps = await db.employees.find({}, {"_id": 0}).to_list(2000)
+    emp_map = {e["id"]: e for e in emps}
+    lines = ["bank_name,account_no,beneficiary,amount_sle,reference"]
+    for s in r["slips"]:
+        e = emp_map.get(s["employee_id"], {})
+        bank = e.get("bank_name", "Sierra Leone Commercial Bank")
+        acct = e.get("bank_account", "0000000000")
+        ref = f"PAYROLL-{r['period']}"
+        lines.append(f'{bank},{acct},"{s["employee_name"]}",{s["net"]:.2f},{ref}')
+    await audit("export_bank_file", f"payroll_runs/{rid}", user, {"period": r["period"], "rows": len(r["slips"])})
+    csv = "\n".join(lines)
+    return StreamingResponse(io.BytesIO(csv.encode()), media_type="text/csv",
+                             headers={"Content-Disposition": f'attachment; filename="bank-file-{r["period"]}.csv"'})
+
+
 # ---------- Health ----------
 @api.get("/")
 async def root():
@@ -602,6 +736,8 @@ async def seed():
                 "allowances_sle": allow,
                 "nassit_no": f"NS{eid[:8].upper()}",
                 "tin": f"TIN{eid[:6].upper()}",
+                "bank_name": "Sierra Leone Commercial Bank",
+                "bank_account": f"00{eid[:10].replace('-', '')[:10]}",
                 "hire_date": "2024-01-15",
                 "status": "active",
                 "created_at": iso(now_utc()),
@@ -617,6 +753,17 @@ async def seed():
                 "created_at": iso(now_utc()),
             })
         logger.info("Seeded employees and employee accounts")
+
+    # Backfill bank fields for existing employees missing them
+    async for e in db.employees.find({"bank_account": {"$in": [None, ""]}}):
+        eid = e["id"]
+        await db.employees.update_one(
+            {"id": eid},
+            {"$set": {
+                "bank_name": e.get("bank_name") or "Sierra Leone Commercial Bank",
+                "bank_account": f"00{eid.replace('-', '')[:10]}",
+            }},
+        )
 
 
 @app.on_event("startup")

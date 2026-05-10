@@ -1,16 +1,29 @@
 import { useEffect, useState } from "react";
-import api, { fmtSLE } from "../lib/api";
+import api, { fmtSLE, API } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { Download, FileText } from "lucide-react";
 
 export default function SelfService() {
   const { user } = useAuth();
   const [slip, setSlip] = useState(null);
+  const [history, setHistory] = useState([]);
   const [leaves, setLeaves] = useState([]);
 
   useEffect(() => {
     api.get("/payroll/my-payslip").then((r) => setSlip(r.data.slip));
+    api.get("/payroll/my-payslips").then((r) => setHistory(r.data));
     api.get("/leave").then((r) => setLeaves(r.data));
   }, []);
+
+  const downloadPdf = async (rid, eid, name, period) => {
+    const token = localStorage.getItem("salonehcm_token");
+    const res = await fetch(`${API}/payroll/runs/${rid}/payslip/${eid}.pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `payslip-${name.replace(/\s/g, "_")}-${period}.pdf`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6" data-testid="self-service-page">
@@ -21,7 +34,7 @@ export default function SelfService() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
-          <h3 className="font-heading text-lg font-semibold">My latest payslip</h3>
+          <h3 className="font-heading text-lg font-semibold">Estimated payslip (current period)</h3>
           {slip ? (
             <div className="mt-4 space-y-2 text-sm font-data">
               <div className="flex justify-between"><span className="text-[#525860]">Basic</span><span>{fmtSLE(slip.basic)}</span></div>
@@ -51,6 +64,43 @@ export default function SelfService() {
             <div className="text-sm text-[#686D76] mt-3">No requests yet.</div>
           )}
         </div>
+      </div>
+
+      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="my-payslips">
+        <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between">
+          <div>
+            <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><FileText className="w-4 h-4" /> Payslip history</h3>
+            <p className="text-xs text-[#686D76] mt-0.5">Download official PDF payslips from completed payroll runs.</p>
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-[#F7F6F2]">
+            <tr>{["Period", "Gross", "NASSIT", "PAYE", "Net", ""].map((h) => (
+              <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {history.map((h) => (
+              <tr key={h.run_id} className="border-t border-[#E2DFD6]">
+                <td className="py-3 px-4 font-medium">{h.period}</td>
+                <td className="py-3 px-4 font-data">{fmtSLE(h.slip.gross)}</td>
+                <td className="py-3 px-4 font-data text-[#B83A3A]">− {fmtSLE(h.slip.nassit_employee)}</td>
+                <td className="py-3 px-4 font-data text-[#B83A3A]">− {fmtSLE(h.slip.paye)}</td>
+                <td className="py-3 px-4 font-data font-semibold">{fmtSLE(h.slip.net)}</td>
+                <td className="py-3 px-4 text-right">
+                  <button
+                    data-testid={`download-payslip-${h.run_id}`}
+                    onClick={() => downloadPdf(h.run_id, h.slip.employee_id, h.slip.employee_name, h.period)}
+                    className="inline-flex items-center gap-1.5 text-xs bg-[#133326] hover:bg-[#0F281E] text-white px-3 py-1.5 rounded"
+                  >
+                    <Download className="w-3.5 h-3.5" /> PDF
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!history.length && <tr><td colSpan={6} className="py-10 text-center text-sm text-[#686D76]">No completed payroll runs yet.</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   );

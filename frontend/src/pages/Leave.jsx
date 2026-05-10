@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Check, X, Plus } from "lucide-react";
+import { DatePicker } from "../components/ui/date-picker";
 
 export default function Leave() {
   const { user } = useAuth();
@@ -91,11 +92,11 @@ export default function Leave() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Start</label>
-                  <input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+                  <DatePicker data-testid="leave-start-date" value={form.start_date} onChange={(v) => setForm({ ...form, start_date: v })} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">End</label>
-                  <input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+                  <DatePicker data-testid="leave-end-date" value={form.end_date} onChange={(v) => setForm({ ...form, end_date: v })} />
                 </div>
               </div>
               <div>

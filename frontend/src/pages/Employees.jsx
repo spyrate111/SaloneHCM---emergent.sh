@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { Plus, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { DatePicker } from "../components/ui/date-picker";
 
 const empty = {
   first_name: "", last_name: "", email: "", phone: "",
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
-  nassit_no: "", tin: "", hire_date: "2025-01-01", status: "active",
+  nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
+  hire_date: "2025-01-01", status: "active",
 };
 
 export default function Employees() {
@@ -129,16 +131,21 @@ export default function Employees() {
                 ["location", "Location", "text"],
                 ["nassit_no", "NASSIT No.", "text"],
                 ["tin", "TIN", "text"],
-                ["hire_date", "Hire date", "date"],
+                ["bank_name", "Bank name", "text"],
+                ["bank_account", "Bank account", "text"],
                 ["basic_salary_sle", "Basic salary (SLE)", "number"],
                 ["allowances_sle", "Allowances (SLE)", "number"],
               ].map(([k, label, type]) => (
                 <div key={k}>
                   <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">{label}</label>
-                  <input data-testid={`emp-${k}`} required={["first_name", "last_name", "email", "job_title", "department", "basic_salary_sle", "hire_date"].includes(k)} type={type} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                  <input data-testid={`emp-${k}`} required={["first_name", "last_name", "email", "job_title", "department", "basic_salary_sle"].includes(k)} type={type} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })}
                     className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]" />
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Hire date</label>
+                <DatePicker data-testid="emp-hire_date" value={form.hire_date} onChange={(v) => setForm({ ...form, hire_date: v })} />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Employment type</label>
                 <select value={form.employment_type} onChange={(e) => setForm({ ...form, employment_type: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Clock, Plus } from "lucide-react";
+import { DatePicker } from "../components/ui/date-picker";
 
 export default function Attendance() {
   const { user } = useAuth();
@@ -42,7 +43,7 @@ export default function Attendance() {
           )}
           <div>
             <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Date</label>
-            <input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+            <DatePicker data-testid="attendance-date" value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
