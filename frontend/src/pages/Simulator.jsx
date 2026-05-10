@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
-import { Plus, Trash2, Play, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { Plus, Trash2, Play, TrendingUp, TrendingDown, Sparkles, Save, Share2, Copy, Check, X, FolderOpen, Trash } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
@@ -12,8 +13,15 @@ export default function Simulator() {
   const [rules, setRules] = useState([{ ...blankRule, name: "Across-the-board 5% raise", basic_pct_change: 5 }]);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveForm, setSaveForm] = useState({ title: "", description: "" });
+  const [shareUrl, setShareUrl] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [params, setParams] = useSearchParams();
 
-  useEffect(() => { api.get("/employees").then((r) => setEmployees(r.data)); }, []);
+  const loadSaved = useCallback(() => api.get("/payroll/scenarios").then((r) => setSaved(r.data)), []);
+  useEffect(() => { api.get("/employees").then((r) => setEmployees(r.data)); loadSaved(); }, [loadSaved]);
   const departments = Array.from(new Set(employees.map((e) => e.department))).sort();
 
   const addRule = () => setRules([...rules, { ...blankRule, name: `Rule ${rules.length + 1}` }]);
@@ -37,6 +45,46 @@ export default function Simulator() {
     } finally { setBusy(false); }
   };
 
+  // Load shared scenario from ?id=
+  useEffect(() => {
+    const id = params.get("id");
+    if (!id) return;
+    api.get(`/payroll/scenarios/${id}`).then(({ data }) => {
+      setRules(data.scenario.rules.map((r, i) => ({ ...blankRule, ...r, name: r.name || `Rule ${i + 1}` })));
+      setResult(data.simulation);
+    }).catch(() => alert("Scenario not found"));
+  }, [params]);
+
+  const saveScenario = async (e) => {
+    e.preventDefault();
+    if (!saveForm.title.trim()) return;
+    const payload = rules.map((r) => ({
+      ...r,
+      basic_pct_change: Number(r.basic_pct_change) || 0,
+      basic_flat_add: Number(r.basic_flat_add) || 0,
+      allowances_pct_change: Number(r.allowances_pct_change) || 0,
+      allowances_flat_add: Number(r.allowances_flat_add) || 0,
+    }));
+    try {
+      const { data } = await api.post("/payroll/scenarios", { ...saveForm, rules: payload });
+      const url = `${window.location.origin}/simulator?id=${data.id}`;
+      setShareUrl(url);
+      setSaveOpen(false);
+      setSaveForm({ title: "", description: "" });
+      loadSaved();
+    } catch (err) {
+      alert(err?.response?.data?.detail || "Save failed");
+    }
+  };
+
+  const loadScenario = (id) => { setParams({ id }); };
+  const deleteScenario = async (id) => {
+    if (!window.confirm("Delete this scenario?")) return;
+    await api.delete(`/payroll/scenarios/${id}`);
+    loadSaved();
+  };
+  const copyShare = async () => { await navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+
   const positive = (n) => (n ?? 0) >= 0;
 
   return (
@@ -50,10 +98,24 @@ export default function Simulator() {
       </div>
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h3 className="font-heading text-lg font-semibold">Scenario rules</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {saved.length > 0 && (
+              <select
+                data-testid="load-scenario"
+                onChange={(e) => e.target.value && loadScenario(e.target.value)}
+                value=""
+                className="text-sm border border-[#E2DFD6] bg-white rounded-md px-3 py-2 cursor-pointer"
+              >
+                <option value="">Load saved…</option>
+                {saved.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+              </select>
+            )}
             <button data-testid="add-rule" onClick={addRule} className="inline-flex items-center gap-1.5 text-sm border border-[#E2DFD6] hover:bg-[#F7F6F2] px-3 py-2 rounded-md"><Plus className="w-3.5 h-3.5" /> Add rule</button>
+            {result && (
+              <button data-testid="save-scenario" onClick={() => setSaveOpen(true)} className="inline-flex items-center gap-1.5 text-sm border border-[#133326] text-[#133326] hover:bg-[#133326] hover:text-white px-3 py-2 rounded-md transition"><Save className="w-3.5 h-3.5" /> Save scenario</button>
+            )}
             <button data-testid="run-simulation" onClick={run} disabled={busy || !rules.length} className="inline-flex items-center gap-1.5 text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2 rounded-md disabled:opacity-60"><Play className="w-3.5 h-3.5" /> {busy ? "Running…" : "Run simulation"}</button>
           </div>
         </div>
@@ -174,6 +236,89 @@ export default function Simulator() {
             </table>
           </div>
         </>
+      )}
+
+      {/* Saved scenarios manager */}
+      {saved.length > 0 && (
+        <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="saved-scenarios">
+          <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between">
+            <div>
+              <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Saved scenarios</h3>
+              <p className="text-xs text-[#686D76] mt-0.5">Click to load & run with current employee data.</p>
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-[#F7F6F2]">
+              <tr>{["Title", "Description", "Rules", "Created by", "Created", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {saved.map((s) => (
+                <tr key={s.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]">
+                  <td className="py-3 px-4 font-medium cursor-pointer" onClick={() => loadScenario(s.id)}>{s.title}</td>
+                  <td className="py-3 px-4 text-[#686D76] text-xs max-w-md truncate">{s.description || "—"}</td>
+                  <td className="py-3 px-4 font-data text-[#525860]">{s.rules.length}</td>
+                  <td className="py-3 px-4 text-xs text-[#686D76]">{s.created_by}</td>
+                  <td className="py-3 px-4 font-data text-xs text-[#686D76]">{new Date(s.created_at).toLocaleDateString()}</td>
+                  <td className="py-3 px-4 text-right">
+                    <div className="inline-flex gap-1">
+                      <button title="Share" onClick={() => { const url = `${window.location.origin}/simulator?id=${s.id}`; setShareUrl(url); }} className="p-1.5 rounded text-[#26547C] hover:bg-[#E5EEF6]"><Share2 className="w-3.5 h-3.5" /></button>
+                      <button title="Load" onClick={() => loadScenario(s.id)} className="p-1.5 rounded text-[#2D7A5D] hover:bg-[#E6F4EC]"><FolderOpen className="w-3.5 h-3.5" /></button>
+                      <button title="Delete" onClick={() => deleteScenario(s.id)} className="p-1.5 rounded text-[#B83A3A] hover:bg-[#FBEAEA]"><Trash className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Save modal */}
+      {saveOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => setSaveOpen(false)}>
+          <form onClick={(e) => e.stopPropagation()} onSubmit={saveScenario} className="bg-white rounded-lg w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-heading text-xl font-semibold flex items-center gap-2"><Save className="w-5 h-5 text-[#133326]" /> Save scenario</h2>
+              <button type="button" onClick={() => setSaveOpen(false)} className="p-1 text-[#686D76]"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Title</label>
+                <input data-testid="save-title" required value={saveForm.title} onChange={(e) => setSaveForm({ ...saveForm, title: e.target.value })} placeholder="e.g. 2026 Q2 Engineering raises" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Notes (optional)</label>
+                <textarea rows={3} value={saveForm.description} onChange={(e) => setSaveForm({ ...saveForm, description: e.target.value })} placeholder="Why this scenario, who requested it, etc." className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div className="text-xs text-[#686D76] bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-3">
+                <strong>{rules.length} rule{rules.length !== 1 ? "s" : ""}</strong> will be saved. The simulation re-runs against current employee data each time the scenario is loaded.
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setSaveOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
+              <button data-testid="save-submit" type="submit" className="px-4 py-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white rounded-md">Save & share</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Share modal */}
+      {shareUrl && (
+        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => setShareUrl("")}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full max-w-md p-6" data-testid="share-modal">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-heading text-xl font-semibold flex items-center gap-2"><Share2 className="w-5 h-5 text-[#26547C]" /> Shareable link</h2>
+              <button onClick={() => setShareUrl("")} className="p-1 text-[#686D76]"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-sm text-[#525860] mb-4">Send this URL to anyone with admin access — they'll see the same scenario re-run against the latest employee data.</p>
+            <div className="flex gap-2">
+              <input readOnly value={shareUrl} onClick={(e) => e.target.select()} className="flex-1 bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-mono text-xs" />
+              <button data-testid="copy-share" onClick={copyShare} className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md ${copied ? "bg-[#2D7A5D] text-white" : "bg-[#26547C] hover:bg-[#1D4363] text-white"}`}>
+                {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

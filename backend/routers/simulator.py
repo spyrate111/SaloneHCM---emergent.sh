@@ -1,9 +1,10 @@
-"""What-if payroll simulator — apply scenario rules and compare current vs projected."""
+"""What-if payroll simulator + saved scenarios."""
+import uuid
 from typing import List, Literal, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core import db, require_admin
+from core import db, get_current_user, require_admin, audit, now_utc, iso
 from payroll_engine import calc_payslip
 
 router = APIRouter(prefix="/payroll", tags=["payroll-sim"])
@@ -112,3 +113,52 @@ async def _do_simulate(body: SimIn) -> dict:
         "employees": rows,
         "by_department": sorted(by_dept.values(), key=lambda x: -x["delta"]),
     }
+
+
+# ---------- Saved scenarios ----------
+class ScenarioIn(BaseModel):
+    title: str = Field(..., min_length=1, max_length=160)
+    description: Optional[str] = ""
+    rules: List[SimRule] = Field(..., min_length=1, max_length=20)
+
+
+@router.post("/scenarios")
+async def save_scenario(body: ScenarioIn, user: dict = Depends(require_admin)):
+    sid = str(uuid.uuid4())
+    doc = {
+        "id": sid,
+        "title": body.title,
+        "description": body.description,
+        "rules": [r.model_dump() for r in body.rules],
+        "created_by": user["email"],
+        "created_at": iso(now_utc()),
+    }
+    await db.payroll_scenarios.insert_one(doc)
+    doc.pop("_id", None)
+    await audit("scenario_save", f"payroll_scenarios/{sid}", user, {"title": body.title})
+    return doc
+
+
+@router.get("/scenarios")
+async def list_scenarios(_: dict = Depends(require_admin)):
+    return await db.payroll_scenarios.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@router.get("/scenarios/{sid}")
+async def get_scenario(sid: str, _: dict = Depends(require_admin)):
+    s = await db.payroll_scenarios.find_one({"id": sid}, {"_id": 0})
+    if not s:
+        raise HTTPException(404, "Not found")
+    # Run simulation fresh with current employee data
+    rules = [SimRule(**r) for r in s["rules"]]
+    sim = await _do_simulate(SimIn(rules=rules))
+    return {"scenario": s, "simulation": sim}
+
+
+@router.delete("/scenarios/{sid}")
+async def delete_scenario(sid: str, user: dict = Depends(require_admin)):
+    res = await db.payroll_scenarios.delete_one({"id": sid})
+    if not res.deleted_count:
+        raise HTTPException(404, "Not found")
+    await audit("scenario_delete", f"payroll_scenarios/{sid}", user)
+    return {"ok": True}
