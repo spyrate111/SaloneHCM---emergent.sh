@@ -27,6 +27,8 @@ class EmployeeIn(BaseModel):
     bank_account: Optional[str] = ""
     hire_date: str
     status: Literal["active", "on_leave", "terminated"] = "active"
+    manager_id: Optional[str] = None
+    is_manager: bool = False
 
 
 # ---------- Leave ----------

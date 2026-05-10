@@ -20,6 +20,7 @@ const NAV = [
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "employee"] },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin"] },
   { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin"] },
+  { to: "/team", label: "My Team", icon: UserCircle, roles: ["admin", "employee"] },
   { to: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
 ];
 

@@ -5,16 +5,16 @@ import uuid
 from core import db, hash_password, verify_password, now_utc, iso, logger
 
 SEED_EMPLOYEES = [
-    ("Aminata", "Kamara", "Senior HR Manager", "Human Resources", 8500, 1200),
-    ("Mohamed", "Sesay", "Software Engineer", "Engineering", 6200, 800),
-    ("Fatmata", "Bangura", "Accountant", "Finance", 4800, 600),
-    ("Ibrahim", "Conteh", "Operations Lead", "Operations", 5500, 700),
-    ("Hawa", "Turay", "Marketing Specialist", "Marketing", 3800, 500),
-    ("Abdul", "Jalloh", "Sales Executive", "Sales", 3200, 1000),
-    ("Isatu", "Mansaray", "Customer Support", "Support", 2400, 300),
-    ("Sahr", "Koroma", "DevOps Engineer", "Engineering", 7200, 900),
-    ("Mariama", "Fofanah", "Junior Accountant", "Finance", 2800, 400),
-    ("Alhaji", "Bah", "Office Administrator", "Operations", 2100, 250),
+    ("Aminata", "Kamara", "Senior HR Manager", "Human Resources", 8500, 1200, True),
+    ("Mohamed", "Sesay", "Software Engineer", "Engineering", 6200, 800, False),
+    ("Fatmata", "Bangura", "Accountant", "Finance", 4800, 600, False),
+    ("Ibrahim", "Conteh", "Operations Lead", "Operations", 5500, 700, True),
+    ("Hawa", "Turay", "Marketing Specialist", "Marketing", 3800, 500, False),
+    ("Abdul", "Jalloh", "Sales Executive", "Sales", 3200, 1000, False),
+    ("Isatu", "Mansaray", "Customer Support", "Support", 2400, 300, False),
+    ("Sahr", "Koroma", "DevOps Engineer", "Engineering", 7200, 900, True),
+    ("Mariama", "Fofanah", "Junior Accountant", "Finance", 2800, 400, False),
+    ("Alhaji", "Bah", "Office Administrator", "Operations", 2100, 250, False),
 ]
 
 
@@ -42,7 +42,7 @@ async def seed():
         )
 
     if await db.employees.count_documents({}) == 0:
-        for fn, ln, title, dept, basic, allow in SEED_EMPLOYEES:
+        for fn, ln, title, dept, basic, allow, is_mgr in SEED_EMPLOYEES:
             eid = str(uuid.uuid4())
             email = f"{fn.lower()}.{ln.lower()}@salonehcm.sl"
             await db.employees.insert_one({
@@ -63,6 +63,8 @@ async def seed():
                 "bank_account": f"00{eid[:10].replace('-', '')[:10]}",
                 "hire_date": "2024-01-15",
                 "status": "active",
+                "is_manager": is_mgr,
+                "manager_id": None,
                 "created_at": iso(now_utc()),
             })
             await db.users.insert_one({
@@ -74,7 +76,16 @@ async def seed():
                 "password_hash": hash_password("Employee@2026"),
                 "created_at": iso(now_utc()),
             })
-        logger.info("Seeded employees and employee accounts")
+        # Wire reporting lines: department leads get their dept peers as direct reports
+        all_emps = await db.employees.find({}, {"_id": 0}).to_list(500)
+        managers = {e["department"]: e["id"] for e in all_emps if e.get("is_manager")}
+        for e in all_emps:
+            if e.get("is_manager"):
+                continue
+            mgr_id = managers.get(e["department"])
+            if mgr_id:
+                await db.employees.update_one({"id": e["id"]}, {"$set": {"manager_id": mgr_id}})
+        logger.info("Seeded employees, accounts, and reporting lines")
 
     # Backfill bank fields for any employee missing them
     async for e in db.employees.find({"bank_account": {"$in": [None, ""]}}):
@@ -86,6 +97,24 @@ async def seed():
                 "bank_account": f"00{eid.replace('-', '')[:10]}",
             }},
         )
+
+    # Backfill is_manager + manager_id for existing employees (when migrating from earlier seed)
+    if await db.employees.count_documents({"is_manager": {"$exists": True}}) == 0:
+        all_emps = await db.employees.find({}, {"_id": 0}).to_list(500)
+        # Mark department leads (highest basic salary per department) as managers
+        by_dept = {}
+        for e in all_emps:
+            d = e["department"]
+            if d not in by_dept or e.get("basic_salary_sle", 0) > by_dept[d].get("basic_salary_sle", 0):
+                by_dept[d] = e
+        for e in all_emps:
+            is_mgr = by_dept.get(e["department"], {}).get("id") == e["id"]
+            mgr_id = None if is_mgr else by_dept.get(e["department"], {}).get("id")
+            await db.employees.update_one(
+                {"id": e["id"]},
+                {"$set": {"is_manager": is_mgr, "manager_id": mgr_id}},
+            )
+        logger.info("Backfilled manager hierarchy across %d employees", len(all_emps))
 
     # Seed benefit plans
     if await db.benefit_plans.count_documents({}) == 0:
