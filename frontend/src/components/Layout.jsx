@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
-  Heart, GraduationCap, BarChart3, FlaskConical,
+  Heart, GraduationCap, BarChart3, FlaskConical, FolderArchive,
 } from "lucide-react";
 
 const NAV = [
@@ -16,6 +16,7 @@ const NAV = [
   { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "employee"] },
   { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "employee"] },
   { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "employee"] },
+  { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "employee"] },
   { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin"] },
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "employee"] },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin"] },

@@ -10,9 +10,11 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from core import client, limiter
 from seed import seed
+from storage import init_storage
 from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
+    documents,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +24,10 @@ logger = logging.getLogger("salonehcm")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await seed()
+    try:
+        init_storage()
+    except Exception as e:
+        logger.warning("Object storage init failed (uploads will fail until env is set): %s", e)
     yield
     client.close()
 
@@ -46,6 +52,7 @@ api.include_router(talent.router)
 api.include_router(analytics.router)
 api.include_router(simulator.router)
 api.include_router(team.router)
+api.include_router(documents.router)
 
 
 @api.get("/")

@@ -19,6 +19,7 @@ import Talent from "./pages/Talent";
 import Analytics from "./pages/Analytics";
 import Simulator from "./pages/Simulator";
 import Team from "./pages/Team";
+import Documents from "./pages/Documents";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/audit" element={<ProtectedRoute adminOnly><AuditLog /></ProtectedRoute>} />
             <Route path="/team" element={<Team />} />
             <Route path="/team/:eid" element={<ProtectedRoute adminOnly><Team /></ProtectedRoute>} />
+            <Route path="/documents" element={<Documents />} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
