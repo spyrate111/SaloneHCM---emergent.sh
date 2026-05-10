@@ -145,16 +145,17 @@ def test_execute_plan_employee_forbidden(employee_token):
     assert r.status_code == 403
 
 
-def test_execute_plan_empty_steps_400(admin_token):
+def test_execute_plan_empty_steps_422(admin_token):
+    """Iter5: empty steps list now rejected upfront by Pydantic min_length=1."""
     r = requests.post(f"{API}/assistant/action/execute", headers=H(admin_token),
                       json={"plan": {"title": "empty", "steps": []}}, timeout=30)
-    assert r.status_code == 400
-    assert "no steps" in r.text.lower()
+    assert r.status_code == 422
 
 
-def test_execute_plan_unknown_step_skipped(admin_token):
+def test_execute_plan_unknown_step_422(admin_token):
+    """Iter5: discriminated union rejects unknown step types upfront with 422."""
     plan = {
-        "title": "TEST_iter4 unknown step",
+        "title": "TEST_iter5 unknown step",
         "steps": [
             {"type": "unknown_xyz", "foo": "bar"},
             {"type": "fake_action"},
@@ -162,21 +163,16 @@ def test_execute_plan_unknown_step_skipped(admin_token):
     }
     r = requests.post(f"{API}/assistant/action/execute", headers=H(admin_token),
                       json={"plan": plan}, timeout=30)
-    assert r.status_code == 200, r.text
-    data = r.json()
-    assert data["executed"] == 0
-    for res in data["results"]:
-        assert res["status"] == "skipped", res
-        assert "Unknown step type" in res["detail"]
+    assert r.status_code == 422
 
 
 def test_execute_plan_step_error_isolated(admin_token):
-    """A failing step should not abort the rest — per-step try/except."""
+    """A failing runtime step (e.g., leave not found) should not abort the rest."""
     plan = {
-        "title": "TEST_iter4 mixed",
+        "title": "TEST_iter5 mixed",
         "steps": [
-            {"type": "leave_decision", "leave_id": "non-existent-id", "decision": "approved"},
-            {"type": "unknown_xyz"},
+            {"type": "leave_decision", "leave_id": "non-existent-id-xyz", "decision": "approved"},
+            {"type": "leave_decision", "leave_id": "another-fake-id", "decision": "rejected"},
         ],
     }
     r = requests.post(f"{API}/assistant/action/execute", headers=H(admin_token),
@@ -185,7 +181,7 @@ def test_execute_plan_step_error_isolated(admin_token):
     data = r.json()
     assert data["executed"] == 0
     assert data["results"][0]["status"] == "error"
-    assert data["results"][1]["status"] == "skipped"
+    assert data["results"][1]["status"] == "error"
 
 
 # ---------- Bank file CSV writer escaping ----------

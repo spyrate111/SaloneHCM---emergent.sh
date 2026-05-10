@@ -1,0 +1,38 @@
+{
+  "summary": "SaloneHCM iteration 5 (Polish trio: shared run_payroll helper + max-50-step cap + Pydantic discriminated PlanStep union + full server.py router refactor) — Backend 61/61 pytest tests PASSED including: 9 router-mount checks (auth/employees/payroll/leave/attendance/dashboard/audit/compliance/assistant all reachable at /api/* after refactor), 8 new discriminated-union validations (unknown step type → 422, max 51 steps → 422, exactly 50 boundary → 200, empty steps → 422, payroll_run missing year/month → 422, leave_decision missing fields → 422, attendance_log missing fields → 422, payroll_run month=13 → 422), shared run_payroll() equivalence (direct POST /api/payroll/run vs AI plan payroll_run produce identical totals and structural keys), audit prefix differentiation (payroll_run vs ai_payroll_run both present), lifespan startup seed verified via admin login, root endpoint v1.1 confirmed. iter4 test file updated: empty-steps now expects 422 (was 400), unknown_step expects 422 (was 200/skipped) per discriminated-union upfront rejection. All 13 iter2 export tests + 11 iter4 action-mode tests + 16 iter1 base tests + 21 iter5 new tests = 61 PASSED. Frontend Playwright smoke: admin login → dashboard renders all 4 KPI cards (Headcount 11, Monthly Payroll SLE 95,150, Pending Leaves 3, Last Run Net SLE 68,777.75) + payroll trend area chart + headcount-by-dept bar chart; nav to Employees/Leave/AI Assistant works; AI Assistant page shows both 'Use company data · OFF' and 'Action mode · OFF' toggles for admin with 4 suggestion chips. No console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Dashboard charts (Recharts)", "issue": "Carry-over from iter2/iter3 — width(-1)/height(-1) console warnings on first paint. Charts render correctly. Cosmetic only.", "selector": ".recharts-responsive-container", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter5_refactor.py",
+    "/app/backend/tests/test_iter4_action_mode.py",
+    "/app/test_reports/pytest/iter5_results.xml",
+    "/app/test_reports/pytest/iter5_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 47 lines — excellent reduction from 1004. Lifespan context replaces deprecated on_event. Single `await seed()` call. Clean.",
+    "models.py PlanStep discriminated union is correctly typed with Annotated + Field(discriminator='type') and ActionPlan.steps has min_length=1 + max_length=50 — verified rejecting all bad payloads at 422.",
+    "payroll_engine.run_payroll() shared helper takes audit_action param ('payroll_run' default, 'ai_payroll_run' from AI path) — both call sites produce identical doc shape (verified via /api/payroll/runs sort + key/totals comparison).",
+    "_extract_plan() now picks the LAST valid fenced JSON block (was first) — relevant when AI emits an example block + a real plan. Verified by static code review (re.findall + reversed iteration).",
+    "All routers use APIRouter with prefix; main api router applies /api prefix once. Endpoints unchanged (auth/me, employees, payroll/runs, leave, attendance, dashboard/overview, audit, compliance/summary, assistant/*).",
+    "MINOR: CORS still allow_origins=['*'] with allow_credentials=False — fine since Authorization header is used (sessionStorage Bearer token), no cookies. But if cookies are added later, must switch to explicit origins.",
+    "MINOR: routers/assistant.py _exec_step lacks a unit-level fallback after the discriminated union — in practice unreachable because Pydantic validates upfront, but a `raise ValueError` final clause is present for defense-in-depth (good)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter5_refactor.py",
+    "/app/backend/tests/test_iter4_action_mode.py"
+  ],
+  "success_rate": {"backend": "100% (61/61)", "frontend": "100% on smoke-tested flows"},
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 ; aminata.kamara@salonehcm.sl / Employee@2026",
+  "seed_data_creation": "test_iter5_refactor.py creates throwaway 50-step plan (all leave_decisions on fake IDs — runtime errors, no DB writes), one direct payroll run + one AI-driven payroll run for equivalence comparison. test_iter4_action_mode.py reuses prior fixtures (TEST_iter4 employee with comma in name+bank, pending leave, multi-step plan).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 5 (server refactor + polish trio) fully validated. server.py 47 lines, 9 routers under /app/backend/routers/. New tests live in test_iter5_refactor.py (21 tests). iter4 tests updated to expect 422 on empty/unknown steps (discriminated-union behavior). Run `export REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2)` before pytest because iter2_exports.py uses os.environ[...] strict access. Audit log records both `payroll_run` (direct) and `ai_payroll_run` (via AI plan) — useful for forensic diff. Recharts width(-1) warning is a known cosmetic carry-over from iter2; do not flag.",
+  "rca of the issue": "N/A — no new bugs found. Discriminated-union behavior change is intentional per code-review recommendation #4 from iter3."
+}
