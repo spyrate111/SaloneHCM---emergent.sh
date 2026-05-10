@@ -79,10 +79,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
+        <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] mb-1">Headcount by department</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Departments</h3>
-          <div className="h-64 w-full">
+          <div style={{ width: "100%", height: 256 }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={data.departments} layout="vertical" margin={{ left: 0 }}>
                 <CartesianGrid stroke="#EBE8E0" horizontal={false} />
