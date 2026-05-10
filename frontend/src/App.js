@@ -17,6 +17,7 @@ import AuditLog from "./pages/AuditLog";
 import Benefits from "./pages/Benefits";
 import Talent from "./pages/Talent";
 import Analytics from "./pages/Analytics";
+import Simulator from "./pages/Simulator";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/employees" element={<ProtectedRoute adminOnly><Employees /></ProtectedRoute>} />
             <Route path="/employees/:id" element={<ProtectedRoute adminOnly><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/payroll" element={<ProtectedRoute adminOnly><Payroll /></ProtectedRoute>} />
+            <Route path="/simulator" element={<ProtectedRoute adminOnly><Simulator /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute adminOnly><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />
             <Route path="/attendance" element={<Attendance />} />

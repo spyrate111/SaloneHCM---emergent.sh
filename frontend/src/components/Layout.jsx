@@ -3,13 +3,14 @@ import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
-  Heart, GraduationCap, BarChart3,
+  Heart, GraduationCap, BarChart3, FlaskConical,
 } from "lucide-react";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "employee"] },
   { to: "/employees", label: "Employees", icon: Users, roles: ["admin"] },
   { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin"] },
+  { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: ["admin"] },
   { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin"] },
   { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "employee"] },
   { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "employee"] },

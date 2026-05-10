@@ -12,7 +12,7 @@ from core import client, limiter
 from seed import seed
 from routers import (
     auth, employees, payroll, compliance, leave, attendance,
-    dashboard, audit, assistant, benefits, talent, analytics,
+    dashboard, audit, assistant, benefits, talent, analytics, simulator,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +44,7 @@ api.include_router(assistant.router)
 api.include_router(benefits.router)
 api.include_router(talent.router)
 api.include_router(analytics.router)
+api.include_router(simulator.router)
 
 
 @api.get("/")
