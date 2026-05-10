@@ -545,8 +545,8 @@ async def build_company_context() -> str:
             lines.append(f"  · {s['employee_name']}: gross {s['gross']:.2f}, paye {s['paye']:.2f}, net {s['net']:.2f}")
 
     lines.append("\n--- LEAVE REQUESTS (recent) ---")
-    for l in leaves[:30]:
-        lines.append(f"- {l['employee_name']} | {l['leave_type']} | {l['start_date']}→{l['end_date']} ({l['days']}d) | {l['status']}")
+    for lv in leaves[:30]:
+        lines.append(f"- {lv['employee_name']} | {lv['leave_type']} | {lv['start_date']}→{lv['end_date']} ({lv['days']}d) | {lv['status']}")
 
     lines.append("\n--- ATTENDANCE (recent) ---")
     for a in attendance[:30]:
@@ -600,8 +600,6 @@ async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_curr
         system_message=sys_msg,
     ).with_model("anthropic", "claude-sonnet-4-5-20250929")
 
-    # Load prior history
-    history = await db.assistant_messages.find({"session_id": sid}, {"_id": 0}).sort("ts", 1).to_list(50)
     # Save user msg
     await db.assistant_messages.insert_one({
         "id": str(uuid.uuid4()),
@@ -612,6 +610,7 @@ async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_curr
         "ts": iso(now_utc()),
     })
 
+    reply = None
     try:
         reply = await chat.send_message(UserMessage(text=body.message))
     except Exception as e:

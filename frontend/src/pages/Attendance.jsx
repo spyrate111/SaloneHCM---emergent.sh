@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Clock, Plus } from "lucide-react";
@@ -10,11 +10,11 @@ export default function Attendance() {
   const [emps, setEmps] = useState([]);
   const [form, setForm] = useState({ employee_id: "", date: new Date().toISOString().split("T")[0], hours: 8, overtime_hours: 0, notes: "" });
 
-  const load = () => api.get("/attendance").then((r) => setList(r.data));
+  const load = useCallback(() => api.get("/attendance").then((r) => setList(r.data)), []);
   useEffect(() => {
     load();
     if (user?.role === "admin") api.get("/employees").then((r) => setEmps(r.data));
-  }, [user]);
+  }, [user, load]);
 
   const submit = async (e) => {
     e.preventDefault();

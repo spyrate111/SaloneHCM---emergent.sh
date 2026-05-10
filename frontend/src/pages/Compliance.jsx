@@ -56,7 +56,7 @@ export default function Compliance() {
         <h3 className="font-heading text-lg font-semibold mt-1 mb-4">Tax tables</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm font-data">
           {summary.regs.paye_bands.map(([upper, rate], i) => (
-            <div key={i} className="border border-[#E2DFD6] rounded-md p-3">
+            <div key={`band-${upper}-${rate}`} className="border border-[#E2DFD6] rounded-md p-3">
               <div className="text-[10px] uppercase tracking-wider text-[#525860]">Band {i + 1}</div>
               <div className="font-medium">Up to {fmtSLE(upper)}</div>
               <div className="text-[#26547C]">{(rate * 100).toFixed(0)}% PAYE</div>

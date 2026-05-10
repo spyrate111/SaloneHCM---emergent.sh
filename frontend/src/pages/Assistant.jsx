@@ -35,7 +35,7 @@ export default function Assistant() {
   const send = async (text) => {
     const q = (text ?? input).trim();
     if (!q || busy) return;
-    setMessages((m) => [...m, { role: "user", content: q, withCtx: useContext }]);
+    setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", content: q, withCtx: useContext }]);
     setInput(""); setBusy(true);
     try {
       const { data } = await api.post("/assistant/chat", {
@@ -44,10 +44,10 @@ export default function Assistant() {
         include_context: useContext && isAdmin,
       });
       setSid(data.session_id);
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+      setMessages((m) => [...m, { id: crypto.randomUUID(), role: "assistant", content: data.reply }]);
     } catch (e) {
       const d = e?.response?.data?.detail;
-      setMessages((m) => [...m, { role: "assistant", content: `Error: ${typeof d === "string" ? d : "AI is unavailable"}` }]);
+      setMessages((m) => [...m, { id: crypto.randomUUID(), role: "assistant", content: `Error: ${typeof d === "string" ? d : "AI is unavailable"}` }]);
     } finally { setBusy(false); }
   };
 
@@ -108,8 +108,8 @@ export default function Assistant() {
               </div>
             </div>
           )}
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[78%] rounded-lg px-4 py-3 text-sm whitespace-pre-wrap ${
                 m.role === "user" ? "bg-[#133326] text-white" : "bg-[#F7F6F2] text-[#1A1C1E] border border-[#E2DFD6]"
               }`}>

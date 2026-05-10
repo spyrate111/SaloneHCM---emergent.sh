@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import api, { fmtSLE, API, getToken } from "../lib/api";
 import { Calculator, Play, Check, FileText, Download } from "lucide-react";
-import api, { fmtSLE, API } from "../lib/api";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -13,11 +13,11 @@ export default function Payroll() {
   const [runs, setRuns] = useState([]);
   const [running, setRunning] = useState(false);
 
-  const loadRuns = () => api.get("/payroll/runs").then((r) => setRuns(r.data));
-  useEffect(() => { loadRuns(); }, []);
+  const loadRuns = useCallback(() => api.get("/payroll/runs").then((r) => setRuns(r.data)), []);
+  useEffect(() => { loadRuns(); }, [loadRuns]);
 
   const downloadPdf = async (rid, eid, name) => {
-    const token = localStorage.getItem("salonehcm_token");
+    const token = getToken();
     const res = await fetch(`${API}/payroll/runs/${rid}/payslip/${eid}.pdf`, { headers: { Authorization: `Bearer ${token}` } });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -27,7 +27,7 @@ export default function Payroll() {
   };
 
   const downloadBank = async (rid, period) => {
-    const token = localStorage.getItem("salonehcm_token");
+    const token = getToken();
     const res = await fetch(`${API}/payroll/runs/${rid}/bank-file`, { headers: { Authorization: `Bearer ${token}` } });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -74,7 +74,7 @@ export default function Payroll() {
             <div>
               <label className="block text-xs uppercase tracking-wider text-[#525860] mb-1.5">Pay period month</label>
               <select data-testid="payroll-month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-                {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
             </div>
             <div>

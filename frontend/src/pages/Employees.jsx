@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { Plus, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -19,8 +19,8 @@ export default function Employees() {
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
 
-  const load = () => api.get("/employees").then((r) => setList(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/employees").then((r) => setList(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = list.filter((e) => {
     const s = `${e.first_name} ${e.last_name} ${e.email} ${e.department} ${e.job_title}`.toLowerCase();

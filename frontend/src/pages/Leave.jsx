@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Check, X, Plus } from "lucide-react";
@@ -11,11 +11,11 @@ export default function Leave() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ employee_id: "", leave_type: "annual", start_date: "", end_date: "", reason: "" });
 
-  const load = () => api.get("/leave").then((r) => setList(r.data));
+  const load = useCallback(() => api.get("/leave").then((r) => setList(r.data)), []);
   useEffect(() => {
     load();
     if (user?.role === "admin") api.get("/employees").then((r) => setEmps(r.data));
-  }, [user]);
+  }, [user, load]);
 
   const submit = async (e) => {
     e.preventDefault();

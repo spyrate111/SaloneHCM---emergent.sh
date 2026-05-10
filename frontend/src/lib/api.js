@@ -2,11 +2,17 @@ import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
+export const TOKEN_KEY = "salonehcm_token";
+
+// Use sessionStorage instead of localStorage — token cleared on tab close, smaller XSS surface
+export const getToken = () => sessionStorage.getItem(TOKEN_KEY);
+export const setToken = (t) => sessionStorage.setItem(TOKEN_KEY, t);
+export const clearToken = () => sessionStorage.removeItem(TOKEN_KEY);
 
 const instance = axios.create({ baseURL: API, withCredentials: false });
 
 instance.interceptors.request.use((cfg) => {
-  const token = localStorage.getItem("salonehcm_token");
+  const token = getToken();
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
   return cfg;
 });

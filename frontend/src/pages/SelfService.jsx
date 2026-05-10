@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api, { fmtSLE, API } from "../lib/api";
+import api, { fmtSLE, API, getToken } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Download, FileText } from "lucide-react";
 
@@ -16,7 +16,7 @@ export default function SelfService() {
   }, []);
 
   const downloadPdf = async (rid, eid, name, period) => {
-    const token = localStorage.getItem("salonehcm_token");
+    const token = getToken();
     const res = await fetch(`${API}/payroll/runs/${rid}/payslip/${eid}.pdf`, { headers: { Authorization: `Bearer ${token}` } });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

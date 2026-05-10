@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import api from "../lib/api";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import api, { getToken, setToken, clearToken } from "../lib/api";
 
 const AuthCtx = createContext(null);
 
@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const tok = localStorage.getItem("salonehcm_token");
+    const tok = getToken();
     if (!tok) {
       setLoading(false);
       return;
@@ -16,22 +16,29 @@ export function AuthProvider({ children }) {
     api
       .get("/auth/me")
       .then((r) => setUser(r.data))
-      .catch(() => localStorage.removeItem("salonehcm_token"))
+      .catch((err) => {
+        console.warn("[Auth] session restore failed:", err?.message || err);
+        clearToken();
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
-    localStorage.setItem("salonehcm_token", data.token);
+    setToken(data.token);
     setUser({ id: data.id, email: data.email, name: data.name, role: data.role, employee_id: data.employee_id });
     return data;
-  };
+  }, []);
 
-  const logout = async () => {
-    try { await api.post("/auth/logout"); } catch {}
-    localStorage.removeItem("salonehcm_token");
+  const logout = useCallback(async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (err) {
+      console.warn("[Auth] logout request failed (proceeding to clear local session):", err?.message || err);
+    }
+    clearToken();
     setUser(null);
-  };
+  }, []);
 
   return <AuthCtx.Provider value={{ user, loading, login, logout }}>{children}</AuthCtx.Provider>;
 }
