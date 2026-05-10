@@ -114,8 +114,14 @@ class _PayrollSimulateStep(BaseModel):
     rules: List[_SimRule] = Field(..., min_length=1, max_length=20)
 
 
+class _ScenarioApplyStep(BaseModel):
+    type: Literal["scenario_apply"]
+    scenario_id: str
+
+
 PlanStep = Annotated[
-    Union[_LeaveDecisionStep, _PayrollRunStep, _AttendanceLogStep, _LeaveCreateStep, _PayrollSimulateStep],
+    Union[_LeaveDecisionStep, _PayrollRunStep, _AttendanceLogStep, _LeaveCreateStep,
+          _PayrollSimulateStep, _ScenarioApplyStep],
     Field(discriminator="type"),
 ]
 

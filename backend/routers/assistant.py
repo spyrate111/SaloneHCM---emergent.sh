@@ -22,6 +22,7 @@ async def _build_company_context() -> str:
     audits = await db.audit_logs.find({}, {"_id": 0}).sort("ts", -1).to_list(50)
     leaves = await db.leave_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     attendance = await db.attendance.find({}, {"_id": 0}).sort("date", -1).to_list(100)
+    scenarios = await db.payroll_scenarios.find({}, {"_id": 0}).sort("created_at", -1).to_list(20)
 
     lines = ["=== SALONEHCM COMPANY DATA SNAPSHOT ===", f"Total employees: {len(employees)}"]
     dept = {}
@@ -63,6 +64,13 @@ async def _build_company_context() -> str:
         meta = " · ".join(f"{k}={v}" for k, v in (au.get("meta") or {}).items())
         lines.append(f"- {au['ts'][:19]} | {au['user_email']} | {au['action']} | {au['resource']}"
                      + (f" | {meta}" if meta else ""))
+
+    lines.append("\n--- SAVED PAYROLL SCENARIOS ---")
+    for s in scenarios:
+        lines.append(f"- id={s['id']} | '{s['title']}' | status={s.get('approval_status')}"
+                     + (" | applied" if s.get("applied") else "")
+                     + (f" | approver={s['approver_email']}" if s.get("approver_email") else "")
+                     + f" | rules={len(s.get('rules', []))}")
 
     return "\n".join(lines)
 
@@ -131,7 +139,8 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
             '    {"type": "payroll_run", "year": 2026, "month": 3},\n'
             '    {"type": "attendance_log", "employee_id": "<id>", "date": "YYYY-MM-DD", "hours": 8, "overtime_hours": 0},\n'
             '    {"type": "payroll_simulate", "title": "Eng +10%",\n'
-            '      "rules": [{"name":"Eng raise","target":"department","department":"Engineering","basic_pct_change":10}]}\n'
+            '      "rules": [{"name":"Eng raise","target":"department","department":"Engineering","basic_pct_change":10}]},\n'
+            '    {"type": "scenario_apply", "scenario_id": "<saved-scenario-id>"}\n'
             "  ]\n"
             "}\n"
             "```\n"
@@ -139,6 +148,10 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
             "(set department), or 'employee' (set employee_id). Each rule supports basic_pct_change, "
             "basic_flat_add, allowances_pct_change, allowances_flat_add. The simulation does NOT change "
             "any data — it's a read-only what-if projection.\n"
+            "scenario_apply permanently applies a saved & APPROVED scenario's rules to employee salaries — "
+            "use it only when the admin wants to apply a previously-approved scenario. After scenario_apply "
+            "you can chain a payroll_run step in the same plan to actually run payroll with the new salaries "
+            "(end-to-end 'decisions to dollars').\n"
             "Use real ids from the LIVE COMPANY DATA above. Only emit steps for actions that match the user's intent. "
             "If the user just asked a question (not an action), do NOT emit a JSON block."
         )
@@ -237,6 +250,14 @@ async def _exec_step(step, user: dict, plan_title: str) -> dict:
         return {
             "detail": f"Δ employer cost SLE {delta:,.2f}/mo · annualized SLE {sim_result['annualized_delta_employer_cost']:,.2f}",
             "simulation": sim_result,
+        }
+
+    if t == "scenario_apply":
+        from routers.simulator import _do_apply_scenario
+        result = await _do_apply_scenario(step.scenario_id, user)
+        return {
+            "detail": f"Applied '{result['scenario_title']}' — {result['employees_changed']} employee(s) updated",
+            "scenario_apply": result,
         }
 
     raise ValueError(f"Unknown step type: {t}")

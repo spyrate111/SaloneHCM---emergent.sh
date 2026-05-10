@@ -175,6 +175,10 @@ async def decide_scenario(sid: str, body: ScenarioDecision, user: dict = Depends
         raise HTTPException(404, "Not found")
     if s.get("approval_status") in ("approved", "rejected"):
         raise HTTPException(409, f"Already {s['approval_status']}")
+    # Tighten: if a specific approver_email was set, only that user (or no-approver scenarios)
+    approver_email = (s.get("approver_email") or "").lower()
+    if approver_email and user["email"].lower() != approver_email:
+        raise HTTPException(403, f"Only {approver_email} can decide this scenario")
     await db.payroll_scenarios.update_one(
         {"id": sid},
         {"$set": {
@@ -189,9 +193,8 @@ async def decide_scenario(sid: str, body: ScenarioDecision, user: dict = Depends
     return {"ok": True, "status": body.decision, "approved_by": user["email"]}
 
 
-@router.post("/scenarios/{sid}/apply")
-async def apply_scenario(sid: str, user: dict = Depends(require_admin)):
-    """Apply scenario rules permanently to employee salary records. Requires approved status."""
+async def _do_apply_scenario(sid: str, user: dict) -> dict:
+    """Apply scenario rules to employee records. Reusable from API + AI executor."""
     s = await db.payroll_scenarios.find_one({"id": sid}, {"_id": 0})
     if not s:
         raise HTTPException(404, "Not found")
@@ -229,7 +232,12 @@ async def apply_scenario(sid: str, user: dict = Depends(require_admin)):
     )
     await audit("scenario_apply", f"payroll_scenarios/{sid}", user,
                 {"title": s["title"], "employees_changed": len(changed)})
-    return {"ok": True, "employees_changed": len(changed), "changes": changed}
+    return {"ok": True, "scenario_title": s["title"], "employees_changed": len(changed), "changes": changed}
+
+
+@router.post("/scenarios/{sid}/apply")
+async def apply_scenario(sid: str, user: dict = Depends(require_admin)):
+    return await _do_apply_scenario(sid, user)
 
 
 @router.delete("/scenarios/{sid}")
