@@ -113,7 +113,7 @@ function PlanCard({ plan, onConfirm, onCancel, busy, results }) {
           const result = results?.[i];
           const status = result?.status;
           return (
-            <li key={i} className={`text-sm border rounded-md px-3 py-2 ${
+            <li key={`${step.type}-${i}`} className={`text-sm border rounded-md px-3 py-2 ${
               status === "ok" ? "border-[#9CC8B1] bg-[#E6F4EC]"
               : status === "error" ? "border-[#E1A1A1] bg-[#FBEAEA]"
               : "border-[#E2DFD6] bg-[#F7F6F2]"

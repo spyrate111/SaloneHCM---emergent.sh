@@ -7,10 +7,11 @@ import {
 } from "recharts";
 
 const blankRule = { name: "", target: "all", department: "", employee_id: "", basic_pct_change: 0, basic_flat_add: 0, allowances_pct_change: 0, allowances_flat_add: 0 };
+const newRuleId = () => `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 export default function Simulator() {
   const [employees, setEmployees] = useState([]);
-  const [rules, setRules] = useState([{ ...blankRule, name: "Across-the-board 5% raise", basic_pct_change: 5 }]);
+  const [rules, setRules] = useState([{ ...blankRule, _id: newRuleId(), name: "Across-the-board 5% raise", basic_pct_change: 5 }]);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState([]);
@@ -27,20 +28,23 @@ export default function Simulator() {
   useEffect(() => { api.get("/employees").then((r) => setEmployees(r.data)); loadSaved(); }, [loadSaved]);
   const departments = Array.from(new Set(employees.map((e) => e.department))).sort();
 
-  const addRule = () => setRules([...rules, { ...blankRule, name: `Rule ${rules.length + 1}` }]);
+  const addRule = () => setRules([...rules, { ...blankRule, _id: newRuleId(), name: `Rule ${rules.length + 1}` }]);
   const removeRule = (i) => setRules(rules.filter((_, idx) => idx !== i));
   const updateRule = (i, patch) => setRules(rules.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
   const run = async () => {
     setBusy(true);
     try {
-      const payload = rules.map((r) => ({
-        ...r,
-        basic_pct_change: Number(r.basic_pct_change) || 0,
-        basic_flat_add: Number(r.basic_flat_add) || 0,
-        allowances_pct_change: Number(r.allowances_pct_change) || 0,
-        allowances_flat_add: Number(r.allowances_flat_add) || 0,
-      }));
+      const payload = rules.map((r) => {
+        const { _id, ...clean } = r;
+        return {
+          ...clean,
+          basic_pct_change: Number(clean.basic_pct_change) || 0,
+          basic_flat_add: Number(clean.basic_flat_add) || 0,
+          allowances_pct_change: Number(clean.allowances_pct_change) || 0,
+          allowances_flat_add: Number(clean.allowances_flat_add) || 0,
+        };
+      });
       const { data } = await api.post("/payroll/simulate", { rules: payload });
       setResult(data);
     } catch (e) {
@@ -53,7 +57,7 @@ export default function Simulator() {
     const id = params.get("id");
     if (!id) { setScenario(null); return; }
     api.get(`/payroll/scenarios/${id}`).then(({ data }) => {
-      setRules(data.scenario.rules.map((r, i) => ({ ...blankRule, ...r, name: r.name || `Rule ${i + 1}` })));
+      setRules(data.scenario.rules.map((r, i) => ({ ...blankRule, ...r, _id: newRuleId(), name: r.name || `Rule ${i + 1}` })));
       setResult(data.simulation);
       setScenario(data.scenario);
     }).catch(() => { alert("Scenario not found"); setScenario(null); });
@@ -128,7 +132,7 @@ export default function Simulator() {
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand("copy"); } catch { /* ignore */ }
+      try { document.execCommand("copy"); } catch (e) { console.warn("clipboard fallback failed", e); }
       document.body.removeChild(ta);
     }
     setCopied(true);
@@ -235,7 +239,7 @@ export default function Simulator() {
         </div>
         <div className="space-y-3">
           {rules.map((r, i) => (
-            <div key={i} className="border border-[#E2DFD6] rounded-md p-4">
+            <div key={r._id} className="border border-[#E2DFD6] rounded-md p-4">
               <div className="flex items-center justify-between mb-3">
                 <input value={r.name} onChange={(e) => updateRule(i, { name: e.target.value })} placeholder="Rule label" className="font-heading text-base font-semibold bg-transparent outline-none flex-1" />
                 <button onClick={() => removeRule(i)} className="text-[#B83A3A] hover:bg-[#FBEAEA] p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>

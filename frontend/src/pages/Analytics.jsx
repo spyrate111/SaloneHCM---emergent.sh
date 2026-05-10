@@ -76,7 +76,7 @@ export default function Analytics() {
             <ResponsiveContainer width="99%" height="99%">
               <PieChart>
                 <Pie data={usage.by_type} dataKey="days" nameKey="type" cx="50%" cy="50%" outerRadius={90} label={(e) => `${e.type} (${e.days}d)`}>
-                  {usage.by_type.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  {usage.by_type.map((entry, i) => <Cell key={entry.type} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} />
               </PieChart>

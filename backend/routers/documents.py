@@ -157,6 +157,8 @@ async def download_document(
     if user.get("role") != "admin" and user.get("employee_id") != doc["employee_id"]:
         raise HTTPException(403, "Forbidden")
 
+    data: bytes = b""
+    ct: str = "application/octet-stream"
     try:
         data, ct = get_object(doc["storage_path"])
     except Exception as e:
@@ -164,9 +166,10 @@ async def download_document(
 
     filename = doc.get("original_filename", f"{doc_id}.bin")
     safe_name = quote(filename)
+    media_type = doc.get("content_type") or ct or "application/octet-stream"
     return StreamingResponse(
         io.BytesIO(data),
-        media_type=doc.get("content_type", ct),
+        media_type=media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{safe_name}',
             "Content-Length": str(len(data)),

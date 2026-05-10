@@ -270,12 +270,12 @@ async def execute_plan(body: ActionPlanIn, user: dict = Depends(require_admin)):
     results = []
     for i, step in enumerate(plan.steps):
         try:
-            r = await _exec_step(step, user, plan.title)
-            results.append({"step": i, "type": step.type, "status": "ok", **r})
+            step_result = await _exec_step(step, user, plan.title)
+            results.append({"step": i, "type": step.type, "status": "ok", **step_result})
         except Exception as e:
             logger.exception("plan step %s failed", i)
             results.append({"step": i, "type": step.type, "status": "error", "detail": str(e)})
     return {
-        "executed": len([r for r in results if r["status"] == "ok"]),
+        "executed": len([row for row in results if row["status"] == "ok"]),
         "results": results,
     }

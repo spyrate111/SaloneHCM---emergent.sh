@@ -47,7 +47,9 @@ export default function Documents() {
       try {
         const s = await api.get("/documents/stats/summary");
         setSummary(s.data);
-      } catch { /* ignore */ }
+      } catch (e) {
+        console.warn("documents stats summary failed", e);
+      }
     }
   }, [isAdmin, filterEmp, filterCat]);
 
