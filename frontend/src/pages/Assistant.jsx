@@ -166,8 +166,8 @@ export default function Assistant() {
   };
 
   const suggestions = isAdmin && actionMode ? ACTION_SUGGESTIONS : isAdmin && useContext ? CONTEXT_SUGGESTIONS : GENERAL_SUGGESTIONS;
-  // Strip the json fence from displayed text when a plan is parsed
-  const cleanContent = (m) => (m.plan ? m.content.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/g, "").trim() : m.content);
+  // Strip the json fence from displayed text when a plan is parsed (or was cancelled — fence still in raw reply)
+  const cleanContent = (m) => ((m.plan || m.cancelled) ? m.content.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/g, "").trim() : m.content);
 
   return (
     <div className="space-y-6 h-[calc(100vh-160px)] flex flex-col" data-testid="assistant-page">
