@@ -247,3 +247,47 @@ async def delete_scenario(sid: str, user: dict = Depends(require_admin)):
         raise HTTPException(404, "Not found")
     await audit("scenario_delete", f"payroll_scenarios/{sid}", user)
     return {"ok": True}
+
+
+# ---------- Compare scenarios ----------
+class CompareIn(BaseModel):
+    scenario_ids: List[str] = Field(..., min_length=2, max_length=10)
+
+
+@router.post("/scenarios/compare")
+async def compare_scenarios(body: CompareIn, _: dict = Depends(require_admin)):
+    """Side-by-side comparison of saved scenarios — ranked by annualized employer cost (cheapest first)."""
+    rows = []
+    for sid in body.scenario_ids:
+        s = await db.payroll_scenarios.find_one({"id": sid}, {"_id": 0})
+        if not s:
+            continue
+        rules = [SimRule(**r) for r in s["rules"]]
+        sim = await _do_simulate(SimIn(rules=rules))
+        rows.append({
+            "scenario": {
+                "id": s["id"],
+                "title": s["title"],
+                "description": s.get("description", ""),
+                "approval_status": s.get("approval_status"),
+                "applied": s.get("applied", False),
+                "rules_count": len(s.get("rules", [])),
+            },
+            "totals": {
+                "current_employer": sim["current"]["employer_total_cost"],
+                "projected_employer": sim["projected"]["employer_total_cost"],
+                "delta_employer": sim["delta"]["employer_total_cost"],
+                "annualized": sim["annualized_delta_employer_cost"],
+                "affected": sim["affected_employees_count"],
+                "paye_delta": sim["delta"]["paye"],
+                "nassit_delta": sim["delta"]["nassit_employee"] + sim["delta"]["nassit_employer"],
+                "net_delta": sim["delta"]["net"],
+            },
+        })
+    if len(rows) < 2:
+        raise HTTPException(400, "At least 2 valid scenarios required")
+    rows.sort(key=lambda r: r["totals"]["annualized"])
+    cheapest = rows[0]["scenario"]["id"]
+    most_targeted = max(rows, key=lambda r: (r["totals"]["affected"], -r["totals"]["annualized"]))["scenario"]["id"]
+    return {"rows": rows, "count": len(rows),
+            "cheapest_id": cheapest, "most_targeted_id": most_targeted}

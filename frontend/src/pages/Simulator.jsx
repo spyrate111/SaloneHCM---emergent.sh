@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
-import { Plus, Trash2, Play, TrendingUp, TrendingDown, Sparkles, Save, Share2, Copy, Check, X, FolderOpen, Trash } from "lucide-react";
+import { Plus, Trash2, Play, TrendingUp, TrendingDown, Sparkles, Save, Share2, Copy, Check, X, FolderOpen, Trash, BarChart3 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
@@ -20,6 +20,8 @@ export default function Simulator() {
   const [copied, setCopied] = useState(false);
   const [scenario, setScenario] = useState(null); // currently loaded scenario (with approval state)
   const [params, setParams] = useSearchParams();
+  const [compareIds, setCompareIds] = useState(new Set());
+  const [comparison, setComparison] = useState(null);
 
   const loadSaved = useCallback(() => api.get("/payroll/scenarios").then((r) => setSaved(r.data)), []);
   useEffect(() => { api.get("/employees").then((r) => setEmployees(r.data)); loadSaved(); }, [loadSaved]);
@@ -131,6 +133,25 @@ export default function Simulator() {
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const toggleCompare = (id) => {
+    const next = new Set(compareIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setCompareIds(next);
+    setComparison(null);
+  };
+
+  const runCompare = async () => {
+    const ids = Array.from(compareIds);
+    if (ids.length < 2) return;
+    try {
+      const { data } = await api.post("/payroll/scenarios/compare", { scenario_ids: ids });
+      setComparison(data);
+      setTimeout(() => document.querySelector("[data-testid=comparison-panel]")?.scrollIntoView({ behavior: "smooth" }), 100);
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Compare failed");
+    }
   };
 
   const positive = (n) => (n ?? 0) >= 0;
@@ -334,15 +355,20 @@ export default function Simulator() {
       {/* Saved scenarios manager */}
       {saved.length > 0 && (
         <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="saved-scenarios">
-          <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between flex-wrap gap-3">
             <div>
               <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Saved scenarios</h3>
-              <p className="text-xs text-[#686D76] mt-0.5">Click to load & run with current employee data.</p>
+              <p className="text-xs text-[#686D76] mt-0.5">Click a row to load. Tick 2+ to compare side-by-side.</p>
             </div>
+            {compareIds.size >= 2 && (
+              <button data-testid="compare-button" onClick={runCompare} className="inline-flex items-center gap-1.5 text-sm bg-[#26547C] hover:bg-[#1D4363] text-white px-4 py-2 rounded-md">
+                <BarChart3 className="w-3.5 h-3.5" /> Compare {compareIds.size} selected
+              </button>
+            )}
           </div>
           <table className="w-full text-sm">
             <thead className="bg-[#F7F6F2]">
-              <tr>{["Title", "Status", "Description", "Rules", "Created by", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+              <tr>{["", "Title", "Status", "Description", "Rules", "Created by", ""].map((h, i) => <th key={`h-${i}-${h}`} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
             </thead>
             <tbody>
               {saved.map((s) => {
@@ -352,8 +378,12 @@ export default function Simulator() {
                   approved: "bg-[#E6F4EC] text-[#2D7A5D]",
                   rejected: "bg-[#FBEAEA] text-[#B83A3A]",
                 };
+                const checked = compareIds.has(s.id);
                 return (
                   <tr key={s.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]">
+                    <td className="py-3 px-4">
+                      <input type="checkbox" data-testid={`compare-${s.id}`} checked={checked} onChange={() => toggleCompare(s.id)} className="w-4 h-4 accent-[#26547C] cursor-pointer" />
+                    </td>
                     <td className="py-3 px-4 font-medium cursor-pointer" onClick={() => loadScenario(s.id)}>{s.title}</td>
                     <td className="py-3 px-4">
                       <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_BG[s.approval_status] || STATUS_BG.draft}`}>
@@ -375,6 +405,66 @@ export default function Simulator() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Comparison panel */}
+      {comparison && (
+        <div className="bg-white border-2 border-[#26547C] rounded-lg p-6" data-testid="comparison-panel">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#26547C]">Scenario comparison</div>
+              <h3 className="font-heading text-xl font-semibold mt-1">Ranked by annualized employer cost (cheapest first)</h3>
+              <p className="text-xs text-[#686D76] mt-1">Each scenario is freshly re-simulated against the latest employee data.</p>
+            </div>
+            <button onClick={() => setComparison(null)} className="inline-flex items-center gap-1.5 text-sm border border-[#E2DFD6] hover:bg-[#F7F6F2] px-3 py-2 rounded-md text-[#525860]"><X className="w-3.5 h-3.5" /> Close</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+            <div className="bg-[#E6F4EC] border border-[#9CC8B1] rounded-md p-3">
+              <div className="text-[10px] uppercase tracking-wider text-[#2D7A5D]">💰 Cheapest</div>
+              <div className="font-heading text-base font-semibold mt-0.5">{comparison.rows.find((r) => r.scenario.id === comparison.cheapest_id)?.scenario.title}</div>
+            </div>
+            <div className="bg-[#FBE9DF] border border-[#E8B89C] rounded-md p-3">
+              <div className="text-[10px] uppercase tracking-wider text-[#8B3A1C]">🎯 Most targeted</div>
+              <div className="font-heading text-base font-semibold mt-0.5">{comparison.rows.find((r) => r.scenario.id === comparison.most_targeted_id)?.scenario.title}</div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#F7F6F2]">
+                <tr>{["#", "Scenario", "Status", "Affected", "Δ Employer/mo", "Annualized", "Δ PAYE", "Δ NASSIT", "Δ Net"].map((h) => (
+                  <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {comparison.rows.map((r, i) => {
+                  const isWinner = r.scenario.id === comparison.cheapest_id;
+                  const isTargeted = r.scenario.id === comparison.most_targeted_id;
+                  const positive = r.totals.delta_employer >= 0;
+                  return (
+                    <tr key={r.scenario.id} className={`border-t border-[#E2DFD6] ${isWinner ? "bg-[#F4FBF5]" : ""}`}>
+                      <td className="py-3 px-4 font-data text-[#686D76]">#{i + 1}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-medium flex items-center gap-1.5">
+                          {r.scenario.title}
+                          {isWinner && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#2D7A5D] text-white">Cheapest</span>}
+                          {isTargeted && !isWinner && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#D1603D] text-white">Targeted</span>}
+                        </div>
+                        <div className="text-xs text-[#686D76]">{r.scenario.rules_count} rule{r.scenario.rules_count !== 1 ? "s" : ""}</div>
+                      </td>
+                      <td className="py-3 px-4 text-[10px] uppercase tracking-wider text-[#686D76]">{r.scenario.approval_status}</td>
+                      <td className="py-3 px-4 font-data">{r.totals.affected}</td>
+                      <td className={`py-3 px-4 font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#2D7A5D]"}`}>{positive ? "+" : ""}{fmtSLE(r.totals.delta_employer)}</td>
+                      <td className={`py-3 px-4 font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#2D7A5D]"}`}>{positive ? "+" : ""}{fmtSLE(r.totals.annualized)}</td>
+                      <td className="py-3 px-4 font-data text-xs">{fmtSLE(r.totals.paye_delta)}</td>
+                      <td className="py-3 px-4 font-data text-xs">{fmtSLE(r.totals.nassit_delta)}</td>
+                      <td className="py-3 px-4 font-data text-xs">{fmtSLE(r.totals.net_delta)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
