@@ -4,9 +4,16 @@ from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from core import client
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from core import client, limiter
 from seed import seed
-from routers import auth, employees, payroll, compliance, leave, attendance, dashboard, audit, assistant
+from routers import (
+    auth, employees, payroll, compliance, leave, attendance,
+    dashboard, audit, assistant, benefits, talent, analytics,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("salonehcm")
@@ -20,8 +27,11 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="SaloneHCM API", lifespan=lifespan)
-api = APIRouter(prefix="/api")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
+api = APIRouter(prefix="/api")
 api.include_router(auth.router)
 api.include_router(employees.router)
 api.include_router(payroll.router)
@@ -31,11 +41,14 @@ api.include_router(attendance.router)
 api.include_router(dashboard.router)
 api.include_router(audit.router)
 api.include_router(assistant.router)
+api.include_router(benefits.router)
+api.include_router(talent.router)
+api.include_router(analytics.router)
 
 
 @api.get("/")
 async def root():
-    return {"app": "SaloneHCM", "status": "ok", "version": "1.1"}
+    return {"app": "SaloneHCM", "status": "ok", "version": "1.2"}
 
 
 app.include_router(api)

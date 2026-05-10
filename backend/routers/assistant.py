@@ -5,10 +5,10 @@ import json
 import uuid
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import ValidationError
 
-from core import db, get_current_user, require_admin, audit, now_utc, iso
+from core import db, get_current_user, require_admin, audit, now_utc, iso, limiter
 from models import AssistantMessageIn, ActionPlanIn, ActionPlan
 from payroll_engine import run_payroll
 
@@ -89,7 +89,8 @@ async def assistant_context_preview(_: dict = Depends(require_admin)):
 
 
 @router.post("/chat")
-async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_current_user)):
+@limiter.limit("20/minute")
+async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict = Depends(get_current_user)):
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
     except Exception as e:

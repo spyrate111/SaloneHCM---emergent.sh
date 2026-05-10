@@ -1,6 +1,7 @@
 """Auth endpoints: login, logout, me."""
-from fastapi import APIRouter, HTTPException, Depends, Response
-from core import db, get_current_user, verify_password, make_access
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
+
+from core import db, get_current_user, verify_password, make_access, limiter
 from models import LoginIn
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -14,7 +15,8 @@ def _set_cookie(resp: Response, token: str):
 
 
 @router.post("/login")
-async def login(body: LoginIn, response: Response):
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginIn, response: Response):
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):

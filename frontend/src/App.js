@@ -14,6 +14,9 @@ import Assistant from "./pages/Assistant";
 import Settings from "./pages/Settings";
 import SelfService from "./pages/SelfService";
 import AuditLog from "./pages/AuditLog";
+import Benefits from "./pages/Benefits";
+import Talent from "./pages/Talent";
+import Analytics from "./pages/Analytics";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -30,6 +33,9 @@ export default function App() {
             <Route path="/compliance" element={<ProtectedRoute adminOnly><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />
             <Route path="/attendance" element={<Attendance />} />
+            <Route path="/benefits" element={<Benefits />} />
+            <Route path="/talent" element={<Talent />} />
+            <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />
             <Route path="/audit" element={<ProtectedRoute adminOnly><AuditLog /></ProtectedRoute>} />

@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
+  Heart, GraduationCap, BarChart3,
 } from "lucide-react";
 
 const NAV = [
@@ -12,6 +13,9 @@ const NAV = [
   { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin"] },
   { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "employee"] },
   { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "employee"] },
+  { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "employee"] },
+  { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "employee"] },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin"] },
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "employee"] },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin"] },
   { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin"] },

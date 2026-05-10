@@ -86,3 +86,49 @@ async def seed():
                 "bank_account": f"00{eid.replace('-', '')[:10]}",
             }},
         )
+
+    # Seed benefit plans
+    if await db.benefit_plans.count_documents({}) == 0:
+        for name, t, cost, share, desc in [
+            ("Premium Health Cover", "health", 350, 70, "Comprehensive medical for employee + family"),
+            ("Standard Health Cover", "health", 180, 50, "Basic medical, outpatient + emergency"),
+            ("Group Life Insurance", "life", 80, 100, "2× annual salary cover, employer-paid"),
+            ("Dental Plan", "dental", 60, 50, "Routine + major dental"),
+            ("Pension Top-up", "pension", 200, 50, "Voluntary top-up beyond NASSIT"),
+            ("Transport Allowance", "transport", 250, 100, "Monthly fuel/transit stipend"),
+        ]:
+            await db.benefit_plans.insert_one({
+                "id": str(uuid.uuid4()), "name": name, "type": t,
+                "monthly_cost_sle": cost, "employer_share_pct": share,
+                "description": desc, "created_at": iso(now_utc()),
+            })
+        logger.info("Seeded benefit plans")
+
+    # Seed job postings
+    if await db.job_postings.count_documents({}) == 0:
+        for title, dept, mn, mx in [
+            ("Senior React Engineer", "Engineering", 5500, 8500),
+            ("Payroll Analyst", "Finance", 3500, 5500),
+            ("Customer Success Manager", "Support", 3000, 5000),
+        ]:
+            await db.job_postings.insert_one({
+                "id": str(uuid.uuid4()), "title": title, "department": dept,
+                "location": "Freetown", "employment_type": "Full-time",
+                "salary_min_sle": mn, "salary_max_sle": mx,
+                "description": f"Looking for an experienced {title} in our {dept} team.",
+                "status": "open", "created_at": iso(now_utc()),
+            })
+
+    # Seed training programs
+    if await db.training_programs.count_documents({}) == 0:
+        for title, prov, hrs, skill in [
+            ("Sierra Leone Tax Compliance 2026", "NRA Academy", 16, "Compliance"),
+            ("Advanced Excel for Payroll", "Internal", 12, "Tools"),
+            ("Leadership Fundamentals", "African Mgmt Inst.", 24, "Leadership"),
+            ("Cybersecurity Awareness", "Internal", 4, "Security"),
+        ]:
+            await db.training_programs.insert_one({
+                "id": str(uuid.uuid4()), "title": title, "provider": prov,
+                "hours": hrs, "skill_area": skill, "description": "",
+                "created_at": iso(now_utc()),
+            })

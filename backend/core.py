@@ -98,3 +98,10 @@ async def audit(action: str, resource: str, user: dict, meta: Optional[dict] = N
         })
     except Exception as e:
         logger.warning("audit insert failed: %s", e)
+
+
+# ---- Rate limiter (shared singleton across routers) ----
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
