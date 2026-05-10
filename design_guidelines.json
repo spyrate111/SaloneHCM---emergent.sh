@@ -1,0 +1,145 @@
+{
+  "theme": "light",
+  "archetype": "Organic & Earthy / Swiss Enterprise Hybrid",
+  "design_philosophy": "Enterprise-grade trust meets localized Sierra Leonean warmth. The dashboard utilizes a strict 'Control Room' grid for dense data management (payroll, tax, compliance), paired with an earthy, distinctly Sierra Leonean palette (Deep Forest Green, Ocean Blue, Sunset Terracotta). Typography is serious and structured to handle complex financial data (SLE) without feeling sterile.",
+  "colors": {
+    "background": {
+      "default": "#F7F6F2",
+      "paper": "#FFFFFF",
+      "sidebar": "#133326"
+    },
+    "primary": {
+      "DEFAULT": "#133326",
+      "hover": "#0F281E",
+      "foreground": "#FFFFFF"
+    },
+    "secondary": {
+      "DEFAULT": "#26547C",
+      "hover": "#1D4363",
+      "foreground": "#FFFFFF"
+    },
+    "accent": {
+      "DEFAULT": "#D1603D",
+      "hover": "#B84F2F",
+      "foreground": "#FFFFFF"
+    },
+    "muted": {
+      "DEFAULT": "#EBE8E0",
+      "foreground": "#686D76"
+    },
+    "border": "#E2DFD6",
+    "text": {
+      "primary": "#1A1C1E",
+      "secondary": "#525860",
+      "disabled": "#A1A5AB"
+    },
+    "status": {
+      "success": "#2D7A5D",
+      "warning": "#D1A13D",
+      "error": "#B83A3A",
+      "info": "#26547C"
+    }
+  },
+  "typography": {
+    "font_families": {
+      "heading": "'Cabinet Grotesk', sans-serif",
+      "body": "'IBM Plex Sans', sans-serif",
+      "mono": "'IBM Plex Mono', monospace"
+    },
+    "scales": {
+      "h1": "text-3xl sm:text-4xl font-bold tracking-tight",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-medium tracking-tight",
+      "h4": "text-lg font-medium",
+      "body": "text-sm",
+      "small": "text-xs tracking-wide uppercase",
+      "data": "text-sm tabular-nums"
+    },
+    "rules": {
+      "headings_alignment": "left-aligned for data density",
+      "currency": "Always use tabular-nums for SLE currency displays",
+      "labels": "Uppercase, tiny, wide-spacing (tracking-[0.05em]) for table headers and overlines"
+    }
+  },
+  "layout": {
+    "strategy": "Control Room Grid",
+    "sidebar": "fixed left, w-64, dark theme (bg-[#133326]) for strong enterprise grounding",
+    "topbar": "sticky top, h-16, glassmorphism or pure white with 1px bottom border",
+    "main_content": "p-6 md:p-8 max-w-7xl mx-auto",
+    "grid_system": {
+      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "widgets": {
+        "kpi": "col-span-1",
+        "chart_primary": "col-span-1 md:col-span-2 lg:col-span-3",
+        "list_feed": "col-span-1 row-span-2"
+      }
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "flat solid",
+      "border_radius": "rounded-lg",
+      "border": "border border-[#E2DFD6]",
+      "shadow": "shadow-sm hover:shadow-md transition-shadow duration-200",
+      "background": "bg-white",
+      "padding": "p-5"
+    },
+    "buttons": {
+      "primary": "bg-[#133326] text-white rounded-md px-4 py-2 font-medium hover:bg-[#0F281E] transition-colors",
+      "secondary": "bg-white border border-[#E2DFD6] text-[#133326] rounded-md px-4 py-2 font-medium hover:bg-[#F7F6F2] transition-colors",
+      "accent": "bg-[#D1603D] text-white rounded-md px-4 py-2 font-medium hover:bg-[#B84F2F] transition-colors"
+    },
+    "tables": {
+      "header": "bg-[#F7F6F2] text-xs uppercase tracking-wider text-[#525860] border-b border-[#E2DFD6] py-3 px-4",
+      "row": "border-b border-[#E2DFD6] hover:bg-[#FDFCFB] transition-colors text-sm text-[#1A1C1E]",
+      "cell": "py-3 px-4"
+    },
+    "inputs": {
+      "style": "bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C] focus:border-transparent",
+      "labels": "block text-xs font-medium text-[#525860] mb-1.5"
+    }
+  },
+  "motion": {
+    "hover": "transition-all duration-200 ease-in-out",
+    "page_transition": "framer-motion opacity-0 to opacity-100, slight y-axis slide (y: 10 to y: 0)",
+    "stagger": "lists and table rows stagger entrance by 0.05s"
+  },
+  "media": {
+    "images": [
+      {
+        "category": "login_background",
+        "url": "https://images.unsplash.com/photo-1676029461383-215556e79bc8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwyfHxzaWVycmElMjBsZW9uZSUyMGxhbmRzY2FwZSUyMHN1bnNldHxlbnwwfHx8fDE3Nzg0MjIzODZ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Sierra Leone mountain sunset landscape to use as a warm, localized login screen background with a dark overlay."
+      },
+      {
+        "category": "employee_avatar_1",
+        "url": "https://images.unsplash.com/photo-1573497491207-618cc224f243?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBvcnRyYWl0JTIwYWZyaWNhbnxlbnwwfHx8fDE3Nzg0MjIzOTB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional African businesswoman portrait for employee directory."
+      },
+      {
+        "category": "employee_avatar_2",
+        "url": "https://images.unsplash.com/photo-1739300293504-234817eead52?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBvcnRyYWl0JTIwYWZyaWNhbnxlbnwwfHx8fDE3Nzg0MjIzOTB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Professional African business portrait for employee directory."
+      }
+    ],
+    "icons": {
+      "library": "lucide-react",
+      "style": "stroke-width 1.5, solid and professional"
+    }
+  },
+  "accessibility": {
+    "testing_attributes": "All interactive elements MUST include data-testid (e.g., data-testid='run-payroll-button')",
+    "contrast": "Strict adherence to WCAG AA, using tabular-nums for SLE amounts",
+    "focus": "focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[#133326]"
+  },
+  "instructions_to_main_agent": [
+    "Install and use 'Cabinet Grotesk' for Headings and 'IBM Plex Sans' for Body text.",
+    "Build a desktop-first dashboard with a dark sidebar (#133326) and off-white/sand main area (#F7F6F2).",
+    "Cards and widgets must use white backgrounds with crisp 1px borders (#E2DFD6) to contrast the sand background.",
+    "Use Phosphor Icons or Lucide React for crisp dashboard iconography.",
+    "Implement the specific modules mentioned: Payroll (SLE currency formats), HR, Compliance (NRA/NASSIT).",
+    "For the login page, use the 'login_background' image with a dark gradient overlay (bg-black/60) and a clean, glassmorphic or solid white login card.",
+    "Ensure all monetary values (SLE) use the 'tabular-nums' utility for perfect vertical alignment in tables.",
+    "Avoid generic purple/violet SaaS colors entirely; stick to the earthy Green/Sand/Blue/Terracotta palette."
+  ]
+}
