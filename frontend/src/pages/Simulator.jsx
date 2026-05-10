@@ -15,9 +15,10 @@ export default function Simulator() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState([]);
   const [saveOpen, setSaveOpen] = useState(false);
-  const [saveForm, setSaveForm] = useState({ title: "", description: "" });
+  const [saveForm, setSaveForm] = useState({ title: "", description: "", approver_email: "" });
   const [shareUrl, setShareUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [scenario, setScenario] = useState(null); // currently loaded scenario (with approval state)
   const [params, setParams] = useSearchParams();
 
   const loadSaved = useCallback(() => api.get("/payroll/scenarios").then((r) => setSaved(r.data)), []);
@@ -48,12 +49,44 @@ export default function Simulator() {
   // Load shared scenario from ?id=
   useEffect(() => {
     const id = params.get("id");
-    if (!id) return;
+    if (!id) { setScenario(null); return; }
     api.get(`/payroll/scenarios/${id}`).then(({ data }) => {
       setRules(data.scenario.rules.map((r, i) => ({ ...blankRule, ...r, name: r.name || `Rule ${i + 1}` })));
       setResult(data.simulation);
-    }).catch(() => alert("Scenario not found"));
+      setScenario(data.scenario);
+    }).catch(() => { alert("Scenario not found"); setScenario(null); });
   }, [params]);
+
+  const refreshScenario = useCallback(async () => {
+    const id = params.get("id");
+    if (!id) return;
+    const { data } = await api.get(`/payroll/scenarios/${id}`);
+    setScenario(data.scenario);
+    setResult(data.simulation);
+  }, [params]);
+
+  const decideScenario = async (decision) => {
+    const id = params.get("id");
+    if (!id) return;
+    const notes = decision === "rejected" ? (window.prompt("Optional notes for rejection:") || "") : "";
+    try {
+      await api.patch(`/payroll/scenarios/${id}/decide`, { decision, notes });
+      await refreshScenario();
+      loadSaved();
+    } catch (e) { alert(e?.response?.data?.detail || "Decision failed"); }
+  };
+
+  const applyScenario = async () => {
+    const id = params.get("id");
+    if (!id) return;
+    if (!window.confirm("This will permanently update employee salaries. Continue?")) return;
+    try {
+      const { data } = await api.post(`/payroll/scenarios/${id}/apply`);
+      alert(`Applied: ${data.employees_changed} employee(s) updated.`);
+      await refreshScenario();
+      loadSaved();
+    } catch (e) { alert(e?.response?.data?.detail || "Apply failed"); }
+  };
 
   const saveScenario = async (e) => {
     e.preventDefault();
@@ -70,7 +103,7 @@ export default function Simulator() {
       const url = `${window.location.origin}/simulator?id=${data.id}`;
       setShareUrl(url);
       setSaveOpen(false);
-      setSaveForm({ title: "", description: "" });
+      setSaveForm({ title: "", description: "", approver_email: "" });
       loadSaved();
     } catch (err) {
       alert(err?.response?.data?.detail || "Save failed");
@@ -83,7 +116,22 @@ export default function Simulator() {
     await api.delete(`/payroll/scenarios/${id}`);
     loadSaved();
   };
-  const copyShare = async () => { await navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const copyShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = shareUrl;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const positive = (n) => (n ?? 0) >= 0;
 
@@ -96,6 +144,51 @@ export default function Simulator() {
         </h1>
         <p className="text-[#525860] text-sm mt-1 max-w-3xl">Model salary changes, raises, allowances, or one-off bonuses. See current vs projected payroll cost — plus NRA PAYE / NASSIT impact, per-employee deltas, and the annualized employer cost change.</p>
       </div>
+
+      {/* Approval banner — shown when a saved scenario is loaded via ?id */}
+      {scenario && (
+        <div className={`rounded-lg p-5 border-l-4 ${
+          scenario.approval_status === "approved" ? "bg-[#E6F4EC] border-[#2D7A5D]"
+          : scenario.approval_status === "rejected" ? "bg-[#FBEAEA] border-[#B83A3A]"
+          : scenario.approval_status === "pending" ? "bg-[#FBF1DE] border-[#8B6A14]"
+          : "bg-[#F7F6F2] border-[#525860]"
+        }`} data-testid="approval-banner">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Saved scenario · {scenario.approval_status}{scenario.applied ? " · APPLIED" : ""}</div>
+              <h2 className="font-heading text-xl font-semibold mt-1">{scenario.title}</h2>
+              {scenario.description && <p className="text-sm text-[#525860] mt-1">{scenario.description}</p>}
+              <div className="text-xs text-[#686D76] mt-2 space-x-3 font-data">
+                <span>Created by {scenario.created_by}</span>
+                <span>·</span>
+                <span>{new Date(scenario.created_at).toLocaleString()}</span>
+                {scenario.approver_email && <><span>·</span><span>Approver: {scenario.approver_email}</span></>}
+                {scenario.approved_by && <><span>·</span><span>{scenario.approval_status} by {scenario.approved_by}</span></>}
+              </div>
+              {scenario.approval_notes && <p className="text-sm italic text-[#525860] mt-2">"{scenario.approval_notes}"</p>}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {scenario.approval_status === "pending" && (
+                <>
+                  <button data-testid="reject-scenario" onClick={() => decideScenario("rejected")} className="inline-flex items-center gap-1.5 text-sm border border-[#B83A3A] text-[#B83A3A] hover:bg-[#FBEAEA] px-3 py-2 rounded-md"><X className="w-3.5 h-3.5" /> Reject</button>
+                  <button data-testid="approve-scenario" onClick={() => decideScenario("approved")} className="inline-flex items-center gap-1.5 text-sm bg-[#2D7A5D] hover:bg-[#256449] text-white px-4 py-2 rounded-md"><Check className="w-3.5 h-3.5" /> Approve</button>
+                </>
+              )}
+              {scenario.approval_status === "approved" && !scenario.applied && (
+                <button data-testid="apply-scenario" onClick={applyScenario} className="inline-flex items-center gap-1.5 text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2 rounded-md font-medium">
+                  <Sparkles className="w-3.5 h-3.5" /> Apply changes to employees
+                </button>
+              )}
+              {scenario.applied && (
+                <span className="inline-flex items-center gap-1.5 text-sm bg-[#2D7A5D] text-white px-3 py-2 rounded-md">
+                  <Check className="w-3.5 h-3.5" /> Applied {scenario.applied_at ? new Date(scenario.applied_at).toLocaleDateString() : ""}
+                </span>
+              )}
+              <button onClick={() => setParams({})} className="inline-flex items-center gap-1.5 text-sm border border-[#E2DFD6] hover:bg-[#F7F6F2] px-3 py-2 rounded-md text-[#525860]"><X className="w-3.5 h-3.5" /> Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -249,25 +342,37 @@ export default function Simulator() {
           </div>
           <table className="w-full text-sm">
             <thead className="bg-[#F7F6F2]">
-              <tr>{["Title", "Description", "Rules", "Created by", "Created", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+              <tr>{["Title", "Status", "Description", "Rules", "Created by", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
             </thead>
             <tbody>
-              {saved.map((s) => (
-                <tr key={s.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]">
-                  <td className="py-3 px-4 font-medium cursor-pointer" onClick={() => loadScenario(s.id)}>{s.title}</td>
-                  <td className="py-3 px-4 text-[#686D76] text-xs max-w-md truncate">{s.description || "—"}</td>
-                  <td className="py-3 px-4 font-data text-[#525860]">{s.rules.length}</td>
-                  <td className="py-3 px-4 text-xs text-[#686D76]">{s.created_by}</td>
-                  <td className="py-3 px-4 font-data text-xs text-[#686D76]">{new Date(s.created_at).toLocaleDateString()}</td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="inline-flex gap-1">
-                      <button title="Share" onClick={() => { const url = `${window.location.origin}/simulator?id=${s.id}`; setShareUrl(url); }} className="p-1.5 rounded text-[#26547C] hover:bg-[#E5EEF6]"><Share2 className="w-3.5 h-3.5" /></button>
-                      <button title="Load" onClick={() => loadScenario(s.id)} className="p-1.5 rounded text-[#2D7A5D] hover:bg-[#E6F4EC]"><FolderOpen className="w-3.5 h-3.5" /></button>
-                      <button title="Delete" onClick={() => deleteScenario(s.id)} className="p-1.5 rounded text-[#B83A3A] hover:bg-[#FBEAEA]"><Trash className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {saved.map((s) => {
+                const STATUS_BG = {
+                  draft: "bg-[#EBE8E0] text-[#525860]",
+                  pending: "bg-[#FBF1DE] text-[#8B6A14]",
+                  approved: "bg-[#E6F4EC] text-[#2D7A5D]",
+                  rejected: "bg-[#FBEAEA] text-[#B83A3A]",
+                };
+                return (
+                  <tr key={s.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]">
+                    <td className="py-3 px-4 font-medium cursor-pointer" onClick={() => loadScenario(s.id)}>{s.title}</td>
+                    <td className="py-3 px-4">
+                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_BG[s.approval_status] || STATUS_BG.draft}`}>
+                        {s.approval_status}{s.applied ? " · applied" : ""}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-[#686D76] text-xs max-w-md truncate">{s.description || "—"}</td>
+                    <td className="py-3 px-4 font-data text-[#525860]">{s.rules.length}</td>
+                    <td className="py-3 px-4 text-xs text-[#686D76]">{s.created_by}</td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="inline-flex gap-1">
+                        <button title="Share" onClick={() => { const url = `${window.location.origin}/simulator?id=${s.id}`; setShareUrl(url); }} className="p-1.5 rounded text-[#26547C] hover:bg-[#E5EEF6]"><Share2 className="w-3.5 h-3.5" /></button>
+                        <button title="Load" onClick={() => loadScenario(s.id)} className="p-1.5 rounded text-[#2D7A5D] hover:bg-[#E6F4EC]"><FolderOpen className="w-3.5 h-3.5" /></button>
+                        <button title="Delete" onClick={() => deleteScenario(s.id)} className="p-1.5 rounded text-[#B83A3A] hover:bg-[#FBEAEA]"><Trash className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -289,6 +394,11 @@ export default function Simulator() {
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Notes (optional)</label>
                 <textarea rows={3} value={saveForm.description} onChange={(e) => setSaveForm({ ...saveForm, description: e.target.value })} placeholder="Why this scenario, who requested it, etc." className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Approver email (optional)</label>
+                <input data-testid="save-approver" type="email" value={saveForm.approver_email} onChange={(e) => setSaveForm({ ...saveForm, approver_email: e.target.value })} placeholder="cfo@company.sl — sets status to pending" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+                <div className="text-[11px] text-[#686D76] mt-1">Designating an approver flags the scenario as pending until they approve.</div>
               </div>
               <div className="text-xs text-[#686D76] bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-3">
                 <strong>{rules.length} rule{rules.length !== 1 ? "s" : ""}</strong> will be saved. The simulation re-runs against current employee data each time the scenario is loaded.

@@ -120,6 +120,12 @@ class ScenarioIn(BaseModel):
     title: str = Field(..., min_length=1, max_length=160)
     description: Optional[str] = ""
     rules: List[SimRule] = Field(..., min_length=1, max_length=20)
+    approver_email: Optional[str] = None
+
+
+class ScenarioDecision(BaseModel):
+    decision: Literal["approved", "rejected"]
+    notes: Optional[str] = ""
 
 
 @router.post("/scenarios")
@@ -130,6 +136,14 @@ async def save_scenario(body: ScenarioIn, user: dict = Depends(require_admin)):
         "title": body.title,
         "description": body.description,
         "rules": [r.model_dump() for r in body.rules],
+        "approver_email": (body.approver_email or "").strip().lower() or None,
+        "approval_status": "pending" if body.approver_email else "draft",
+        "approval_notes": "",
+        "approved_by": None,
+        "approved_at": None,
+        "applied": False,
+        "applied_at": None,
+        "applied_run_id": None,
         "created_by": user["email"],
         "created_at": iso(now_utc()),
     }
@@ -149,10 +163,73 @@ async def get_scenario(sid: str, _: dict = Depends(require_admin)):
     s = await db.payroll_scenarios.find_one({"id": sid}, {"_id": 0})
     if not s:
         raise HTTPException(404, "Not found")
-    # Run simulation fresh with current employee data
     rules = [SimRule(**r) for r in s["rules"]]
     sim = await _do_simulate(SimIn(rules=rules))
     return {"scenario": s, "simulation": sim}
+
+
+@router.patch("/scenarios/{sid}/decide")
+async def decide_scenario(sid: str, body: ScenarioDecision, user: dict = Depends(require_admin)):
+    s = await db.payroll_scenarios.find_one({"id": sid}, {"_id": 0})
+    if not s:
+        raise HTTPException(404, "Not found")
+    if s.get("approval_status") in ("approved", "rejected"):
+        raise HTTPException(409, f"Already {s['approval_status']}")
+    await db.payroll_scenarios.update_one(
+        {"id": sid},
+        {"$set": {
+            "approval_status": body.decision,
+            "approval_notes": body.notes or "",
+            "approved_by": user["email"],
+            "approved_at": iso(now_utc()),
+        }},
+    )
+    await audit(f"scenario_{body.decision}", f"payroll_scenarios/{sid}", user,
+                {"title": s["title"], "approver": user["email"]})
+    return {"ok": True, "status": body.decision, "approved_by": user["email"]}
+
+
+@router.post("/scenarios/{sid}/apply")
+async def apply_scenario(sid: str, user: dict = Depends(require_admin)):
+    """Apply scenario rules permanently to employee salary records. Requires approved status."""
+    s = await db.payroll_scenarios.find_one({"id": sid}, {"_id": 0})
+    if not s:
+        raise HTTPException(404, "Not found")
+    if s.get("approval_status") != "approved":
+        raise HTTPException(409, "Scenario must be approved before applying")
+    if s.get("applied"):
+        raise HTTPException(409, "Scenario already applied")
+
+    rules = [SimRule(**r) for r in s["rules"]]
+    emps = await db.employees.find({"status": "active"}, {"_id": 0}).to_list(2000)
+    changed = []
+    for e in emps:
+        new_e = _apply(rules, e)
+        if (new_e["basic_salary_sle"] != e["basic_salary_sle"]
+                or new_e["allowances_sle"] != e["allowances_sle"]):
+            await db.employees.update_one(
+                {"id": e["id"]},
+                {"$set": {
+                    "basic_salary_sle": new_e["basic_salary_sle"],
+                    "allowances_sle": new_e["allowances_sle"],
+                }},
+            )
+            changed.append({
+                "id": e["id"],
+                "name": f'{e["first_name"]} {e["last_name"]}',
+                "old_basic": e["basic_salary_sle"],
+                "new_basic": new_e["basic_salary_sle"],
+                "old_allowances": e["allowances_sle"],
+                "new_allowances": new_e["allowances_sle"],
+            })
+
+    await db.payroll_scenarios.update_one(
+        {"id": sid},
+        {"$set": {"applied": True, "applied_at": iso(now_utc())}},
+    )
+    await audit("scenario_apply", f"payroll_scenarios/{sid}", user,
+                {"title": s["title"], "employees_changed": len(changed)})
+    return {"ok": True, "employees_changed": len(changed), "changes": changed}
 
 
 @router.delete("/scenarios/{sid}")
