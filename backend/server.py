@@ -18,6 +18,9 @@ from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 import io
+import csv
+import re
+import json
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -175,6 +178,12 @@ class AssistantMessageIn(BaseModel):
     session_id: Optional[str] = None
     message: str
     include_context: bool = False
+    action_mode: bool = False
+
+
+class ActionPlanIn(BaseModel):
+    plan: dict
+    session_id: Optional[str] = None
 
 
 # ---------- Sierra Leone Payroll Engine ----------
@@ -529,7 +538,7 @@ async def build_company_context() -> str:
     lines.append("\n--- EMPLOYEES (full) ---")
     for e in employees:
         lines.append(
-            f"- {e['first_name']} {e['last_name']} | {e['job_title']} | {e['department']} | "
+            f"- id={e['id']} | {e['first_name']} {e['last_name']} | {e['job_title']} | {e['department']} | "
             f"basic SLE {e['basic_salary_sle']:.2f} + allow {e['allowances_sle']:.2f} | status {e['status']}"
         )
 
@@ -537,7 +546,7 @@ async def build_company_context() -> str:
     for r in runs:
         t = r["totals"]
         lines.append(
-            f"Run {r['period']} | gross SLE {t['gross']:.2f} | PAYE {t['paye']:.2f} | "
+            f"Run id={r['id']} period={r['period']} | gross SLE {t['gross']:.2f} | PAYE {t['paye']:.2f} | "
             f"NASSIT(emp+er) {t['nassit_employee'] + t['nassit_employer']:.2f} | net {t['net']:.2f} | "
             f"{t['employee_count']} employees"
         )
@@ -546,7 +555,7 @@ async def build_company_context() -> str:
 
     lines.append("\n--- LEAVE REQUESTS (recent) ---")
     for lv in leaves[:30]:
-        lines.append(f"- {lv['employee_name']} | {lv['leave_type']} | {lv['start_date']}→{lv['end_date']} ({lv['days']}d) | {lv['status']}")
+        lines.append(f"- id={lv['id']} | {lv['employee_name']} | {lv['leave_type']} | {lv['start_date']}→{lv['end_date']} ({lv['days']}d) | {lv['status']}")
 
     lines.append("\n--- ATTENDANCE (recent) ---")
     for a in attendance[:30]:
@@ -594,6 +603,29 @@ async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_curr
             "ground your answer in the data above. Use specific names, departments, and SLE figures."
         )
 
+    if body.action_mode and user.get("role") == "admin":
+        sys_msg += (
+            "\n\n--- ACTION MODE ENABLED ---\n"
+            "When the admin asks you to perform an action (approve leave, run payroll, log attendance, "
+            "create leave requests), DO NOT execute it. Instead, respond with a SHORT one-line summary, "
+            "then output a JSON code block describing the proposed plan. The admin will review and confirm "
+            "before execution.\n\n"
+            "JSON schema:\n"
+            "```json\n"
+            "{\n"
+            '  "title": "Short human-readable title",\n'
+            '  "rationale": "1-2 sentences explaining what you will do and why",\n'
+            '  "steps": [\n'
+            '    {"type": "leave_decision", "leave_id": "<id>", "decision": "approved" | "rejected"},\n'
+            '    {"type": "payroll_run", "year": 2026, "month": 3},\n'
+            '    {"type": "attendance_log", "employee_id": "<id>", "date": "YYYY-MM-DD", "hours": 8, "overtime_hours": 0}\n'
+            "  ]\n"
+            "}\n"
+            "```\n"
+            "Use real ids from the LIVE COMPANY DATA above. Only emit steps for actions that match the user's intent. "
+            "If the user just asked a question (not an action), do NOT emit a JSON block."
+        )
+
     chat = LlmChat(
         api_key=os.environ["EMERGENT_LLM_KEY"],
         session_id=sid,
@@ -625,7 +657,119 @@ async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_curr
         "user_id": user["id"],
         "ts": iso(now_utc()),
     })
-    return {"session_id": sid, "reply": reply}
+
+    plan = _extract_plan(reply) if body.action_mode and user.get("role") == "admin" else None
+    return {"session_id": sid, "reply": reply, "plan": plan}
+
+
+# ---------- Action Plan Execution ----------
+def _extract_plan(text: str):
+    """Extract a JSON action plan from a markdown ```json``` fenced block."""
+    if not text:
+        return None
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        plan = json.loads(m.group(1))
+        if isinstance(plan, dict) and isinstance(plan.get("steps"), list) and plan["steps"]:
+            return plan
+    except Exception:
+        pass
+    return None
+
+
+@api.post("/assistant/action/execute")
+async def execute_plan(body: ActionPlanIn, user: dict = Depends(require_admin)):
+    """Execute a confirmed AI-generated action plan. Each step is audited individually."""
+    plan = body.plan or {}
+    steps = plan.get("steps", [])
+    if not steps:
+        raise HTTPException(400, "Plan has no steps")
+
+    results = []
+    for i, step in enumerate(steps):
+        t = step.get("type")
+        try:
+            if t == "leave_decision":
+                lid = step.get("leave_id")
+                decision = step.get("decision")
+                if decision not in ("approved", "rejected"):
+                    raise ValueError("decision must be approved or rejected")
+                res = await db.leave_requests.update_one({"id": lid}, {"$set": {"status": decision}})
+                if not res.matched_count:
+                    raise ValueError(f"leave {lid} not found")
+                await audit(f"ai_leave_{decision}", f"leave_requests/{lid}", user, {"plan_title": plan.get("title", "")})
+                results.append({"step": i, "type": t, "status": "ok", "detail": f"Leave {lid} {decision}"})
+
+            elif t == "payroll_run":
+                year = int(step.get("year"))
+                month = int(step.get("month"))
+                emps = await db.employees.find({"status": "active"}, {"_id": 0}).to_list(2000)
+                slips = [calc_payslip(e) for e in emps]
+                rid = str(uuid.uuid4())
+                period = f"{year}-{month:02d}"
+                doc = {
+                    "id": rid,
+                    "period": period,
+                    "period_year": year,
+                    "period_month": month,
+                    "slips": slips,
+                    "totals": {
+                        "employee_count": len(slips),
+                        "gross": round(sum(s["gross"] for s in slips), 2),
+                        "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
+                        "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
+                        "paye": round(sum(s["paye"] for s in slips), 2),
+                        "net": round(sum(s["net"] for s in slips), 2),
+                    },
+                    "status": "completed",
+                    "created_at": iso(now_utc()),
+                }
+                await db.payroll_runs.insert_one(doc)
+                await audit("ai_payroll_run", f"payroll_runs/{rid}", user, {"period": period, "net": doc["totals"]["net"]})
+                results.append({"step": i, "type": t, "status": "ok", "detail": f"Payroll {period} run, net SLE {doc['totals']['net']:,.2f}"})
+
+            elif t == "attendance_log":
+                doc = {
+                    "id": str(uuid.uuid4()),
+                    "employee_id": step.get("employee_id"),
+                    "date": step.get("date"),
+                    "hours": float(step.get("hours", 0)),
+                    "overtime_hours": float(step.get("overtime_hours", 0)),
+                    "notes": step.get("notes", "[AI-logged]"),
+                    "created_at": iso(now_utc()),
+                }
+                await db.attendance.insert_one(doc)
+                await audit("ai_attendance_log", f"attendance/{doc['id']}", user, {"date": doc["date"]})
+                results.append({"step": i, "type": t, "status": "ok", "detail": f"Logged {doc['hours']}h on {doc['date']}"})
+
+            elif t == "leave_create":
+                eid = step.get("employee_id")
+                emp = await db.employees.find_one({"id": eid}, {"_id": 0})
+                doc = {
+                    "id": str(uuid.uuid4()),
+                    "employee_id": eid,
+                    "employee_name": f'{emp["first_name"]} {emp["last_name"]}' if emp else "Unknown",
+                    "leave_type": step.get("leave_type", "annual"),
+                    "start_date": step.get("start_date"),
+                    "end_date": step.get("end_date"),
+                    "days": int(step.get("days", 1)),
+                    "reason": step.get("reason", "[AI-created]"),
+                    "status": "pending",
+                    "created_at": iso(now_utc()),
+                }
+                await db.leave_requests.insert_one(doc)
+                await audit("ai_leave_create", f"leave_requests/{doc['id']}", user)
+                results.append({"step": i, "type": t, "status": "ok", "detail": f"Leave request created for {doc['employee_name']}"})
+
+            else:
+                results.append({"step": i, "type": t, "status": "skipped", "detail": f"Unknown step type: {t}"})
+        except Exception as e:
+            logger.exception("plan step %s failed", i)
+            results.append({"step": i, "type": t, "status": "error", "detail": str(e)})
+
+    return {"executed": len([r for r in results if r["status"] == "ok"]), "results": results}
 
 
 @api.get("/assistant/history/{sid}")
@@ -728,16 +872,20 @@ async def bank_file(rid: str, user: dict = Depends(require_admin)):
         raise HTTPException(404, "Run not found")
     emps = await db.employees.find({}, {"_id": 0}).to_list(2000)
     emp_map = {e["id"]: e for e in emps}
-    lines = ["bank_name,account_no,beneficiary,amount_sle,reference"]
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(["bank_name", "account_no", "beneficiary", "amount_sle", "reference"])
     for s in r["slips"]:
         e = emp_map.get(s["employee_id"], {})
-        bank = e.get("bank_name", "Sierra Leone Commercial Bank")
-        acct = e.get("bank_account", "0000000000")
-        ref = f"PAYROLL-{r['period']}"
-        lines.append(f'{bank},{acct},"{s["employee_name"]}",{s["net"]:.2f},{ref}')
+        writer.writerow([
+            e.get("bank_name", "Sierra Leone Commercial Bank"),
+            e.get("bank_account", "0000000000"),
+            s["employee_name"],
+            f"{s['net']:.2f}",
+            f"PAYROLL-{r['period']}",
+        ])
     await audit("export_bank_file", f"payroll_runs/{rid}", user, {"period": r["period"], "rows": len(r["slips"])})
-    csv = "\n".join(lines)
-    return StreamingResponse(io.BytesIO(csv.encode()), media_type="text/csv",
+    return StreamingResponse(io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
                              headers={"Content-Disposition": f'attachment; filename="bank-file-{r["period"]}.csv"'})
 
 

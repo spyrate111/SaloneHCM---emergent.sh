@@ -102,7 +102,7 @@ def test_bank_file_admin(admin_token, payroll_run):
     ct = r.headers.get("content-type", "")
     assert "text/csv" in ct
     text = r.text
-    lines = text.strip().split("\n")
+    lines = [ln.rstrip("\r") for ln in text.strip().split("\n")]
     assert lines[0] == "bank_name,account_no,beneficiary,amount_sle,reference"
     assert len(lines) >= 2
     # row should contain 5 comma-sep fields (beneficiary may be quoted)

@@ -1,0 +1,40 @@
+{
+  "summary": "SaloneHCM iteration 4 (AI Action Mode + CSV writer + context ids) — Backend 40/40 pytest tests PASSED (11 new in test_iter4_action_mode.py covering context id= prefix, action_mode admin/employee, multi-step plan execution, employee 403, empty steps 400, unknown step skipped, per-step error isolation, CSV escaping with commas in name + bank_name; plus 29 regressions). Frontend Playwright: admin sees both 'Use company data' (forest green) + 'Action mode' (terracotta) toggles; employee sees neither. Action mode toggle correctly forces context ON (verified 'Use company data · ON' after clicking Action mode). User message shows 'ACTION REQUEST' badge. AI returns parseable plan — orange-bordered 'PROPOSED ACTION PLAN' card renders with title, rationale, numbered steps, Cancel + Confirm buttons. Cancel removes plan card (replaced with 'Plan cancelled.'). Confirm executes via /api/assistant/action/execute and renders ✓ green per-step status with summary 'Plan executed — 1 of 1 steps succeeded.' Audit log entries ai_leave_approved / ai_payroll_run / ai_attendance_log / ai_leave_create all confirmed in DB.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Assistant — cancelled plan message", "issue": "After clicking Cancel, the parent assistant message still displays the raw ```json``` fenced block as plain text (because cleanContent() only strips the fence when m.plan is truthy; once plan is set to null on cancel the fence reappears). Cosmetic — the JSON dump leaks into the chat transcript after cancel. Fix: gate cleanContent on (m.plan || m.cancelled).", "selector": "[data-testid='assistant-messages']", "priority": "LOW"},
+      {"component": "Dashboard charts (Recharts)", "issue": "Carry-over from iter2 — width(-1)/height(-1) console warnings still appear on first paint. Charts render correctly. Acceptable per problem statement.", "selector": ".recharts-responsive-container", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_action_mode.py",
+    "/app/test_reports/pytest/iter4_results.xml",
+    "/app/test_reports/pytest/iter4_full.xml"
+  ],
+  "action_items": [
+    "Minor: in Assistant.jsx line 170, change `cleanContent` to also strip fence when m.cancelled is true so cancelled plan messages don't display raw JSON."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1004 lines — well past the 700-line threshold. URGENT: split into routers/ modules (auth.py, employees.py, payroll.py, leave.py, audit.py, assistant.py, pdf.py). The monolithic server.py is hard to maintain and increases collision risk on next iteration.",
+    "/api/assistant/action/execute payroll_run step duplicates the entire payroll engine logic from /api/payroll/run — extract a shared async function `_run_payroll(year, month, user, audit_action_prefix='')` and reuse from both endpoints to satisfy DRY.",
+    "_extract_plan() regex is non-greedy and only matches the first ```json``` block. If the AI emits multiple fenced blocks (e.g., one example + one real plan), it picks the example. Consider extracting all blocks and picking the last/largest valid one.",
+    "ActionPlanIn.plan is typed as `dict` (no Pydantic validation of steps shape). Consider a typed PlanModel with discriminated step union for better validation and to surface bad payloads as 422 instead of generic per-step errors.",
+    "execute_plan does not enforce a max-steps cap — a malicious or hallucinated plan with 1000 steps would all execute serially. Add `if len(steps) > 50: raise HTTPException(400, ...)`.",
+    "Audit logging for action plan steps does not include the original session_id or the user-confirmed plan title for non-leave steps — makes forensic correlation harder. Consider attaching plan title + session_id to every meta dict.",
+    "csv.writer fix verified — commas in bank_name and beneficiary now correctly quoted/escaped (parseable with csv.reader)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_action_mode.py",
+    "/app/backend/tests/test_iter2_exports.py"
+  ],
+  "success_rate": {"backend": "100% (40/40)", "frontend": "100% on tested flows (1 cosmetic nit on cancel)"},
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 ; aminata.kamara@salonehcm.sl / Employee@2026",
+  "seed_data_creation": "test_iter4_action_mode.py creates a TEST_iter4 employee with comma in name+bank_name for CSV escaping test (deleted on teardown), one pending leave per run for multi-step execution test, one payroll run via AI plan, one attendance entry, and one AI-created leave. test_iter2_exports.py minor fix: rstrip('\\r') on CSV lines (csv.writer emits CRLF per RFC).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 4 fully validated end-to-end (backend + frontend + integration). data-testid coverage on Assistant: assistant-page, assistant-context-toggle, assistant-action-toggle, assistant-input, assistant-send, assistant-messages, action-plan, plan-cancel, plan-confirm. Audit log records ai_* prefixed actions for AI-executed steps. Bank-file CSV uses csv.writer with QUOTE_MINIMAL and CRLF line endings (RFC 4180). The only outstanding UX nit is the leftover JSON fence on cancelled plans (LOW priority). server.py is 1004 lines — strongly recommend splitting before iteration 5.",
+  "rca of the issue": "Cancel raw-JSON leak RCA: cleanContent() conditional only checks m.plan; on cancel, m.plan is set to null so the regex stripping branch is never taken and the original assistant text (which still contains the ```json``` fence from the AI reply) renders verbatim. Fix: `const cleanContent = (m) => ((m.plan || m.cancelled) ? m.content.replace(/```(?:json)?\\s*\\{[\\s\\S]*?\\}\\s*```/g, '').trim() : m.content);`"
+}
