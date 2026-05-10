@@ -174,6 +174,7 @@ class PayrollRunIn(BaseModel):
 class AssistantMessageIn(BaseModel):
     session_id: Optional[str] = None
     message: str
+    include_context: bool = False
 
 
 # ---------- Sierra Leone Payroll Engine ----------
@@ -511,6 +512,62 @@ async def dashboard(_: dict = Depends(get_current_user)):
     }
 
 
+async def build_company_context() -> str:
+    """Full read snapshot for AI: employees, recent runs, audit, leave, attendance."""
+    employees = await db.employees.find({}, {"_id": 0}).to_list(2000)
+    runs = await db.payroll_runs.find({}, {"_id": 0}).sort("created_at", -1).to_list(3)
+    audits = await db.audit_logs.find({}, {"_id": 0}).sort("ts", -1).to_list(50)
+    leaves = await db.leave_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    attendance = await db.attendance.find({}, {"_id": 0}).sort("date", -1).to_list(100)
+
+    lines = ["=== SALONEHCM COMPANY DATA SNAPSHOT ===", f"Total employees: {len(employees)}"]
+    dept = {}
+    for e in employees:
+        dept[e["department"]] = dept.get(e["department"], 0) + 1
+    lines.append("Departments: " + ", ".join(f"{k}({v})" for k, v in dept.items()))
+
+    lines.append("\n--- EMPLOYEES (full) ---")
+    for e in employees:
+        lines.append(
+            f"- {e['first_name']} {e['last_name']} | {e['job_title']} | {e['department']} | "
+            f"basic SLE {e['basic_salary_sle']:.2f} + allow {e['allowances_sle']:.2f} | status {e['status']}"
+        )
+
+    lines.append("\n--- RECENT PAYROLL RUNS ---")
+    for r in runs:
+        t = r["totals"]
+        lines.append(
+            f"Run {r['period']} | gross SLE {t['gross']:.2f} | PAYE {t['paye']:.2f} | "
+            f"NASSIT(emp+er) {t['nassit_employee'] + t['nassit_employer']:.2f} | net {t['net']:.2f} | "
+            f"{t['employee_count']} employees"
+        )
+        for s in r["slips"]:
+            lines.append(f"  · {s['employee_name']}: gross {s['gross']:.2f}, paye {s['paye']:.2f}, net {s['net']:.2f}")
+
+    lines.append("\n--- LEAVE REQUESTS (recent) ---")
+    for l in leaves[:30]:
+        lines.append(f"- {l['employee_name']} | {l['leave_type']} | {l['start_date']}→{l['end_date']} ({l['days']}d) | {l['status']}")
+
+    lines.append("\n--- ATTENDANCE (recent) ---")
+    for a in attendance[:30]:
+        emp = next((e for e in employees if e["id"] == a["employee_id"]), {})
+        nm = f"{emp.get('first_name', '?')} {emp.get('last_name', '')}".strip()
+        lines.append(f"- {a['date']} | {nm} | {a['hours']}h regular + {a['overtime_hours']}h OT")
+
+    lines.append("\n--- AUDIT LOG (last 50) ---")
+    for au in audits:
+        meta = " · ".join(f"{k}={v}" for k, v in (au.get("meta") or {}).items())
+        lines.append(f"- {au['ts'][:19]} | {au['user_email']} | {au['action']} | {au['resource']}" + (f" | {meta}" if meta else ""))
+
+    return "\n".join(lines)
+
+
+@api.get("/assistant/context")
+async def assistant_context_preview(_: dict = Depends(require_admin)):
+    """Returns the raw context the AI sees when 'Use company data' is enabled (for transparency)."""
+    return {"context": await build_company_context()}
+
+
 # ---------- AI Assistant ----------
 @api.post("/assistant/chat")
 async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_current_user)):
@@ -526,6 +583,17 @@ async def assistant_chat(body: AssistantMessageIn, user: dict = Depends(get_curr
         "Answer in clear, concise tone. Use Sierra Leonean Leone (SLE) currency. When asked about payroll, "
         "explain the calculation steps. Keep replies under 200 words unless detail is requested."
     )
+
+    if body.include_context and user.get("role") == "admin":
+        ctx = await build_company_context()
+        sys_msg += (
+            "\n\n--- BEGIN LIVE COMPANY DATA ---\n"
+            f"{ctx}\n"
+            "--- END LIVE COMPANY DATA ---\n"
+            "When the admin asks about anomalies, top performers, leave usage, or payroll trends, "
+            "ground your answer in the data above. Use specific names, departments, and SLE figures."
+        )
+
     chat = LlmChat(
         api_key=os.environ["EMERGENT_LLM_KEY"],
         session_id=sid,
