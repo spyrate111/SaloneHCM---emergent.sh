@@ -104,4 +104,16 @@ async def audit(action: str, resource: str, user: dict, meta: Optional[dict] = N
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[])
+
+def _client_ip(request) -> str:
+    """Prefer X-Forwarded-For first hop (for k8s ingress / proxy setups), else peer addr."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_client_ip, default_limits=[])

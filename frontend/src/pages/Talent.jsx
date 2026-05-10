@@ -15,7 +15,7 @@ const STAGE_BG = {
 
 function Tab({ active, onClick, icon: Icon, children, testId }) {
   return (
-    <button data-testid={testId} onClick={onClick} className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
+    <button data-testid={testId} role="tab" aria-selected={active} onClick={onClick} className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
       active ? "text-[#133326] border-[#133326]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
     }`}>
       <Icon className="w-4 h-4" strokeWidth={1.5} /> {children}
@@ -35,7 +35,7 @@ export default function Talent() {
         <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">Talent</h1>
         <p className="text-[#525860] text-sm mt-1">Hire, review, and develop your team.</p>
       </div>
-      <div className="flex border-b border-[#E2DFD6] gap-1">
+      <div className="flex border-b border-[#E2DFD6] gap-1" role="tablist">
         <Tab active={tab === "recruitment"} onClick={() => setTab("recruitment")} icon={Briefcase} testId="tab-recruitment">Recruitment</Tab>
         <Tab active={tab === "performance"} onClick={() => setTab("performance")} icon={Star} testId="tab-performance">Performance</Tab>
         <Tab active={tab === "learning"} onClick={() => setTab("learning")} icon={GraduationCap} testId="tab-learning">Learning</Tab>
