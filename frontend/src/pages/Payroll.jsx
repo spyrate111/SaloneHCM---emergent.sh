@@ -1,0 +1,157 @@
+import { useEffect, useState } from "react";
+import api, { fmtSLE } from "../lib/api";
+import { Calculator, Play, Check, FileText } from "lucide-react";
+
+const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+export default function Payroll() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [step, setStep] = useState(1);
+  const [preview, setPreview] = useState(null);
+  const [runs, setRuns] = useState([]);
+  const [running, setRunning] = useState(false);
+
+  const loadRuns = () => api.get("/payroll/runs").then((r) => setRuns(r.data));
+  useEffect(() => { loadRuns(); }, []);
+
+  const doPreview = async () => {
+    const { data } = await api.post("/payroll/preview");
+    setPreview(data); setStep(2);
+  };
+
+  const doRun = async () => {
+    setRunning(true);
+    try {
+      await api.post("/payroll/run", { period_year: Number(year), period_month: Number(month) });
+      setStep(3); loadRuns();
+    } finally { setRunning(false); }
+  };
+
+  return (
+    <div className="space-y-6" data-testid="payroll-page">
+      <div>
+        <div className="text-[11px] uppercase tracking-[0.18em] text-[#525860]">Payroll Engine</div>
+        <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">Run payroll</h1>
+        <p className="text-[#525860] text-sm mt-1 max-w-2xl">Auto-calculates gross-to-net for active employees including NRA PAYE bands and NASSIT contributions.</p>
+      </div>
+
+      {/* Wizard */}
+      <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
+        <div className="flex items-center gap-2 mb-6">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className={`flex items-center gap-2 ${step >= n ? "text-[#133326]" : "text-[#A1A5AB]"}`}>
+              <div className={`w-7 h-7 rounded-full grid place-items-center text-xs font-semibold ${step >= n ? "bg-[#133326] text-white" : "bg-[#EBE8E0]"}`}>{n}</div>
+              <span className="text-xs uppercase tracking-wider">{["Period", "Review", "Confirm"][n - 1]}</span>
+              {n < 3 && <div className="w-8 h-px bg-[#E2DFD6] mx-2" />}
+            </div>
+          ))}
+        </div>
+
+        {step === 1 && (
+          <div className="space-y-5 max-w-md">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#525860] mb-1.5">Pay period month</label>
+              <select data-testid="payroll-month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#525860] mb-1.5">Year</label>
+              <input data-testid="payroll-year" type="number" value={year} onChange={(e) => setYear(e.target.value)} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+            </div>
+            <button data-testid="payroll-preview-button" onClick={doPreview} className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2.5 rounded-md text-sm font-medium">
+              <Calculator className="w-4 h-4" strokeWidth={1.5} /> Preview calculations
+            </button>
+          </div>
+        )}
+
+        {step === 2 && preview && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                ["Employees", preview.totals.employee_count],
+                ["Gross", fmtSLE(preview.totals.gross)],
+                ["NASSIT (10%+5%)", fmtSLE(preview.totals.nassit_employer + preview.totals.nassit_employee)],
+                ["PAYE", fmtSLE(preview.totals.paye)],
+                ["Net pay", fmtSLE(preview.totals.net)],
+              ].map(([k, v]) => (
+                <div key={k} className="border border-[#E2DFD6] rounded-md p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-[#525860]">{k}</div>
+                  <div className="font-data text-base font-semibold mt-1">{v}</div>
+                </div>
+              ))}
+            </div>
+            <div className="overflow-x-auto border border-[#E2DFD6] rounded-md">
+              <table className="w-full text-sm" data-testid="payroll-preview-table">
+                <thead className="bg-[#F7F6F2]">
+                  <tr>{["Employee", "Gross", "NASSIT 5%", "PAYE", "Net"].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {preview.slips.map((s) => (
+                    <tr key={s.employee_id} className="border-t border-[#E2DFD6]">
+                      <td className="py-2.5 px-4 text-[#1A1C1E]">{s.employee_name}</td>
+                      <td className="py-2.5 px-4 font-data">{fmtSLE(s.gross)}</td>
+                      <td className="py-2.5 px-4 font-data text-[#B83A3A]">− {fmtSLE(s.nassit_employee)}</td>
+                      <td className="py-2.5 px-4 font-data text-[#B83A3A]">− {fmtSLE(s.paye)}</td>
+                      <td className="py-2.5 px-4 font-data font-semibold">{fmtSLE(s.net)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setStep(1)} className="px-4 py-2.5 text-sm border border-[#E2DFD6] rounded-md">Back</button>
+              <button data-testid="payroll-run-button" onClick={doRun} disabled={running} className="inline-flex items-center gap-2 bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2.5 rounded-md text-sm font-medium disabled:opacity-60">
+                <Play className="w-4 h-4" strokeWidth={1.5} /> {running ? "Running…" : `Run for ${months[month - 1]} ${year}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="text-center py-10" data-testid="payroll-success">
+            <div className="w-14 h-14 rounded-full bg-[#E6F4EC] grid place-items-center mx-auto mb-4">
+              <Check className="w-6 h-6 text-[#2D7A5D]" strokeWidth={2} />
+            </div>
+            <h3 className="font-heading text-2xl font-bold">Payroll completed</h3>
+            <p className="text-[#525860] text-sm mt-2">Run for {months[month - 1]} {year} has been recorded.</p>
+            <button onClick={() => { setStep(1); setPreview(null); }} className="mt-5 px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Run another</button>
+          </div>
+        )}
+      </div>
+
+      {/* Runs history */}
+      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">History</div>
+            <h3 className="font-heading text-lg font-semibold">Recent payroll runs</h3>
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-[#F7F6F2]">
+            <tr>{["Period", "Employees", "Gross", "PAYE", "NASSIT", "Net", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {runs.map((r) => (
+              <tr key={r.id} className="border-t border-[#E2DFD6]">
+                <td className="py-3 px-4 font-medium">{r.period}</td>
+                <td className="py-3 px-4 font-data">{r.totals.employee_count}</td>
+                <td className="py-3 px-4 font-data">{fmtSLE(r.totals.gross)}</td>
+                <td className="py-3 px-4 font-data">{fmtSLE(r.totals.paye)}</td>
+                <td className="py-3 px-4 font-data">{fmtSLE(r.totals.nassit_employee + r.totals.nassit_employer)}</td>
+                <td className="py-3 px-4 font-data font-semibold">{fmtSLE(r.totals.net)}</td>
+                <td className="py-3 px-4 text-right">
+                  <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs text-[#26547C] hover:underline"><FileText className="w-3.5 h-3.5" /> Export</a>
+                </td>
+              </tr>
+            ))}
+            {!runs.length && <tr><td colSpan={7} className="py-10 text-center text-sm text-[#686D76]">No payroll runs yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
