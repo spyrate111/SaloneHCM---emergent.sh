@@ -1,14 +1,14 @@
 """Compliance & Tax endpoints."""
 from fastapi import APIRouter, HTTPException, Depends
-from core import db, get_current_user, require_admin
+from core import db, get_current_user, require_admin, tenant_filter
 from payroll_engine import PAYE_BANDS, NASSIT_EMPLOYEE, NASSIT_EMPLOYER
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 
 
 @router.get("/summary")
-async def compliance_summary(_: dict = Depends(get_current_user)):
-    runs = await db.payroll_runs.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+async def compliance_summary(user: dict = Depends(get_current_user)):
+    runs = await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(50)
     total_paye = sum(r["totals"]["paye"] for r in runs)
     total_nassit = sum(r["totals"]["nassit_employee"] + r["totals"]["nassit_employer"] for r in runs)
     return {
@@ -25,8 +25,8 @@ async def compliance_summary(_: dict = Depends(get_current_user)):
 
 
 @router.get("/nra-export/{rid}")
-async def nra_export(rid: str, _: dict = Depends(require_admin)):
-    r = await db.payroll_runs.find_one({"id": rid}, {"_id": 0})
+async def nra_export(rid: str, user: dict = Depends(require_admin)):
+    r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Not found")
     rows = [

@@ -1,100 +1,22 @@
-import { useEffect, useState, useCallback } from "react";
-import api from "../lib/api";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { toast } from "sonner";
-import {
-  FolderArchive, Upload, Download, Trash2, X, FileText, Image as ImageIcon,
-  FileSignature, Award, Receipt, IdCard, Folder, Search,
-} from "lucide-react";
-
-const CATEGORIES = [
-  { id: "contract", label: "Contract", icon: FileSignature, color: "bg-[#E6F4EC] text-[#2D7A5D]" },
-  { id: "certificate", label: "Certificate", icon: Award, color: "bg-[#FBF1DE] text-[#8B6A14]" },
-  { id: "p9_form", label: "P9 / Tax Form", icon: Receipt, color: "bg-[#E5EEF6] text-[#26547C]" },
-  { id: "payslip", label: "Payslip", icon: FileText, color: "bg-[#FBE9DF] text-[#B84F2F]" },
-  { id: "id_document", label: "ID Document", icon: IdCard, color: "bg-[#F7E5EC] text-[#9A2A52]" },
-  { id: "other", label: "Other", icon: Folder, color: "bg-[#EBE8E0] text-[#525860]" },
-];
-const CAT_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
-
-const fmtBytes = (n) => {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(2)} MB`;
-};
-
-const ACCEPT = ".pdf,.docx,.doc,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+import { useDocuments } from "../hooks/useDocuments";
+import UploadModal from "../components/documents/UploadModal";
+import DocumentsTable from "../components/documents/DocumentsTable";
+import { CATEGORIES } from "../components/documents/constants";
+import { Upload, Search } from "lucide-react";
 
 export default function Documents() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const [docs, setDocs] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [filterEmp, setFilterEmp] = useState("");
-  const [filterCat, setFilterCat] = useState("");
   const [open, setOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [summary, setSummary] = useState({ total: 0, by_category: [] });
   const [q, setQ] = useState("");
 
-  const load = useCallback(async () => {
-    const params = {};
-    if (isAdmin && filterEmp) params.employee_id = filterEmp;
-    if (filterCat) params.category = filterCat;
-    const r = await api.get("/documents", { params });
-    setDocs(r.data);
-    if (isAdmin) {
-      try {
-        const s = await api.get("/documents/stats/summary");
-        setSummary(s.data);
-      } catch (e) {
-        console.warn("documents stats summary failed", e);
-      }
-    }
-  }, [isAdmin, filterEmp, filterCat]);
-
-  useEffect(() => {
-    load();
-    if (isAdmin) api.get("/employees").then((r) => setEmployees(r.data)).catch(() => {});
-  }, [load, isAdmin]);
-
-  const onUpload = async (ev) => {
-    ev.preventDefault();
-    const fd = new FormData(ev.currentTarget);
-    setSubmitting(true);
-    try {
-      await api.post("/documents/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      toast.success("Document uploaded");
-      setOpen(false);
-      load();
-    } catch (e) {
-      const d = e?.response?.data?.detail;
-      toast.error(typeof d === "string" ? d : "Upload failed");
-    } finally { setSubmitting(false); }
-  };
-
-  const onDownload = async (doc) => {
-    try {
-      const resp = await api.get(`/documents/${doc.id}/download`, { responseType: "blob" });
-      const url = URL.createObjectURL(resp.data);
-      const a = document.createElement("a");
-      a.href = url; a.download = doc.original_filename; a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Download failed");
-    }
-  };
-
-  const onDelete = async (doc) => {
-    if (!window.confirm(`Delete "${doc.original_filename}"?`)) return;
-    try {
-      await api.delete(`/documents/${doc.id}`);
-      toast.success("Document deleted");
-      load();
-    } catch {
-      toast.error("Delete failed");
-    }
-  };
+  const {
+    docs, employees, summary, submitting,
+    filterEmp, setFilterEmp, filterCat, setFilterCat,
+    upload, download, remove,
+  } = useDocuments({ isAdmin });
 
   const filtered = docs.filter((d) => {
     if (!q) return true;
@@ -197,131 +119,24 @@ export default function Documents() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((d) => {
-              const cat = CAT_BY_ID[d.category] || CAT_BY_ID.other;
-              const Icon = (d.content_type || "").startsWith("image/") ? ImageIcon : FileText;
-              return (
-                <tr key={d.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]" data-testid={`doc-row-${d.id}`}>
-                  <td className="py-3 px-4">
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-md bg-[#F7F6F2] border border-[#E2DFD6] grid place-items-center text-[#525860]">
-                        <Icon className="w-4 h-4" strokeWidth={1.5} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium truncate max-w-[260px]" title={d.original_filename}>{d.original_filename}</div>
-                        {d.description && <div className="text-xs text-[#686D76] truncate max-w-[260px]">{d.description}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-[#525860]">{isAdmin ? d.employee_name : d.uploaded_by}</td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full ${cat.color}`}>
-                      <cat.icon className="w-3 h-3" strokeWidth={1.7} /> {cat.label}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 font-data text-[#525860] text-xs">{fmtBytes(d.size)}</td>
-                  <td className="py-3 px-4 font-data text-[#686D76] text-xs">{new Date(d.uploaded_at).toLocaleDateString()}</td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        data-testid={`doc-download-${d.id}`}
-                        onClick={() => onDownload(d)}
-                        className="p-1.5 rounded hover:bg-[#F1EEE6] text-[#26547C]"
-                        title="Download"
-                      >
-                        <Download className="w-4 h-4" strokeWidth={1.5} />
-                      </button>
-                      {isAdmin && (
-                        <button
-                          data-testid={`doc-delete-${d.id}`}
-                          onClick={() => onDelete(d)}
-                          className="p-1.5 rounded hover:bg-[#FBEAEA] text-[#B83A3A]"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {!filtered.length && (
-              <tr><td colSpan={6} className="py-12 text-center text-sm text-[#686D76]">
-                <FolderArchive className="w-8 h-8 mx-auto mb-2 text-[#A1A5AB]" strokeWidth={1.3} />
-                {q || filterCat || filterEmp ? "No documents match these filters." : (isAdmin ? "No documents yet — upload the first one." : "No documents have been shared with you yet.")}
-              </td></tr>
-            )}
+            <DocumentsTable
+              docs={filtered}
+              isAdmin={isAdmin}
+              onDownload={download}
+              onDelete={remove}
+              hasFilters={!!(q || filterCat || filterEmp)}
+            />
           </tbody>
         </table>
       </div>
 
       {open && isAdmin && (
-        <div className="fixed inset-0 z-40 bg-black/40 grid place-items-center p-4" data-testid="documents-upload-modal">
-          <form
-            onSubmit={onUpload}
-            className="bg-white rounded-lg border border-[#E2DFD6] w-full max-w-md p-6 space-y-4"
-            encType="multipart/form-data"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading text-lg font-semibold">Upload document</h3>
-              <button type="button" onClick={() => setOpen(false)} className="text-[#525860] hover:text-[#1A1C1E]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-[#525860] mb-1">Employee</label>
-              <select required name="employee_id" data-testid="upload-employee-select" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-                <option value="">Select employee…</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>{e.first_name} {e.last_name} · {e.department}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-[#525860] mb-1">Category</label>
-              <select required name="category" data-testid="upload-category-select" defaultValue="contract" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-                {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-[#525860] mb-1">Description (optional)</label>
-              <input
-                name="description"
-                data-testid="upload-description-input"
-                placeholder="e.g. Employment contract — 2026"
-                className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-[#525860] mb-1">File · PDF, DOCX, JPG, PNG · max 10MB</label>
-              <input
-                required
-                name="file"
-                type="file"
-                accept={ACCEPT}
-                data-testid="upload-file-input"
-                className="w-full text-sm file:bg-[#F7F6F2] file:border-0 file:rounded-md file:px-3 file:py-2 file:mr-3 file:text-xs file:font-medium file:text-[#133326]"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6] hover:bg-[#F7F6F2]">Cancel</button>
-              <button
-                type="submit"
-                disabled={submitting}
-                data-testid="upload-submit"
-                className="inline-flex items-center gap-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md disabled:opacity-60"
-              >
-                <Upload className="w-4 h-4" strokeWidth={1.5} /> {submitting ? "Uploading…" : "Upload"}
-              </button>
-            </div>
-          </form>
-        </div>
+        <UploadModal
+          employees={employees}
+          submitting={submitting}
+          onClose={() => setOpen(false)}
+          onSubmit={upload}
+        />
       )}
     </div>
   );

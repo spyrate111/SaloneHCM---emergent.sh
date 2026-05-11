@@ -62,12 +62,16 @@ def calc_payslip(emp: dict) -> dict:
 
 async def run_payroll(year: int, month: int, user: dict, audit_action: str = "payroll_run") -> dict:
     """Shared runner used by both POST /payroll/run and AI action plan executor."""
-    emps = await db.employees.find({"status": "active"}, {"_id": 0}).to_list(2000)
+    emps = await db.employees.find(
+        {"status": "active", "company_id": user["company_id"]},
+        {"_id": 0},
+    ).to_list(2000)
     slips = [calc_payslip(e) for e in emps]
     rid = str(uuid.uuid4())
     period = f"{year}-{month:02d}"
     doc = {
         "id": rid,
+        "company_id": user["company_id"],
         "period": period,
         "period_year": year,
         "period_month": month,

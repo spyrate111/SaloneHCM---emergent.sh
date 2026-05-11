@@ -74,6 +74,8 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(401, "User not found")
+    if not user.get("company_id"):
+        raise HTTPException(401, "User has no company assigned")
     return user
 
 
@@ -83,11 +85,44 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+def tenant_filter(user: dict) -> dict:
+    """Return a Mongo filter clause that scopes a query to the user's company."""
+    return {"company_id": user["company_id"]}
+
+
+def with_tenant(doc: dict, user: dict) -> dict:
+    """Stamp company_id onto a doc before insert."""
+    doc["company_id"] = user["company_id"]
+    return doc
+
+
+async def get_company(user: dict) -> dict:
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+    if not company:
+        raise HTTPException(404, "Company not found")
+    return company
+
+
+def require_feature(feature: str):
+    """FastAPI dependency that 402s if the user's company tier doesn't include `feature`."""
+    async def _dep(user: dict = Depends(get_current_user)) -> dict:
+        company = await get_company(user)
+        if feature not in (company.get("features") or []):
+            raise HTTPException(
+                402,
+                f"Feature '{feature}' is not available on the {company.get('tier', 'lite')} tier. "
+                f"Upgrade your plan in Settings → Organization.",
+            )
+        return user
+    return _dep
+
+
 async def audit(action: str, resource: str, user: dict, meta: Optional[dict] = None):
     """Fire-and-forget audit log entry. Never raises to caller."""
     try:
         await db.audit_logs.insert_one({
             "id": str(uuid.uuid4()),
+            "company_id": user.get("company_id"),
             "action": action,
             "resource": resource,
             "user_id": user.get("id"),

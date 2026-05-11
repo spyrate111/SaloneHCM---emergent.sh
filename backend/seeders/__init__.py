@@ -1,0 +1,21 @@
+"""SaloneHCM seed orchestrator — runs per-domain seeders in order."""
+from core import db, logger
+from . import companies, users, employees, benefits, talent
+from . import migrate
+
+
+async def seed() -> None:
+    """Run all seeders idempotently on startup."""
+    await db.users.create_index("email", unique=True)
+    await db.employees.create_index("email", unique=True)
+
+    # Backfill old data first (no company_id), then seed missing.
+    demo_id, _gov_id = await companies.seed()
+    await migrate.backfill_company_id(default_company_id=demo_id)
+
+    await users.seed_admin(company_id=demo_id)
+    await employees.seed(company_id=demo_id)
+    await employees.backfill_bank_and_managers()
+    await benefits.seed(company_id=demo_id)
+    await talent.seed(company_id=demo_id)
+    logger.info("Seed complete")

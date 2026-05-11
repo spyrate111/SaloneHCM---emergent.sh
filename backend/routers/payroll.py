@@ -3,7 +3,7 @@ import io
 import csv
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from core import db, get_current_user, require_admin, audit
+from core import db, get_current_user, require_admin, audit, tenant_filter
 from models import PayrollRunIn
 from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf
 
@@ -11,8 +11,11 @@ router = APIRouter(prefix="/payroll", tags=["payroll"])
 
 
 @router.post("/preview")
-async def preview_payroll(_: dict = Depends(require_admin)):
-    emps = await db.employees.find({"status": "active"}, {"_id": 0}).to_list(2000)
+async def preview_payroll(user: dict = Depends(require_admin)):
+    emps = await db.employees.find(
+        {"status": "active", **tenant_filter(user)},
+        {"_id": 0},
+    ).to_list(2000)
     slips = [calc_payslip(e) for e in emps]
     totals = {
         "employee_count": len(slips),
@@ -31,13 +34,13 @@ async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
 
 
 @router.get("/runs")
-async def list_runs(_: dict = Depends(get_current_user)):
-    return await db.payroll_runs.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+async def list_runs(user: dict = Depends(get_current_user)):
+    return await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.get("/runs/{rid}")
-async def get_run(rid: str, _: dict = Depends(get_current_user)):
-    r = await db.payroll_runs.find_one({"id": rid}, {"_id": 0})
+async def get_run(rid: str, user: dict = Depends(get_current_user)):
+    r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Not found")
     return r
@@ -48,7 +51,7 @@ async def my_payslip(user: dict = Depends(get_current_user)):
     eid = user.get("employee_id")
     if not eid:
         return {"slip": None}
-    e = await db.employees.find_one({"id": eid}, {"_id": 0})
+    e = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
     if not e:
         return {"slip": None}
     return {"slip": calc_payslip(e)}
@@ -59,7 +62,7 @@ async def my_payslips(user: dict = Depends(get_current_user)):
     eid = user.get("employee_id")
     if not eid:
         return []
-    runs = await db.payroll_runs.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    runs = await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(50)
     out = []
     for r in runs:
         slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
@@ -72,13 +75,14 @@ async def my_payslips(user: dict = Depends(get_current_user)):
 async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)):
     if user["role"] != "admin" and user.get("employee_id") != eid:
         raise HTTPException(403, "Forbidden")
-    r = await db.payroll_runs.find_one({"id": rid}, {"_id": 0})
+    r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
     slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
     if not slip:
         raise HTTPException(404, "Payslip not found")
-    pdf = build_payslip_pdf(slip, r["period"])
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+    pdf = build_payslip_pdf(slip, r["period"], company=company.get("name") if company else "Demo Salone Ltd.")
     fname = f"payslip-{slip['employee_name'].replace(' ', '_')}-{r['period']}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf), media_type="application/pdf",
@@ -89,10 +93,10 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
 @router.get("/runs/{rid}/bank-file")
 async def bank_file(rid: str, user: dict = Depends(require_admin)):
     """NRC clearing CSV — bank_name, account_no, beneficiary, amount, reference."""
-    r = await db.payroll_runs.find_one({"id": rid}, {"_id": 0})
+    r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
-    emps = await db.employees.find({}, {"_id": 0}).to_list(2000)
+    emps = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
     emp_map = {e["id"]: e for e in emps}
     buf = io.StringIO()
     writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)

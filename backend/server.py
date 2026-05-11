@@ -9,12 +9,12 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from core import client, limiter
-from seed import seed
+from seeders import seed
 from storage import init_storage
 from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
-    documents,
+    documents, company,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +53,7 @@ api.include_router(analytics.router)
 api.include_router(simulator.router)
 api.include_router(team.router)
 api.include_router(documents.router)
+api.include_router(company.router)
 
 
 @api.get("/")

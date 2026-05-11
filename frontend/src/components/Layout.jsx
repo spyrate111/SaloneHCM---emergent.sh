@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useFeatures, TIER_COLORS } from "../lib/features";
 import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
@@ -8,28 +9,31 @@ import {
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "employee"] },
-  { to: "/employees", label: "Employees", icon: Users, roles: ["admin"] },
-  { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin"] },
-  { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: ["admin"] },
-  { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin"] },
-  { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "employee"] },
-  { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "employee"] },
-  { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "employee"] },
-  { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "employee"] },
-  { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "employee"] },
-  { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin"] },
-  { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "employee"] },
+  { to: "/employees", label: "Employees", icon: Users, roles: ["admin"], feature: "employees" },
+  { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin"], feature: "payroll" },
+  { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: ["admin"], feature: "simulator" },
+  { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin"], feature: "compliance" },
+  { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "employee"], feature: "leave" },
+  { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "employee"], feature: "attendance" },
+  { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "employee"], feature: "benefits" },
+  { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "employee"], feature: "talent" },
+  { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "employee"], feature: "documents" },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin"], feature: "analytics" },
+  { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "employee"], feature: "ai_assistant" },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin"] },
-  { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin"] },
+  { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin"], feature: "audit_log" },
   { to: "/team", label: "My Team", icon: UserCircle, roles: ["admin", "employee"] },
   { to: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { has, company, tier } = useFeatures();
   const nav = useNavigate();
   if (!user) return null;
-  const items = NAV.filter((n) => n.roles.includes(user.role));
+  const items = NAV.filter((n) => n.roles.includes(user.role) && (!n.feature || has(n.feature)));
+  const tierKey = tier || "lite";
+  const tierColor = TIER_COLORS[tierKey] || TIER_COLORS.lite;
 
   return (
     <div className="min-h-screen flex bg-[#F7F6F2]">
@@ -94,10 +98,20 @@ export default function Layout() {
       <div className="flex-1 ml-64 min-h-screen flex flex-col">
         <header className="sticky top-0 z-20 h-16 px-8 flex items-center justify-between border-b border-[#E2DFD6] bg-white/85 backdrop-blur">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-[#525860]">Republic of Sierra Leone</div>
-            <div className="text-sm font-medium text-[#1A1C1E]">SaloneHCM Professional</div>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-[#525860]" data-testid="header-company-country">
+              Republic of Sierra Leone
+            </div>
+            <div className="text-sm font-medium text-[#1A1C1E]" data-testid="header-company-name">
+              {company?.name || "SaloneHCM"}
+            </div>
           </div>
           <div className="flex items-center gap-3">
+            <span
+              data-testid="header-tier-badge"
+              className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium px-2.5 py-1 rounded-full ${tierColor}`}
+            >
+              {company?.label || "SaloneHCM"}
+            </span>
             <span className="hidden md:inline-flex items-center gap-2 text-xs text-[#525860] font-data px-3 py-1.5 rounded-full border border-[#E2DFD6] bg-white">
               <span className="w-1.5 h-1.5 rounded-full bg-[#2D7A5D]" /> NRA & NASSIT compliant
             </span>

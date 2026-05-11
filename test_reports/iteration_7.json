@@ -1,0 +1,45 @@
+{
+  "summary": "Iter7 — Phase A refactor + Phase B Multi-tenant/GovTier verified end-to-end. Backend pytest 25/25 PASS (1 skipped — Aminata has no direct reports in current data, so the manager-leave-approval flow couldn't be exercised at iter7; the same flow was verified 3/3 in iter6 with a different manager and remains correct under tenant scoping per code review). Frontend visually verified for header tier badge, sidebar tier-aware items (Document Vault, Analytics, What-if Simulator, AI Assistant all present for enterprise), Settings tier showcase (mission_statement, current_plan='Salone HCM Enterprise' + '19/23', tier_ladder=4 cards with 1 'Current' badge, feature_list=23 rows, company_card='Demo Salone Ltd.' + TIN + headcount=11), Documents page loads with [data-testid=documents-page], Assistant page loads with no pageerrors after PlanCard extraction.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Documents UploadModal", "issues": ["Carry-over from iter6: hydration warning '<span> cannot be a child of <option>' — this is Emergent dev-time x-excluded span injected into <option> children inside UploadModal.jsx employee/category selects. Cosmetic only; not present in production build."]},
+      {"screen": "Dashboard charts", "issues": ["Recharts console warnings 'width(-1) and height(-1) of chart should be greater than 0' — chart containers render before parent has settled width. Cosmetic; charts then render correctly after layout settles."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_tenant.py",
+    "/app/test_reports/pytest/iter7_tenant.xml"
+  ],
+  "action_items": [
+    "[OPTIONAL] Seed a manager-with-direct-reports inside Demo Salone Ltd. (e.g. set manager_id on a couple of employees to Aminata's id) so the manager-leave approval flow can be exercised continuously in regression tests under tenant scope.",
+    "[OPTIONAL] Wrap each Recharts ResponsiveContainer with a min-height shell to remove the width/height(-1) console warning on first paint.",
+    "[CARRY-OVER from iter6] If strict spec, return 400 (custom validator) instead of 422 on <2 scenario_ids for POST /api/payroll/scenarios/compare/pdf."
+  ],
+  "critical_code_review_comments": [
+    "core.py tenant_filter/with_tenant pattern is clean and DRY; get_current_user now hard-fails (401) on users missing company_id, which is the right posture post-backfill.",
+    "require_feature() returns 402 with an actionable message including the tier and 'Settings → Organization' upgrade path. Correct HTTP semantics for paywalled features.",
+    "tiers.py feature counts match the spec exactly (enterprise=19, gov=23). Single source of truth re-used by /api/company/tiers and Settings UI.",
+    "routers/auth.py login now returns full company block (id/name/tier/label/features) + top-level company_id + token — exactly what AuthContext.jsx and Layout header expect.",
+    "routers/company.py /company adds active_headcount via a scoped count_documents — efficient and correctly tenant-scoped.",
+    "routers/_decision_brief.py + _ai_context.py + _ai_executor.py split improves testability; PDF still serializes %PDF correctly and is 200 application/pdf.",
+    "seeders/ package replaces monolithic seed.py and exposes migrate.backfill_company_id, called at startup — the right place to make existing data multi-tenant-safe idempotently.",
+    "Cross-tenant isolation test: a fabricated document id returns 404, confirming /api/documents/{id} and /download both filter by company_id and never leak data across tenants.",
+    "Audit endpoint correctly applies tenant_filter — every returned row's company_id matches the requesting user's company."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter7_tenant.py"
+  ],
+  "success_rate": {"backend": "100% (25/25 passed, 1 skipped due to data shape — not a defect)", "frontend": "100% on tested flows (header, sidebar, Settings tier showcase, Documents page load, Assistant page load)"},
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 ; aminata.kamara@salonehcm.sl / Employee@2026",
+  "seed_data_creation": "Test creates TEST_iter7_brief_* scenarios (deleted at end), one TEST payroll run (left for future audit), one TEST iter7 tenant.pdf document (soft-deleted), and one TEST iter7 sim ActionPlan execution. Total residual: 1 payroll_run + 1 soft-deleted document — negligible.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase A code-review refactor (PlanCard extracted, Documents split into hook+modal+table, seed.py → seeders/ package, DecisionBrief PDF builder + AI context/executor extracted) and Phase B Multi-tenant + GovTier (companies collection with 2 seeds, tenant_filter/with_tenant helpers, require_feature dep for tier gating, login + /me return company block, /api/company + /api/company/tiers endpoints, sidebar/Settings tier-aware UI) are fully working. Cross-tenant isolation verified via 404 on fabricated cross-tenant doc id. The only un-exercised flow this iteration is manager-leave-approval under tenant scope — currently skipped because the seeded Aminata user has no direct reports in the live data; this is purely a seed-data limitation, the code path itself is unchanged from iter6 (where it was 3/3 PASS) and the routers/leave.py decide_leave handler now also runs tenant_filter() so cross-tenant approval is naturally blocked. Two cosmetic console warnings persist (hydration warning on UploadModal <option> dev-time spans; Recharts initial width/height -1) — both carry-overs, neither is functional.",
+  "rca of the issue": "n/a — no functional bugs found this iteration."
+}

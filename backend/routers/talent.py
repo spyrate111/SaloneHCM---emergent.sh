@@ -4,9 +4,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 
-from core import db, get_current_user, require_admin, audit, now_utc, iso
+from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, require_feature
 
-router = APIRouter(prefix="/talent", tags=["talent"])
+router = APIRouter(prefix="/talent", tags=["talent"], dependencies=[Depends(require_feature("talent"))])
 
 
 # ---- Job postings + applicants ----
@@ -35,14 +35,14 @@ class ApplicantStageUpdate(BaseModel):
 
 
 @router.get("/postings")
-async def list_postings(_: dict = Depends(get_current_user)):
-    return await db.job_postings.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+async def list_postings(user: dict = Depends(get_current_user)):
+    return await db.job_postings.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.post("/postings")
 async def create_posting(body: JobPostingIn, user: dict = Depends(require_admin)):
     pid = str(uuid.uuid4())
-    doc = {**body.model_dump(), "id": pid, "created_at": iso(now_utc())}
+    doc = with_tenant({**body.model_dump(), "id": pid, "created_at": iso(now_utc())}, user)
     await db.job_postings.insert_one(doc)
     doc.pop("_id", None)
     await audit("create", f"job_postings/{pid}", user, {"title": body.title})
@@ -51,16 +51,18 @@ async def create_posting(body: JobPostingIn, user: dict = Depends(require_admin)
 
 @router.delete("/postings/{pid}")
 async def delete_posting(pid: str, user: dict = Depends(require_admin)):
-    await db.job_postings.delete_one({"id": pid})
-    await db.applicants.delete_many({"posting_id": pid})
+    tf = tenant_filter(user)
+    await db.job_postings.delete_one({"id": pid, **tf})
+    await db.applicants.delete_many({"posting_id": pid, **tf})
     await audit("delete", f"job_postings/{pid}", user)
     return {"ok": True}
 
 
 @router.get("/applicants")
-async def list_applicants(_: dict = Depends(require_admin)):
-    rows = await db.applicants.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    postings = {p["id"]: p["title"] for p in await db.job_postings.find({}, {"_id": 0}).to_list(500)}
+async def list_applicants(user: dict = Depends(require_admin)):
+    tf = tenant_filter(user)
+    rows = await db.applicants.find(tf, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    postings = {p["id"]: p["title"] for p in await db.job_postings.find(tf, {"_id": 0}).to_list(500)}
     for r in rows:
         r["posting_title"] = postings.get(r["posting_id"], "—")
     return rows
@@ -69,7 +71,7 @@ async def list_applicants(_: dict = Depends(require_admin)):
 @router.post("/applicants")
 async def create_applicant(body: ApplicantIn, user: dict = Depends(require_admin)):
     aid = str(uuid.uuid4())
-    doc = {**body.model_dump(), "id": aid, "created_at": iso(now_utc())}
+    doc = with_tenant({**body.model_dump(), "id": aid, "created_at": iso(now_utc())}, user)
     await db.applicants.insert_one(doc)
     doc.pop("_id", None)
     await audit("create", f"applicants/{aid}", user, {"name": body.name})
@@ -78,7 +80,10 @@ async def create_applicant(body: ApplicantIn, user: dict = Depends(require_admin
 
 @router.patch("/applicants/{aid}/stage")
 async def update_stage(aid: str, body: ApplicantStageUpdate, user: dict = Depends(require_admin)):
-    res = await db.applicants.update_one({"id": aid}, {"$set": {"stage": body.stage}})
+    res = await db.applicants.update_one(
+        {"id": aid, **tenant_filter(user)},
+        {"$set": {"stage": body.stage}},
+    )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
     await audit("applicant_stage", f"applicants/{aid}", user, {"stage": body.stage})
@@ -96,9 +101,10 @@ class ReviewIn(BaseModel):
 
 @router.get("/reviews")
 async def list_reviews(user: dict = Depends(get_current_user)):
-    q = {} if user["role"] == "admin" else {"employee_id": user.get("employee_id")}
+    tf = tenant_filter(user)
+    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.performance_reviews.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    employees = {e["id"]: e for e in await db.employees.find({}, {"_id": 0}).to_list(2000)}
+    employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
     for r in rows:
         e = employees.get(r["employee_id"], {})
         r["employee_name"] = f'{e.get("first_name","")} {e.get("last_name","")}'.strip() or "—"
@@ -108,7 +114,7 @@ async def list_reviews(user: dict = Depends(get_current_user)):
 @router.post("/reviews")
 async def create_review(body: ReviewIn, user: dict = Depends(require_admin)):
     rid = str(uuid.uuid4())
-    doc = {**body.model_dump(), "id": rid, "reviewer": body.reviewer or user["email"], "created_at": iso(now_utc())}
+    doc = with_tenant({**body.model_dump(), "id": rid, "reviewer": body.reviewer or user["email"], "created_at": iso(now_utc())}, user)
     await db.performance_reviews.insert_one(doc)
     doc.pop("_id", None)
     await audit("create", f"performance_reviews/{rid}", user, {"period": body.period, "rating": body.rating})
@@ -132,14 +138,14 @@ class CompletionIn(BaseModel):
 
 
 @router.get("/programs")
-async def list_programs(_: dict = Depends(get_current_user)):
-    return await db.training_programs.find({}, {"_id": 0}).sort("title", 1).to_list(500)
+async def list_programs(user: dict = Depends(get_current_user)):
+    return await db.training_programs.find(tenant_filter(user), {"_id": 0}).sort("title", 1).to_list(500)
 
 
 @router.post("/programs")
 async def create_program(body: ProgramIn, user: dict = Depends(require_admin)):
     pid = str(uuid.uuid4())
-    doc = {**body.model_dump(), "id": pid, "created_at": iso(now_utc())}
+    doc = with_tenant({**body.model_dump(), "id": pid, "created_at": iso(now_utc())}, user)
     await db.training_programs.insert_one(doc)
     doc.pop("_id", None)
     await audit("create", f"training_programs/{pid}", user, {"title": body.title})
@@ -148,17 +154,18 @@ async def create_program(body: ProgramIn, user: dict = Depends(require_admin)):
 
 @router.delete("/programs/{pid}")
 async def delete_program(pid: str, user: dict = Depends(require_admin)):
-    await db.training_programs.delete_one({"id": pid})
+    await db.training_programs.delete_one({"id": pid, **tenant_filter(user)})
     await audit("delete", f"training_programs/{pid}", user)
     return {"ok": True}
 
 
 @router.get("/completions")
 async def list_completions(user: dict = Depends(get_current_user)):
-    q = {} if user["role"] == "admin" else {"employee_id": user.get("employee_id")}
+    tf = tenant_filter(user)
+    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.training_completions.find(q, {"_id": 0}).sort("completed_on", -1).to_list(1000)
-    progs = {p["id"]: p for p in await db.training_programs.find({}, {"_id": 0}).to_list(500)}
-    employees = {e["id"]: e for e in await db.employees.find({}, {"_id": 0}).to_list(2000)}
+    progs = {p["id"]: p for p in await db.training_programs.find(tf, {"_id": 0}).to_list(500)}
+    employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
     for r in rows:
         p = progs.get(r["program_id"], {})
         e = employees.get(r["employee_id"], {})
@@ -174,7 +181,7 @@ async def add_completion(body: CompletionIn, user: dict = Depends(get_current_us
     if not eid:
         raise HTTPException(400, "employee_id required")
     cid = str(uuid.uuid4())
-    doc = {**body.model_dump(), "id": cid, "employee_id": eid, "created_at": iso(now_utc())}
+    doc = with_tenant({**body.model_dump(), "id": cid, "employee_id": eid, "created_at": iso(now_utc())}, user)
     await db.training_completions.insert_one(doc)
     doc.pop("_id", None)
     await audit("training_completed", f"training_completions/{cid}", user)
