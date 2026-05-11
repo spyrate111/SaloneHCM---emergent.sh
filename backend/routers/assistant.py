@@ -111,6 +111,7 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
         "ts": iso(now_utc()),
     })
 
+    reply: str = ""
     try:
         reply = await chat.send_message(UserMessage(text=body.message))
     except Exception as e:

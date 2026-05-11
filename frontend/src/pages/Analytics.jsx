@@ -4,8 +4,10 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, Legend,
 } from "recharts";
+import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
 const PIE_COLORS = ["#133326", "#26547C", "#D1603D", "#8B6A14", "#2D7A5D", "#9A2A52"];
+const LEGEND_STYLE = { fontSize: 12 };
 
 export default function Analytics() {
   const [trend, setTrend] = useState([]);
@@ -42,8 +44,8 @@ export default function Analytics() {
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="period" stroke="#686D76" fontSize={11} />
                 <YAxis stroke="#686D76" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} formatter={(v) => fmtSLE(v)} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
+                <Legend wrapperStyle={LEGEND_STYLE} />
                 <Line type="monotone" dataKey="gross" stroke="#26547C" strokeWidth={2} dot={false} name="Gross" />
                 <Line type="monotone" dataKey="net" stroke="#133326" strokeWidth={2} dot={false} name="Net" />
                 <Line type="monotone" dataKey="paye" stroke="#D1603D" strokeWidth={2} dot={false} name="PAYE" />
@@ -62,7 +64,7 @@ export default function Analytics() {
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="name" stroke="#686D76" fontSize={11} />
                 <YAxis stroke="#686D76" fontSize={11} />
-                <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Bar dataKey="days" fill="#D1603D" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -78,7 +80,7 @@ export default function Analytics() {
                 <Pie data={usage.by_type} dataKey="days" nameKey="type" cx="50%" cy="50%" outerRadius={90} label={(e) => `${e.type} (${e.days}d)`}>
                   {usage.by_type.map((entry, i) => <Cell key={entry.type} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -99,7 +101,7 @@ export default function Analytics() {
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="date" stroke="#686D76" fontSize={10} />
                 <YAxis stroke="#686D76" fontSize={11} />
-                <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Area type="monotone" dataKey="count" stroke="#26547C" strokeWidth={2} fill="url(#g2)" />
               </AreaChart>
             </ResponsiveContainer>

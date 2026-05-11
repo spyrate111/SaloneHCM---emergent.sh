@@ -5,7 +5,9 @@ import { Plus, Trash2, Play, TrendingUp, TrendingDown, Sparkles, Save, Share2, C
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
+import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
+const LEGEND_STYLE = { fontSize: 12 };
 const blankRule = { name: "", target: "all", department: "", employee_id: "", basic_pct_change: 0, basic_flat_add: 0, allowances_pct_change: 0, allowances_flat_add: 0 };
 const newRuleId = () => `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -313,8 +315,8 @@ export default function Simulator() {
                   <CartesianGrid stroke="#EBE8E0" vertical={false} />
                   <XAxis dataKey="name" stroke="#686D76" fontSize={11} />
                   <YAxis stroke="#686D76" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} formatter={(v) => fmtSLE(v)} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
+                  <Legend wrapperStyle={LEGEND_STYLE} />
                   <Bar dataKey="current" fill="#26547C" radius={[4, 4, 0, 0]} name="Current" />
                   <Bar dataKey="projected" fill="#D1603D" radius={[4, 4, 0, 0]} name="Projected" />
                 </BarChart>

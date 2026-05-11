@@ -5,6 +5,10 @@ import { Users, Wallet, Receipt, CalendarClock, ArrowUpRight } from "lucide-reac
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
 } from "recharts";
+import { TOOLTIP_STYLE } from "../lib/chartStyles";
+
+const BAR_LEFT_MARGIN = { left: 0 };
+const BAR_RADIUS = [0, 4, 4, 0];
 
 const KPI = ({ label, value, sub, icon: Icon, accent }) => (
   <div className="bg-white border border-[#E2DFD6] rounded-lg p-5 hover:shadow-sm transition" data-testid={`kpi-${label.toLowerCase().replace(/\s/g, "-")}`}>
@@ -69,7 +73,7 @@ export default function Dashboard() {
                   <CartesianGrid stroke="#EBE8E0" vertical={false} />
                   <XAxis dataKey="period" stroke="#686D76" fontSize={11} />
                   <YAxis stroke="#686D76" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} formatter={(v) => fmtSLE(v)} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
                   <Area type="monotone" dataKey="net" stroke="#133326" strokeWidth={2} fill="url(#g1)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -84,12 +88,12 @@ export default function Dashboard() {
           <h3 className="font-heading text-lg font-semibold mb-4">Departments</h3>
           <div style={{ width: "100%", height: 256 }}>
             <ResponsiveContainer width="99%" height="99%">
-              <BarChart data={data.departments} layout="vertical" margin={{ left: 0 }}>
+              <BarChart data={data.departments} layout="vertical" margin={BAR_LEFT_MARGIN}>
                 <CartesianGrid stroke="#EBE8E0" horizontal={false} />
                 <XAxis type="number" stroke="#686D76" fontSize={11} />
                 <YAxis type="category" dataKey="name" stroke="#686D76" fontSize={11} width={110} />
-                <Tooltip contentStyle={{ background: "#fff", border: "1px solid #E2DFD6", borderRadius: 8, fontSize: 12 }} />
-                <Bar dataKey="count" fill="#26547C" radius={[0, 4, 4, 0]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Bar dataKey="count" fill="#26547C" radius={BAR_RADIUS} />
               </BarChart>
             </ResponsiveContainer>
           </div>

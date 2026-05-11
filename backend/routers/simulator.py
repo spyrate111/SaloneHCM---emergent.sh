@@ -103,9 +103,20 @@ async def _do_simulate(body: SimIn, user: dict) -> dict:
     cur = _totals(cur_slips)
     proj = _totals(proj_slips)
     delta = {k: round(proj[k] - cur[k], 2) for k in cur if k != "employee_count"}
-
     affected_ids = {e["id"] for e in emps if any(_matches(r, e) for r in body.rules)}
 
+    return {
+        "current": cur,
+        "projected": proj,
+        "delta": delta,
+        "annualized_delta_employer_cost": round(delta["employer_total_cost"] * 12, 2),
+        "affected_employees_count": len(affected_ids),
+        "employees": _per_employee_rows(emps, cur_slips, proj_slips, affected_ids),
+        "by_department": _by_department(emps, cur_slips, proj_slips),
+    }
+
+
+def _per_employee_rows(emps, cur_slips, proj_slips, affected_ids):
     rows = []
     for e, cs, ps in zip(emps, cur_slips, proj_slips):
         if e["id"] not in affected_ids:
@@ -123,8 +134,11 @@ async def _do_simulate(body: SimIn, user: dict) -> dict:
             "delta_net": round(ps["net"] - cs["net"], 2),
         })
     rows.sort(key=lambda r: -r["delta_gross"])
+    return rows
 
-    by_dept = {}
+
+def _by_department(emps, cur_slips, proj_slips):
+    by_dept: dict = {}
     for e, cs, ps in zip(emps, cur_slips, proj_slips):
         d = by_dept.setdefault(e["department"], {"name": e["department"], "current": 0, "projected": 0})
         d["current"] += cs["gross"]
@@ -133,16 +147,7 @@ async def _do_simulate(body: SimIn, user: dict) -> dict:
         d["current"] = round(d["current"], 2)
         d["projected"] = round(d["projected"], 2)
         d["delta"] = round(d["projected"] - d["current"], 2)
-
-    return {
-        "current": cur,
-        "projected": proj,
-        "delta": delta,
-        "annualized_delta_employer_cost": round(delta["employer_total_cost"] * 12, 2),
-        "affected_employees_count": len(rows),
-        "employees": rows,
-        "by_department": sorted(by_dept.values(), key=lambda x: -x["delta"]),
-    }
+    return sorted(by_dept.values(), key=lambda x: -x["delta"])
 
 
 # ---------- Saved scenarios ----------
