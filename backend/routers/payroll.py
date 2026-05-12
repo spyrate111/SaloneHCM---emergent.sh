@@ -3,11 +3,18 @@ import io
 import csv
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from core import db, get_current_user, require_admin, audit, tenant_filter
+from pydantic import BaseModel
+
+from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
 from models import PayrollRunIn
 from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf
+from sms import send_payslip_batch, is_configured as sms_is_configured
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
+
+
+class SendSmsIn(BaseModel):
+    dry_run: bool = False
 
 
 @router.post("/preview")
@@ -116,3 +123,46 @@ async def bank_file(rid: str, user: dict = Depends(require_admin)):
         io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="bank-file-{r["period"]}.csv"'},
     )
+
+
+@router.get("/sms/status")
+async def sms_status(_: dict = Depends(require_admin)):
+    """Tell the frontend whether Twilio creds are wired so it can warn the admin."""
+    return {"twilio_configured": sms_is_configured()}
+
+
+@router.post("/runs/{rid}/send-sms")
+async def send_payslip_sms(
+    rid: str,
+    body: SendSmsIn,
+    user: dict = Depends(require_feature("bulk_sms_payslips")),
+):
+    if user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(403, "Admin only")
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Payroll run not found")
+    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    summary = await send_payslip_batch(run, employees, user, dry_run=body.dry_run)
+    await audit(
+        "sms_bulk_send",
+        f"payroll_runs/{rid}",
+        user,
+        {
+            "period": run["period"],
+            "sent": summary["sent"],
+            "failed": summary["failed"],
+            "skipped": summary["skipped"],
+            "dry_run": summary["dry_run"],
+            "batch_id": summary["batch_id"],
+        },
+    )
+    return summary
+
+
+@router.get("/sms/logs")
+async def list_sms_logs(user: dict = Depends(require_admin)):
+    rows = await db.sms_logs.find(
+        tenant_filter(user), {"_id": 0}
+    ).sort("sent_at", -1).to_list(500)
+    return rows

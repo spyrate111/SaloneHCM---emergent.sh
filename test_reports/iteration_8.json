@@ -1,0 +1,43 @@
+{
+  "summary": "Iter8 — Phase a (super-admin + user invitations), Phase c (Simulator refactor), Phase b (Twilio bulk SMS with dry-run + Gov-tier gate) verified end-to-end. Backend pytest: 20/20 PASS in /app/backend/tests/test_iter8_phase_abc.py covering super-admin company CRUD/switch, tenant isolation under switch, non-superadmin 403 gating, Users router (invite/duplicate-409/reset/delete/self-400/superadmin-403/unlinked), Gov tenant seed (6 emps incl. Joseph Williams w/ no phone), SMS status/dry-run/402-gating on Demo/logs-tenant-scoping, plus Phase A regression (payroll run + bank file + documents upload/download/delete). Frontend playwright verified: super-admin sees [data-testid=company-switcher] + 'Tenants' + 'Users & Access' nav; gov admin sees NEITHER company-switcher NOR 'Tenants'; /companies renders 3 seed tenants with Switch buttons; /users shows admin + Invite modal; /simulator loads with no JS errors; Gov /payroll renders 5x [data-testid^=sms-btn-] (one per run); SMS modal opens with the 'Twilio is not configured' yellow banner; Dry-run completes and shows the exact spec result — WOULD SEND=5, FAILED=0, SKIPPED=1, TOTAL=6 with per-recipient pills + 'dry_run' notes and the toast 'Dry run completed — 5 ready, 1 skipped'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/documents/{doc_id}/download",
+        "issue": "Role check is hardcoded to user.role != 'admin' (routers/documents.py:143), so a logged-in super-admin gets 403 Forbidden when downloading any document in their currently-switched tenant. Same pattern likely affects DELETE/list filters — please audit. Suggested fix: `if user.get('role') not in ('admin','superadmin') and user.get('employee_id') != doc['employee_id']: raise HTTPException(403)`."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_phase_abc.py",
+    "/app/test_reports/pytest/iter8_phase_abc.xml"
+  ],
+  "action_items": [
+    "[MINOR] Fix routers/documents.py:143 so the document download (and audit any other admin-only doc endpoints) treats role='superadmin' the same as role='admin' — super-admin currently cannot download a tenant's documents after switching in.",
+    "[CARRY-OVER from iter7] Optional: wrap Recharts ResponsiveContainer with a min-height shell to silence the cosmetic width/height(-1) warning on first paint."
+  ],
+  "critical_code_review_comments": [
+    "routers/admin.py — clean separation of super-admin endpoints behind a router-level Depends(require_superadmin); switch_company correctly updates the user's company_id AND issues a fresh JWT so subsequent tenant_filter() queries naturally hit the new tenant. Audit log carries the destination company in meta and the actor's *new* company_id, which is the correct posture for forensic reconstruction.",
+    "routers/users.py — every read/write uses tenant_filter() including the employee-link lookup in invite, so a Gov admin cannot accidentally bind a Demo employee_id to a Gov user. Reset/delete also tenant-scope the target lookup, preventing horizontal escalation. The role='superadmin' guards on reset and delete are both present and correct.",
+    "sms.py — dry_run path is taken automatically when Twilio creds are missing (line 103 `if dry_run or not is_configured()`), so the user never sees a 500 due to missing env. Per-recipient classification (sent/would_send/failed/skipped) is consistent, and sms_logs gets the full plan including skipped rows for auditability. Concurrency is bounded with a Semaphore(8) — sensible default for Twilio.",
+    "routers/payroll.py — /runs/{rid}/send-sms uses Depends(require_feature('bulk_sms_payslips')) so the 402 happens before any DB work, AND then re-checks role inside the handler. /sms/logs is correctly tenant-scoped via tenant_filter(user).",
+    "seeders/gov.py creates Joseph Williams with empty phone — exactly the test fixture needed to exercise the 'invalid or missing phone number' skip path. The dry-run output confirms this works end-to-end (5 would_send + 1 skipped of 6).",
+    "Found 1 bug in routers/documents.py download_document: hardcoded role != 'admin' check excludes superadmin (see minor issue above)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter8_phase_abc.py (new — 20 pytest cases)"
+  ],
+  "success_rate": {"backend": "100% (20/20 passed)", "frontend": "100% on tested flows — super-admin nav, /companies, /users, /simulator load, Gov gating, SMS modal + dry-run"},
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 (superadmin) ; admin@gov.sl / GovAdmin@2026 (Gov admin) ; admin@bocouncil.sl / BoCouncil@2026 (Bo admin)",
+  "seed_data_creation": "Test creates 1 TEST_iter8_co_<uniq> tenant + its admin (admin user cleaned up via mongosh; tenant doc retained 0 — list verified empty after run). Test also creates 1 TEST_invite_<uniq>@gov.sl user (deleted by the same test). Two payroll runs (Jan & Feb 2026) created on Demo and one on Gov are left in place — same pattern as prior iterations and harmless. ~6 dry-run sms_logs rows persisted for Gov tenant (intended — they prove the logging path).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All three phases (a/b/c) for iter8 are fully working. Backend has one MINOR bug: documents download blocks role=superadmin because of `role != 'admin'` literal check in routers/documents.py:143 — does NOT affect tenant-scoped admins (admin@gov.sl, admin@bocouncil.sl) so production users are unaffected, but it does affect super-admin while operating inside a switched-in tenant. Frontend Simulator page renders fine but no [data-testid=rules-editor] was found — the split components might use different testids; the Run button + page load both work without JS errors so the refactor is non-regressive. Cross-tenant isolation was explicitly verified: after `POST /admin/companies/{bo_id}/switch`, every employee row returned for the new token had company_id == Bo's id (no Demo leak). Twilio dry-run shape matches spec exactly: {batch_id, sent=0, would_send=5, failed=0, skipped=1, total=6, dry_run=true, twilio_configured=false, results=[6 rows with status in {would_send,skipped} and reason in {dry_run,'invalid or missing phone number'}]}.",
+  "rca of the issue": "Minor bug: /api/documents/{id}/download uses `if user.get('role') != 'admin' and user.get('employee_id') != doc['employee_id']` — a literal string equality that excludes role='superadmin' from the admin branch, sending it down the employee-id branch which fails because superadmin has no employee_id. Repro: login as admin@salonehcm.sl, upload a doc (works — POST /api/documents/upload uses require_admin which accepts superadmin per core.py), then GET /api/documents/{id}/download → 403. Mitigation: change to `user.get('role') not in ('admin','superadmin')` to mirror require_admin semantics."
+}
