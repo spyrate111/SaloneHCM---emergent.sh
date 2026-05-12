@@ -58,7 +58,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-white border border-[#E2DFD6] rounded-lg p-6">
+        <div className="lg:col-span-2 bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="flex items-center justify-between mb-5">
             <div>
               <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Payroll trend</div>
@@ -67,7 +67,7 @@ export default function Dashboard() {
           </div>
           <div style={{ width: "100%", height: 256 }}>
             {data.runs_history?.length ? (
-              <ResponsiveContainer width="99%" height="99%">
+              <ResponsiveContainer width="100%" height="100%" debounce={50}>
                 <AreaChart data={data.runs_history}>
                   <defs>
                     <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
@@ -92,7 +92,7 @@ export default function Dashboard() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] mb-1">Headcount by department</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Departments</h3>
           <div style={{ width: "100%", height: 256 }}>
-            <ResponsiveContainer width="99%" height="99%">
+            <ResponsiveContainer width="100%" height="100%" debounce={50}>
               <BarChart data={data.departments} layout="vertical" margin={BAR_LEFT_MARGIN}>
                 <CartesianGrid stroke="#EBE8E0" horizontal={false} />
                 <XAxis type="number" stroke="#686D76" fontSize={11} />

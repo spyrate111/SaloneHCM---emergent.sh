@@ -1,0 +1,34 @@
+{
+  "summary": "Iter10 — NRA filing exports (PAYE CSV, NASSIT CSV, mark-filed), enriched compliance summary, tenant isolation, PWA icons, and Recharts no-regression all verified. Backend pytest: 13/13 PASS in /app/backend/tests/test_iter10_nra_filing.py. Frontend Playwright (Gov + Demo): compliance-page renders with 4 KPIs, PAYE bands, per-period export/mark-filed actions for Gov; Demo sees only legacy export-{rid}. Mark-filed flow round-trip works: dialog confirm -> button disappears -> Filed pill renders. PWA icons live (icon-192.png=3213B image/png, icon-512.png=9097B image/png, both PNG magic bytes verified). Manifest icons array intact, theme_color=#133326 set in <meta name='theme-color'>.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard / Analytics charts", "issues": ["Recharts width(-1)/height(-1) console warning still fires (Recharts 3.6 + React 19 strict-mode race). Confirmed cosmetic — charts render correctly. Documented as won't-fix per handoff."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter10_nra_filing.py",
+    "/app/test_reports/pytest/iter10_nra.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/compliance.py — NRA PAYE CSV correctly computes Sierra Leone taxable = gross - nassit_employee (line 102), matching NRA convention. NASSIT 5%/10% labels in CSV columns (employee_5pct/employer_10pct/total_15pct) match the statutory rates from payroll_engine constants.",
+    "/file-nra/{rid} idempotency is correct: existence check on (run_id, tenant_filter) before insert returns 409 (line 187-189). Audit log entry action='nra_filed' written after insert. NRA reference format NRA-{period}-{first8 of run id} is deterministic and human-readable.",
+    "Tenant isolation: db.nra_filings uses tf=tenant_filter(user) for BOTH find_one duplicate check AND insert (line 187, 192). /filings list endpoint filters by tenant_filter (line 212). Verified end-to-end — Demo and Gov filings lists are disjoint and only contain their own runs.",
+    "Compliance summary outstanding[] is derived from history filter — DRY, single source of truth. filed_count comes from filings collection len, not from history filter — keeps the two views consistent even if a payroll run is later deleted (filing record persists).",
+    "Compliance.jsx — uses useFeatures().has('nra_export') to gate Gov-tier UI; falls back to legacy /nra-export/{rid} JSON->CSV for non-Gov tenants. window.confirm dialog before mark-filed gives audit-safe UX. busy state prevents double-download. All interactive elements have data-testid (export-nra-paye-{rid}, export-nassit-{rid}, mark-filed-{rid}, export-{rid} for legacy).",
+    "PWA icons (3213B + 9097B PNGs) are now real files on disk under /app/frontend/public — served by react-scripts dev server as image/png. Manifest references match exactly. theme-color meta tag correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter10_nra_filing.py (NEW — 13 pytest cases covering NRA PAYE CSV, NASSIT CSV, mark-filed (incl. 409 conflict), summary, /filings tenant isolation, PWA icons, manifest)"
+  ],
+  "success_rate": { "backend": "100% (13/13)", "frontend": "100% on tested flows — Gov compliance page (4 KPIs + PAYE bands + 7 NRA + 7 NASSIT + mark-filed click round-trip), Demo compliance page (legacy export-X only, 31 buttons, 0 Gov-tier), PWA icons served, theme-color meta set" },
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 (Demo Salone, enterprise — no nra_export); admin@gov.sl / GovAdmin@2026 (Gov, has nra_export)",
+  "seed_data_creation": "The mark-filed flow created nra_filings records on the Gov tenant for the first payroll run available + one additional run via the frontend click. All records are idempotent and tenant-scoped — re-running tests returns 409 on already-filed runs without polluting other tenants. No cleanup needed; persisted filings are the expected production state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All P2/P3 unblocked backlog items shipped and verified: NRA PAYE Return CSV, NASSIT Schedule CSV, Mark NRA filed (with 409 idempotency + audit log), enriched /compliance/summary (history + outstanding + filed_count), /compliance/filings tenant isolation, PWA icons (192/512) live on disk with image/png + >500B sizes, manifest + theme-color correct. Recharts width(-1) warning is documented won't-fix (Recharts 3.6 + React 19 strict-mode noise, dev-only, charts render correctly). Pytest file /app/backend/tests/test_iter10_nra_filing.py is reusable for regression. Twilio + Resend creds remain pending from user.",
+  "rca of the issue": "N/A — no bugs found."
+}
