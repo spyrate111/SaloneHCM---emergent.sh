@@ -1,41 +1,79 @@
 ## CHANGELOG
 
-### v1.4 (May 2026) — Multi-tenant SaaS + Bulk SMS
+### v1.5 (May 2026) — Compliance, Automation, Mobile, Security
+
+**Compliance Score**
+- New `compliance_score.py` engine weighting 4 dimensions: NRA filing timeliness (25%), NASSIT contribution accuracy (30%), SMS delivery success in last 30d (20%), audit-log coverage (25%)
+- `GET /api/dashboard/compliance-score` returns `{score, grade, breakdown, weights}` — drops non-applicable dimensions cleanly so non-Gov tenants aren't penalised for missing SMS
+- Animated SVG-arc `ComplianceScoreWidget` on Dashboard with letter grade + expandable per-dimension breakdown
+
+**Recurring Payroll Schedules**
+- New `payroll_schedules` collection + `routers/schedules.py` (CRUD + manual run-now)
+- `scheduler.py` boots an in-process APScheduler (5-min tick) that fires due schedules with `_evaluate_due()`; updates `last_run_*` + recomputes `next_run_at` on each fire
+- Cadences: `monthly` (with `day_of_month` clamped to month length), `biweekly`, `weekly`
+- Frontend `/schedules` page (admin-only) with create/pause/run-now/delete
+
+**Ministry Rollup (Gov tier exclusive)**
+- New `routers/ministry.py` — `GET /api/ministry/rollup` gated on `require_feature("ministry_reports")` (Gov tier only)
+- Aggregates by department (= ministry): headcount active/total, manager count, monthly gross/net/PAYE/NASSIT, average basic, leave pending, leave-days approved in last 30d
+- Frontend `/ministry` page: KPI strip · grouped bar chart (Gross/PAYE/NASSIT per ministry) · per-ministry breakdown table
+
+**2FA for super-admin (TOTP)**
+- `twofa.py` — pyotp + qrcode; data-URL QR for the setup screen
+- New endpoints `POST /api/auth/2fa/setup|enable|disable` + `GET /api/auth/2fa/policy`
+- Login flow: `LoginIn.totp_code` optional; if `twofa_enabled`, returns structured 401 `{detail: {code: "totp_required"}}` so frontend can prompt; subsequent submit with valid code completes login
+- Enforced on `superadmin` role (`TWOFA_REQUIRED_ROLES`); super-admin cannot disable
+- Frontend: TOTP input on Login (auto-prompted on `totp_required`), `TwoFactorCard` on Settings with QR + 6-digit verify + disable flow
+
+**Mobile ESS PWA**
+- `public/manifest.json` (theme `#133326`, standalone display, shortcuts to /self-service /leave /documents)
+- `public/sw.js` — network-first for navigation, cache-first for static assets, API calls never cached
+- `index.html` — manifest link, theme-color meta, apple-mobile-web-app-* metas, proper viewport-fit
+- `Layout.jsx` — responsive sidebar (slide-in drawer on `<lg`, hamburger button in header, backdrop tap-to-close, auto-close on route change)
+- Service worker registers via `useEffect` on App mount
+
+**Bug fixes & nits this iter**
+- Removed unused vars in `tests/test_iter8_phase_abc.py`
+- Stale carry-over from iter8 audit (documents.py role check) verified clean — no remaining `role != "admin"` literals across routers
+
+**Architectural invariants preserved**
+- Every Mongo query uses `tenant_filter(user)`; every insert wrapped in `with_tenant()`
+- Tier-gated endpoints return **402** with upgrade prompt
+- All third-party integrations route through `integration_playbook_expert_v2`
+- Token in `sessionStorage` (key `salonehcm_token`); httpOnly cookie also set on login
+- APScheduler lifecycle managed by FastAPI lifespan (start on startup, stop on shutdown)
+
+---
+
+### v1.4 — Multi-tenant SaaS + Bulk SMS (May 2026)
+
 **Phase a — Super-admin + user invitations**
 - `superadmin` role with router-level `Depends(require_superadmin)` for `/api/admin/*`
 - Seed admin (`admin@salonehcm.sl`) auto-upgraded to `superadmin` on every boot (idempotent)
 - `POST /api/admin/companies` — provision new tenant + initial admin user atomically
 - `PATCH /api/admin/companies/{id}/tier` — change tier, refreshes feature list
-- `POST /api/admin/companies/{id}/switch` — moves super-admin's `company_id` and issues fresh JWT; subsequent `tenant_filter()` queries naturally hit the new tenant
-- `routers/users.py` — `GET/POST /api/users`, `/invite`, `/{id}/reset-password`, `/{id}` DELETE, `/unlinked-employees` (all tenant-scoped); guards against self-delete + super-admin tampering
-- Frontend: `Users` page (admin) + `Companies` page (super-admin) + `CompanySwitcher` dropdown in header (super-admin only)
-- `useFeatures()` exposes `isAdmin`/`isSuperAdmin` flags
-- `AuthContext` now exposes `refetch()` for post-switch user/company hydration
+- `POST /api/admin/companies/{id}/switch` — moves super-admin's `company_id` and issues fresh JWT
+- `routers/users.py` — `/api/users` CRUD + invite + reset-password + unlinked-employees
+- Frontend: `Users` page (admin) + `Companies` page (super-admin) + `CompanySwitcher` dropdown
 
 **Phase b — Twilio bulk SMS payslips**
-- `sms.py` — `send_payslip_batch()` with `asyncio.Semaphore(8)` for bounded concurrency
-- E.164 phone normalization (`+232 76 000 000` → `+23276000000`)
-- Auto dry-run when `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER` unset (graceful fallback)
-- `POST /api/payroll/runs/{rid}/send-sms` gated by `require_feature("bulk_sms_payslips")` (Gov tier only) — returns `{batch_id, sent, would_send, failed, skipped, total, dry_run, twilio_configured, results}`
-- Per-recipient `sms_logs` collection (tenant-scoped) for forensic auditability
-- `GET /api/payroll/sms/status` reports whether Twilio is wired
-- Gov tenant seeded with 6 ministerial employees (1 with empty phone to exercise skip path) + admin `admin@gov.sl / GovAdmin@2026`
-- Frontend: `SmsPayslipButton` modal with dry-run/live toggle, Twilio-not-configured banner, per-recipient pill table
+- `sms.py` — `send_payslip_batch()` with `asyncio.Semaphore(8)` bounded concurrency
+- E.164 phone normalization
+- Auto dry-run when `TWILIO_*` unset (graceful fallback)
+- `POST /api/payroll/runs/{rid}/send-sms` gated by `require_feature("bulk_sms_payslips")` (Gov tier)
+- Per-recipient `sms_logs` collection (tenant-scoped)
+- Gov tenant seeded with 6 ministerial employees + admin `admin@gov.sl / GovAdmin@2026`
+- Frontend: `SmsPayslipButton` modal
 
-**Phase b' — SMS Audit page** (added after Phase b)
-- New `GET /api/payroll/sms/summary`, `/sms/batches`, `/sms/logs.csv` endpoints (all tenant-scoped, admin-only)
-- `GET /api/payroll/sms/logs` now accepts `period`, `status`, `batch_id` query filters
-- Frontend `/sms-logs` page (gated on `bulk_sms_payslips` feature): KPI strip, batches table with drill-down, per-recipient drill view, status/period filters, CSV export for Auditor General submissions
+**Phase b' — SMS Audit page**
+- `GET /api/payroll/sms/summary`, `/sms/batches`, `/sms/logs.csv` (all tenant-scoped, admin-only)
+- `GET /api/payroll/sms/logs` accepts `period`, `status`, `batch_id` query filters
+- Frontend `/sms-logs` page with batches/recipients drill-down + CSV export
 
 **Phase c — Simulator refactor**
 - `pages/Simulator.jsx`: 558 → **96 lines** orchestrator
-- New: `hooks/useSimulator.js` (state + API actions)
-- New: `components/simulator/` — `ApprovalBanner.jsx`, `RulesEditor.jsx`, `SimulationResults.jsx`, `SavedScenariosTable.jsx`, `ComparisonPanel.jsx`, `SaveScenarioModal.jsx`, `ShareLinkModal.jsx`
+- `hooks/useSimulator.js` (state + API actions)
+- `components/simulator/`: ApprovalBanner, RulesEditor, SimulationResults, SavedScenariosTable, ComparisonPanel, SaveScenarioModal, ShareLinkModal
 
-**Bug fix this iter**
-- Audit + fixed 6 places (`documents.py`, `payroll.py`, `assistant.py`, `benefits.py`, `leave.py`) where `role != 'admin'` literal blocked `superadmin` from acting in switched-in tenants. All such checks now use `role not in ("admin","superadmin")` to mirror `require_admin` semantics.
-
-**Architectural invariants reinforced**
-- Every Mongo query uses `**tenant_filter(user)`; every insert wrapped in `with_tenant()`
-- Tier-gated endpoints return **402** with upgrade prompt + Settings deep-link
-- All third-party integrations route through `integration_playbook_expert_v2`
+**Cross-cutting bug fix**
+- 6 places (documents, payroll, assistant, benefits, leave) where `role != 'admin'` literal locked superadmins out — all now use `role not in ("admin","superadmin")`
