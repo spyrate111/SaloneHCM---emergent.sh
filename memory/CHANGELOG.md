@@ -1,5 +1,27 @@
 ## CHANGELOG
 
+### v1.6 (May 2026) — NRA Filing Automation + PWA polish
+
+**NRA filing export automation** (Gov-tier exclusive)
+- `GET /api/compliance/nra-paye-return.csv/{rid}` — Sierra Leone NRA PAYE Return CSV with proper header block (Period, Employer TIN, Employer Name) followed by per-employee rows (tin, nassit_no, gross, taxable=gross-nassit_employee, paye, nassit_employee, nassit_employer, net) and a TOTAL row
+- `GET /api/compliance/nassit-schedule.csv/{rid}` — NASSIT contribution schedule: employer NASSIT no. header, per-employee 5%/10%/15% rows, TOTAL row
+- `POST /api/compliance/file-nra/{rid}` — records the run as filed with deterministic NRA reference `NRA-{period}-{first8 of run id}`; 409 on re-file; audit-trail entry
+- `GET /api/compliance/filings` — tenant-scoped filing history
+- Enriched `/compliance/summary` now returns `{filed_count, outstanding[], history[]}` with `nra_filed`, `nra_filed_at`, `nra_reference` per run
+- Frontend Compliance page redesigned with KPI strip (YTD PAYE, YTD NASSIT, returns filed, outstanding) + per-period **NRA PAYE / NASSIT / Mark filed** actions
+
+**PWA icons live**
+- `/icon-192.png` + `/icon-512.png` generated with Pillow + Bera Sans Bold TTF: dark green `#133326` background, white "S" mark, orange `#D1603D` accent block — matches sidebar logo
+- Both files served by react-scripts dev server (image/png, magic bytes verified)
+- Manifest icons array points to real files; theme-color meta tag set
+
+**Recharts width(-1) warning — documented won't-fix**
+- Known Recharts 3.6.0 + React 19 strict-mode dev-only race; only appears in development double-render and is silently suppressed in production builds
+- Tried `width="100%"`, `debounce={50}`, `min-w-0` parent — warning still fires, but charts render correctly with no visual artifacts
+- Marked P3 cosmetic in CHANGELOG/PRD
+
+---
+
 ### v1.5 (May 2026) — Compliance, Automation, Mobile, Security
 
 **Compliance Score**
