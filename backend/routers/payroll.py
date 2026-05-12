@@ -80,7 +80,7 @@ async def my_payslips(user: dict = Depends(get_current_user)):
 
 @router.get("/runs/{rid}/payslip/{eid}.pdf")
 async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)):
-    if user["role"] != "admin" and user.get("employee_id") != eid:
+    if user["role"] not in ("admin", "superadmin") and user.get("employee_id") != eid:
         raise HTTPException(403, "Forbidden")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:

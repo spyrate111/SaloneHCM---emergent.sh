@@ -94,7 +94,7 @@ async def unenroll(enr_id: str, user: dict = Depends(get_current_user)):
     enr = await db.benefit_enrollments.find_one({"id": enr_id, **tf}, {"_id": 0})
     if not enr:
         raise HTTPException(404, "Not found")
-    if user["role"] != "admin" and enr["employee_id"] != user.get("employee_id"):
+    if user["role"] not in ("admin", "superadmin") and enr["employee_id"] != user.get("employee_id"):
         raise HTTPException(403, "Forbidden")
     await db.benefit_enrollments.delete_one({"id": enr_id, **tf})
     await audit("benefit_unenroll", f"benefit_enrollments/{enr_id}", user)

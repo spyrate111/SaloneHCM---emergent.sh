@@ -143,7 +143,7 @@ async def assistant_history(sid: str, user: dict = Depends(get_current_user)):
 @router.post("/action/execute")
 async def execute_plan(body: ActionPlanIn, user: dict = Depends(require_feature("ai_action_mode"))):
     """Execute a confirmed AI-generated action plan. Each step is audited individually."""
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(403, "Admin only")
     plan: ActionPlan = body.plan
     results = []

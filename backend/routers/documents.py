@@ -97,7 +97,7 @@ async def list_documents(
     user: dict = Depends(get_current_user),
 ):
     q: dict = {"is_deleted": False, **tenant_filter(user)}
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "superadmin"):
         my_eid = user.get("employee_id")
         if not my_eid:
             return []
@@ -112,7 +112,7 @@ async def list_documents(
 
 @router.get("/employee/{eid}")
 async def list_employee_documents(eid: str, user: dict = Depends(get_current_user)):
-    if user.get("role") != "admin" and user.get("employee_id") != eid:
+    if user.get("role") not in ("admin", "superadmin") and user.get("employee_id") != eid:
         raise HTTPException(403, "Forbidden")
     rows = await db.documents.find(
         {"employee_id": eid, "is_deleted": False, **tenant_filter(user)},
@@ -140,7 +140,7 @@ async def download_document(
     )
     if not doc:
         raise HTTPException(404, "Not found")
-    if user.get("role") != "admin" and user.get("employee_id") != doc["employee_id"]:
+    if user.get("role") not in ("admin", "superadmin") and user.get("employee_id") != doc["employee_id"]:
         raise HTTPException(403, "Forbidden")
 
     data: bytes = b""

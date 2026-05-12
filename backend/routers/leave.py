@@ -59,8 +59,8 @@ async def decide_leave(lid: str, body: LeaveDecision, user: dict = Depends(get_c
     lv = await db.leave_requests.find_one({"id": lid, **tenant_filter(user)}, {"_id": 0})
     if not lv:
         raise HTTPException(404, "Not found")
-    # Authorization: admin, or the requesting employee's direct manager
-    if user.get("role") != "admin":
+    # Authorization: admin/superadmin, or the requesting employee's direct manager
+    if user.get("role") not in ("admin", "superadmin"):
         if not user.get("employee_id"):
             raise HTTPException(403, "Admin or manager only")
         emp = await db.employees.find_one({"id": lv["employee_id"]}, {"_id": 0})

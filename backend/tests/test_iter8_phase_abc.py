@@ -61,7 +61,6 @@ def _login(creds):
 def _ensure_super_on_demo():
     """Super-admin tests may have switched the user. Re-switch to Demo Salone."""
     t, _ = _login(SUPER)
-    me = requests.get(f"{API}/auth/me", headers=_h(t)).json()
     # If already on Demo (enterprise), nothing to do
     comp = requests.get(f"{API}/company", headers=_h(t)).json()
     if comp.get("name") == "Demo Salone Ltd.":
@@ -250,7 +249,6 @@ class TestUsersRouter:
     def test_reset_password_on_superadmin_target_is_403(self):
         t, _ = _login(SUPER)
         # super_ctx is itself superadmin in Demo tenant; reset against self should 403
-        comps = requests.get(f"{API}/admin/companies", headers=_h(t)).json()
         # Find the superadmin user's own id via /auth/me
         me = requests.get(f"{API}/auth/me", headers=_h(t)).json()
         rr = requests.post(f"{API}/users/{me['id']}/reset-password",
