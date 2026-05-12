@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -23,9 +24,16 @@ import Documents from "./pages/Documents";
 import Users from "./pages/Users";
 import Companies from "./pages/Companies";
 import SmsLogs from "./pages/SmsLogs";
+import Schedules from "./pages/Schedules";
+import Ministry from "./pages/Ministry";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("SW registration failed", e));
+    }
+  }, []);
   return (
     <AuthProvider>
       <BrowserRouter>
@@ -36,6 +44,7 @@ export default function App() {
             <Route path="/employees" element={<ProtectedRoute adminOnly><Employees /></ProtectedRoute>} />
             <Route path="/employees/:id" element={<ProtectedRoute adminOnly><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/payroll" element={<ProtectedRoute adminOnly><Payroll /></ProtectedRoute>} />
+            <Route path="/schedules" element={<ProtectedRoute adminOnly><Schedules /></ProtectedRoute>} />
             <Route path="/simulator" element={<ProtectedRoute adminOnly><Simulator /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute adminOnly><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />
@@ -51,6 +60,7 @@ export default function App() {
             <Route path="/documents" element={<Documents />} />
             <Route path="/users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
             <Route path="/sms-logs" element={<ProtectedRoute adminOnly><SmsLogs /></ProtectedRoute>} />
+            <Route path="/ministry" element={<ProtectedRoute adminOnly><Ministry /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute superAdminOnly><Companies /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
           </Route>

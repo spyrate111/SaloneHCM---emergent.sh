@@ -7,6 +7,16 @@ from pydantic import BaseModel, EmailStr, Field
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    totp_code: Optional[str] = None
+
+
+class TotpVerifyIn(BaseModel):
+    code: str = Field(..., min_length=6, max_length=10)
+
+
+class TotpDisableIn(BaseModel):
+    password: str
+    code: str
 
 
 # ---------- Employees ----------

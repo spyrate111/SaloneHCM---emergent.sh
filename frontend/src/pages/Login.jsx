@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Lock, Mail, ArrowRight } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react";
 
 const BG = "https://images.unsplash.com/photo-1676029461383-215556e79bc8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwyfHxzaWVycmElMjBsZW9uZSUyMGxhbmRzY2FwZSUyMHN1bnNldHxlbnwwfHx8fDE3Nzg0MjIzODZ8MA&ixlib=rb-4.1.0&q=85";
 
 export default function Login() {
   const [email, setEmail] = useState("admin@salonehcm.sl");
   const [password, setPassword] = useState("Admin@2026");
+  const [totpCode, setTotpCode] = useState("");
+  const [needsTotp, setNeedsTotp] = useState(false);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -17,11 +19,19 @@ export default function Login() {
     e.preventDefault();
     setErr(""); setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, needsTotp ? totpCode : undefined);
       nav("/dashboard");
-    } catch (e) {
-      const d = e?.response?.data?.detail;
-      setErr(typeof d === "string" ? d : "Sign-in failed");
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      if (d && typeof d === "object" && d.code === "totp_required") {
+        setNeedsTotp(true);
+        setErr("");
+      } else if (d && typeof d === "object" && d.code === "totp_invalid") {
+        setErr("Invalid 2FA code — please try again");
+      } else {
+        setErr(typeof d === "string" ? d : "Sign-in failed");
+        setNeedsTotp(false);
+      }
     } finally { setLoading(false); }
   };
 
@@ -100,6 +110,29 @@ export default function Login() {
                 />
               </div>
             </div>
+
+            {needsTotp && (
+              <div data-testid="login-totp-block">
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">2FA code</label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A5AB]" strokeWidth={1.5} />
+                  <input
+                    data-testid="login-totp-input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    autoFocus
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    required
+                    placeholder="123 456"
+                    className="w-full bg-white border border-[#E2DFD6] rounded-md pl-10 pr-3 py-2.5 text-sm font-data tracking-widest focus:outline-none focus:ring-2 focus:ring-[#26547C]"
+                  />
+                </div>
+                <p className="text-[11px] text-[#686D76] mt-1">Open your authenticator app and enter the 6-digit code.</p>
+              </div>
+            )}
 
             {err && <div data-testid="login-error" className="text-sm text-[#B83A3A] bg-[#FBEAEA] border border-[#F2D0D0] rounded-md px-3 py-2">{err}</div>}
 

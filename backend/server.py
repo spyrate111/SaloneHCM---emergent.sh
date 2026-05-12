@@ -11,10 +11,11 @@ from slowapi.middleware import SlowAPIMiddleware
 from core import client, limiter
 from seeders import seed
 from storage import init_storage
+import scheduler as payroll_scheduler
 from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
-    documents, company, admin, users,
+    documents, company, admin, users, schedules, ministry,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +29,12 @@ async def lifespan(_app: FastAPI):
         init_storage()
     except Exception as e:
         logger.warning("Object storage init failed (uploads will fail until env is set): %s", e)
+    try:
+        payroll_scheduler.start()
+    except Exception as e:
+        logger.warning("Payroll scheduler failed to start: %s", e)
     yield
+    payroll_scheduler.stop()
     client.close()
 
 
@@ -56,6 +62,8 @@ api.include_router(documents.router)
 api.include_router(company.router)
 api.include_router(admin.router)
 api.include_router(users.router)
+api.include_router(schedules.router)
+api.include_router(ministry.router)
 
 
 @api.get("/")

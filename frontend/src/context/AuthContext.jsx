@@ -23,8 +23,10 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+  const login = useCallback(async (email, password, totpCode) => {
+    const payload = { email, password };
+    if (totpCode) payload.totp_code = totpCode;
+    const { data } = await api.post("/auth/login", payload);
     setToken(data.token);
     setUser({
       id: data.id,
@@ -34,6 +36,7 @@ export function AuthProvider({ children }) {
       employee_id: data.employee_id,
       company_id: data.company_id,
       company: data.company,
+      twofa_enabled: !!data.twofa_enabled,
     });
     return data;
   }, []);

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api, { fmtSLE, fmtNum } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useFeatures } from "../lib/features";
+import ComplianceScoreWidget from "../components/ComplianceScoreWidget";
 import { Users, Wallet, Receipt, CalendarClock, ArrowUpRight } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
@@ -27,6 +29,7 @@ const KPI = ({ label, value, sub, icon: Icon, accent }) => (
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isAdmin } = useFeatures();
   const [data, setData] = useState(null);
 
   useEffect(() => { api.get("/dashboard/overview").then((r) => setData(r.data)); }, []);
@@ -44,6 +47,8 @@ export default function Dashboard() {
           Here's what's happening across your organization today — payroll, headcount, compliance, and pending approvals.
         </p>
       </div>
+
+      {isAdmin && <ComplianceScoreWidget />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <KPI label="Headcount" value={fmtNum(data.headcount)} sub={`${data.total_employees} total records`} icon={Users} accent="bg-[#133326]" />

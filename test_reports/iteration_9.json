@@ -1,0 +1,40 @@
+{
+  "summary": "Iter9 — Compliance Score, 2FA (TOTP) for super-admin, Recurring Payroll Schedules (APScheduler), Ministry Rollup, and Mobile PWA all verified end-to-end. Backend pytest: 14/14 PASS in /app/backend/tests/test_iter9_features.py. Frontend Playwright: all critical selectors render and interact correctly (compliance widget + toggle/breakdown, twofa-card + twofa-begin on Settings, mobile hamburger + drawer + close, /schedules form + cadence/day inputs, /ministry page, SW registered). 2FA round-trip verified in pytest: setup → enable (live pyotp code) → login WITHOUT code returns 401 with detail.code='totp_required' → login WITH code succeeds → superadmin cannot disable (403). Cleanup confirmed — twofa_enabled=False on admin@salonehcm.sl after run; verified by re-login without code. Backend logs show 'Payroll scheduler started (tick every 300s)' on each boot and _evaluate_due running every 5 min. Compliance Score for Gov tenant returns score=55 grade=C with sms_delivery.applicable=true; for Demo Salone (enterprise) sms_delivery.applicable=false — exactly per spec. Super-admin tenant switch correctly flips sms_delivery applicability after /admin/companies/{gov_id}/switch. Schedule lifecycle: create monthly → patch to weekly recomputes next_run_at → toggle active → run-now creates real payroll run + increments runs_completed → delete. Ministry rollup returns 5 ministries + totals for Gov; returns 402 for Demo (require_feature gating).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard + Ministry charts", "issues": ["Recharts width(-1)/height(-1) console warning still fires on first paint for ResponsiveContainer cards — cosmetic, noted as known issue in original handoff. Suggested fix is wrapping with min-height shell."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter9_features.py",
+    "/app/test_reports/pytest/iter9_features.xml"
+  ],
+  "action_items": [
+    "(carry-over from iter8) Fix routers/documents.py:143 — role='superadmin' should be treated same as role='admin' for download/delete; currently `user.get('role') != 'admin'` excludes superadmin. Independent of iter9 scope.",
+    "(cosmetic) Wrap Recharts ResponsiveContainer with min-height shell to silence width(-1) warning."
+  ],
+  "critical_code_review_comments": [
+    "compliance_score.py — clean weighting logic: dimensions with applicable=False are correctly DROPPED from both numerator AND denominator, so Demo Salone's overall score is not artificially deflated by missing SMS. Grade bucketing thresholds are sensible. _payroll_timeliness deadline math handles Dec→Jan wrap correctly (line 48).",
+    "routers/auth.py — 2FA enforcement is correct: TWOFA_REQUIRED_ROLES={'superadmin'} is checked in /2fa/policy and /2fa/disable, and the login path returns HTTPException(401, detail={'code':'totp_required'}) — a structured detail dict the frontend reads as err.response.data.detail.code. Pending-secret-then-confirm flow is the right posture (prevents enabling a TOTP the user can't verify).",
+    "routers/schedules.py — compute_next_run is called both on create AND on patch when cadence/day_of_month changes (line 72-77), AND after run-now (line 102), so next_run_at stays accurate. All endpoints depend on require_admin and tenant_filter() — no horizontal escalation possible.",
+    "scheduler.py + server.py lifespan — APScheduler is started in lifespan startup and stopped in shutdown, so no orphan jobs across hot-reloads. Tick=300s logged as expected.",
+    "routers/ministry.py — gated on require_feature('ministry_reports') which raises 402 BEFORE any DB work — confirmed in test_demo_tenant_402. Response shape matches spec (name, headcount_active, monthly_payroll_gross, monthly_paye, monthly_nassit, leave_pending).",
+    "ComplianceScoreWidget.jsx / TwoFactorCard.jsx / Schedules.jsx / Ministry.jsx — all interactive elements have data-testid coverage: compliance-score-widget, compliance-toggle, compliance-breakdown, twofa-card, twofa-begin, schedule-create-open, new-schedule-title, new-schedule-cadence, new-schedule-day, ministry-page, sidebar-open, sidebar, sidebar-close — verified live.",
+    "public/manifest.json + sw.js + index.html — manifest.theme_color=#133326, name starts with 'SaloneHCM', SW registers successfully in browser (navigator.serviceWorker.getRegistrations() returned 1 entry); known: PWA icons 192/512 missing on disk per handoff note — graceful fallback as expected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter9_features.py (NEW — 14 pytest cases covering all 5 iter9 features)"
+  ],
+  "success_rate": {"backend": "100% (14/14 passed)", "frontend": "100% on tested flows — compliance widget, 2FA card, mobile drawer, /schedules form, /ministry page, service worker registration"},
+  "test_credentials": "admin@salonehcm.sl / Admin@2026 (superadmin) ; admin@gov.sl / GovAdmin@2026 (Gov admin) ; aminata.kamara@salonehcm.sl / Employee@2026 (employee)",
+  "seed_data_creation": "Test creates one TEST_iter9_sched schedule on Gov tenant and deletes it before exit. The run-now call did create one extra payroll run on the Gov tenant for current period (2026-05) — harmless, same pattern as prior iterations. 2FA on admin@salonehcm.sl is cleaned up via direct mongo update (twofa_enabled=False + unset twofa_secret) AND verified by re-login without code returning 200, so subsequent agents are not locked out.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 5 iter9 features (Compliance Score widget, 2FA TOTP for superadmin, Recurring Schedules with APScheduler, Ministry Rollup, Mobile PWA) are fully working. Pytest file at /app/backend/tests/test_iter9_features.py is reusable for regression. The 2FA test always cleans up admin@salonehcm.sl in a try/finally — both the enable AND the test_super_admin_switch_to_gov_changes_applicability tests leave super-admin pointing at the Gov company; that switch is idempotent and not destructive but worth noting if a future test depends on super starting in Demo. Recharts width(-1) warning is the ONLY console noise; no JS errors. Carry-over minor from iter8 (documents.py:143 role check) is still unfixed — not in iter9 scope."
+}

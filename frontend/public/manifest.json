@@ -1,0 +1,32 @@
+{
+  "name": "SaloneHCM — Sierra Leone HCM & Payroll",
+  "short_name": "SaloneHCM",
+  "description": "Sierra Leone Human Capital Management & Payroll — pay, leave, NRA & NASSIT compliance.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#133326",
+  "background_color": "#F7F6F2",
+  "lang": "en-SL",
+  "categories": ["business", "productivity", "finance"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "My payslip", "url": "/self-service" },
+    { "name": "Request leave", "url": "/leave" },
+    { "name": "Documents", "url": "/documents" }
+  ]
+}

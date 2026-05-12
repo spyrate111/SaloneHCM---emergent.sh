@@ -1,8 +1,14 @@
 """Dashboard overview."""
 from fastapi import APIRouter, Depends
-from core import db, get_current_user, tenant_filter
+from core import db, get_current_user, require_admin, tenant_filter
+from compliance_score import compute as compute_compliance_score
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+@router.get("/compliance-score")
+async def compliance_score(user: dict = Depends(require_admin)):
+    return await compute_compliance_score(user)
 
 
 @router.get("/overview")
