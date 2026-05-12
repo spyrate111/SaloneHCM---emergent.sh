@@ -80,8 +80,14 @@ async def get_current_user(request: Request) -> dict:
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(403, "Admin only")
+    return user
+
+
+async def require_superadmin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "superadmin":
+        raise HTTPException(403, "Super-admin only")
     return user
 
 

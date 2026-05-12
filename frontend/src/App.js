@@ -20,6 +20,8 @@ import Analytics from "./pages/Analytics";
 import Simulator from "./pages/Simulator";
 import Team from "./pages/Team";
 import Documents from "./pages/Documents";
+import Users from "./pages/Users";
+import Companies from "./pages/Companies";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -46,6 +48,8 @@ export default function App() {
             <Route path="/team" element={<Team />} />
             <Route path="/team/:eid" element={<ProtectedRoute adminOnly><Team /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
+            <Route path="/users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
+            <Route path="/companies" element={<ProtectedRoute superAdminOnly><Companies /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

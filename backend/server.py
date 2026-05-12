@@ -14,7 +14,7 @@ from storage import init_storage
 from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
-    documents, company,
+    documents, company, admin, users,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +54,8 @@ api.include_router(simulator.router)
 api.include_router(team.router)
 api.include_router(documents.router)
 api.include_router(company.router)
+api.include_router(admin.router)
+api.include_router(users.router)
 
 
 @api.get("/")

@@ -48,7 +48,18 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
+  const refetch = useCallback(async () => {
+    try {
+      const r = await api.get("/auth/me");
+      setUser(r.data);
+      return r.data;
+    } catch (err) {
+      console.warn("[Auth] refetch failed:", err?.message || err);
+      return null;
+    }
+  }, []);
+
+  const value = useMemo(() => ({ user, loading, login, logout, refetch }), [user, loading, login, logout, refetch]);
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 

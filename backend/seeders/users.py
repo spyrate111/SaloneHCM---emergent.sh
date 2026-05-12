@@ -13,12 +13,12 @@ async def seed_admin(company_id: str) -> None:
             "id": str(uuid.uuid4()),
             "email": admin_email,
             "name": "System Administrator",
-            "role": "admin",
+            "role": "superadmin",
             "company_id": company_id,
             "password_hash": hash_password(admin_password),
             "created_at": iso(now_utc()),
         })
-        logger.info("Seeded admin: %s", admin_email)
+        logger.info("Seeded superadmin: %s", admin_email)
         return
     # Make sure password matches current env and company_id is set
     updates = {}
@@ -26,5 +26,8 @@ async def seed_admin(company_id: str) -> None:
         updates["password_hash"] = hash_password(admin_password)
     if not existing.get("company_id"):
         updates["company_id"] = company_id
+    # Auto-promote seed admin to superadmin (idempotent)
+    if existing.get("role") != "superadmin":
+        updates["role"] = "superadmin"
     if updates:
         await db.users.update_one({"email": admin_email}, {"$set": updates})

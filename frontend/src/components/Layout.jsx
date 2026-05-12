@@ -1,34 +1,40 @@
+import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures, TIER_COLORS } from "../lib/features";
+import api, { setToken } from "../lib/api";
+import { toast } from "sonner";
 import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
   Heart, GraduationCap, BarChart3, FlaskConical, FolderArchive,
+  Building2, UserCog, ChevronDown, ArrowRightLeft,
 } from "lucide-react";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "employee"] },
-  { to: "/employees", label: "Employees", icon: Users, roles: ["admin"], feature: "employees" },
-  { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin"], feature: "payroll" },
-  { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: ["admin"], feature: "simulator" },
-  { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin"], feature: "compliance" },
-  { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "employee"], feature: "leave" },
-  { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "employee"], feature: "attendance" },
-  { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "employee"], feature: "benefits" },
-  { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "employee"], feature: "talent" },
-  { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "employee"], feature: "documents" },
-  { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin"], feature: "analytics" },
-  { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "employee"], feature: "ai_assistant" },
-  { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin"] },
-  { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin"], feature: "audit_log" },
-  { to: "/team", label: "My Team", icon: UserCircle, roles: ["admin", "employee"] },
-  { to: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "superadmin", "employee"] },
+  { to: "/employees", label: "Employees", icon: Users, roles: ["admin", "superadmin"], feature: "employees" },
+  { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin", "superadmin"], feature: "payroll" },
+  { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: ["admin", "superadmin"], feature: "simulator" },
+  { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin", "superadmin"], feature: "compliance" },
+  { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "superadmin", "employee"], feature: "leave" },
+  { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "superadmin", "employee"], feature: "attendance" },
+  { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "superadmin", "employee"], feature: "benefits" },
+  { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "superadmin", "employee"], feature: "talent" },
+  { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "superadmin", "employee"], feature: "documents" },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "superadmin"], feature: "analytics" },
+  { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "superadmin", "employee"], feature: "ai_assistant" },
+  { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin", "superadmin"] },
+  { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin", "superadmin"], feature: "audit_log" },
+  { to: "/team", label: "My Team", icon: UserCircle, roles: ["admin", "superadmin", "employee"] },
+  { to: "/users", label: "Users & Access", icon: UserCog, roles: ["admin", "superadmin"] },
+  { to: "/settings", label: "Settings", icon: Settings, roles: ["admin", "superadmin"] },
+  { to: "/companies", label: "Tenants", icon: Building2, roles: ["superadmin"] },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const { has, company, tier } = useFeatures();
+  const { has, company, tier, isSuperAdmin } = useFeatures();
   const nav = useNavigate();
   if (!user) return null;
   const items = NAV.filter((n) => n.roles.includes(user.role) && (!n.feature || has(n.feature)));
@@ -97,13 +103,16 @@ export default function Layout() {
 
       <div className="flex-1 ml-64 min-h-screen flex flex-col">
         <header className="sticky top-0 z-20 h-16 px-8 flex items-center justify-between border-b border-[#E2DFD6] bg-white/85 backdrop-blur">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-[#525860]" data-testid="header-company-country">
-              Republic of Sierra Leone
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.16em] text-[#525860]" data-testid="header-company-country">
+                Republic of Sierra Leone
+              </div>
+              <div className="text-sm font-medium text-[#1A1C1E]" data-testid="header-company-name">
+                {company?.name || "SaloneHCM"}
+              </div>
             </div>
-            <div className="text-sm font-medium text-[#1A1C1E]" data-testid="header-company-name">
-              {company?.name || "SaloneHCM"}
-            </div>
+            {isSuperAdmin && <CompanySwitcher />}
           </div>
           <div className="flex items-center gap-3">
             <span
@@ -121,6 +130,75 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+    </div>
+  );
+}
+
+function CompanySwitcher() {
+  const { user, refetch } = useAuth();
+  const [companies, setCompanies] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/admin/companies").then((r) => setCompanies(r.data)).catch(() => {});
+  }, []);
+
+  const switchTo = async (cid) => {
+    if (cid === user?.company_id) { setOpen(false); return; }
+    setBusy(true);
+    try {
+      const r = await api.post(`/admin/companies/${cid}/switch`);
+      setToken(r.data.token);
+      await refetch();
+      toast.success(`Switched to ${r.data.company.name}`);
+      setOpen(false);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Switch failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="relative" data-testid="company-switcher">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 text-xs font-medium border border-[#E2DFD6] rounded-md px-2.5 py-1.5 hover:bg-[#F7F6F2]"
+        data-testid="company-switcher-toggle"
+      >
+        <ArrowRightLeft className="w-3.5 h-3.5 text-[#525860]" strokeWidth={1.7} />
+        Switch tenant
+        <ChevronDown className={`w-3.5 h-3.5 text-[#525860] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute top-full mt-2 left-0 w-72 bg-white border border-[#E2DFD6] rounded-lg shadow-lg z-30 overflow-hidden" data-testid="company-switcher-menu">
+          <div className="px-4 py-2.5 text-[10px] uppercase tracking-wider text-[#525860] border-b border-[#F1EEE6] bg-[#F7F6F2]">
+            Tenants ({companies.length})
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {companies.map((c) => (
+              <button
+                key={c.id}
+                disabled={busy}
+                onClick={() => switchTo(c.id)}
+                data-testid={`switcher-item-${c.id}`}
+                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F7F6F2] flex items-center justify-between gap-2 ${c.id === user?.company_id ? "bg-[#E6F4EC]" : ""}`}
+              >
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{c.name}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#686D76]">{c.tier} · {c.active_headcount} active</div>
+                </div>
+                {c.id === user?.company_id && (
+                  <span className="text-[9px] uppercase tracking-widest font-semibold bg-[#133326] text-white px-1.5 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

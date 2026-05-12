@@ -19,5 +19,14 @@ export function useFeatures() {
   const { user } = useAuth();
   const features = user?.company?.features || [];
   const has = (f) => features.includes(f);
-  return { features, has, company: user?.company, tier: user?.company?.tier };
+  const role = user?.role;
+  return {
+    features,
+    has,
+    company: user?.company,
+    tier: user?.company?.tier,
+    role,
+    isAdmin: role === "admin" || role === "superadmin",
+    isSuperAdmin: role === "superadmin",
+  };
 }
