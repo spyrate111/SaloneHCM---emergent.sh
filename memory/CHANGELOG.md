@@ -19,9 +19,13 @@
 - `POST /api/payroll/runs/{rid}/send-sms` gated by `require_feature("bulk_sms_payslips")` (Gov tier only) — returns `{batch_id, sent, would_send, failed, skipped, total, dry_run, twilio_configured, results}`
 - Per-recipient `sms_logs` collection (tenant-scoped) for forensic auditability
 - `GET /api/payroll/sms/status` reports whether Twilio is wired
-- `GET /api/payroll/sms/logs` returns tenant's send history
 - Gov tenant seeded with 6 ministerial employees (1 with empty phone to exercise skip path) + admin `admin@gov.sl / GovAdmin@2026`
 - Frontend: `SmsPayslipButton` modal with dry-run/live toggle, Twilio-not-configured banner, per-recipient pill table
+
+**Phase b' — SMS Audit page** (added after Phase b)
+- New `GET /api/payroll/sms/summary`, `/sms/batches`, `/sms/logs.csv` endpoints (all tenant-scoped, admin-only)
+- `GET /api/payroll/sms/logs` now accepts `period`, `status`, `batch_id` query filters
+- Frontend `/sms-logs` page (gated on `bulk_sms_payslips` feature): KPI strip, batches table with drill-down, per-recipient drill view, status/period filters, CSV export for Auditor General submissions
 
 **Phase c — Simulator refactor**
 - `pages/Simulator.jsx`: 558 → **96 lines** orchestrator

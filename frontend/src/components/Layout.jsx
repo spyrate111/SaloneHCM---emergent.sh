@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
   Heart, GraduationCap, BarChart3, FlaskConical, FolderArchive,
-  Building2, UserCog, ChevronDown, ArrowRightLeft,
+  Building2, UserCog, ChevronDown, ArrowRightLeft, MessageSquare,
 } from "lucide-react";
 
 const NAV = [
@@ -26,6 +26,7 @@ const NAV = [
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "superadmin", "employee"], feature: "ai_assistant" },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin", "superadmin"] },
   { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin", "superadmin"], feature: "audit_log" },
+  { to: "/sms-logs", label: "SMS Audit", icon: MessageSquare, roles: ["admin", "superadmin"], feature: "bulk_sms_payslips" },
   { to: "/team", label: "My Team", icon: UserCircle, roles: ["admin", "superadmin", "employee"] },
   { to: "/users", label: "Users & Access", icon: UserCog, roles: ["admin", "superadmin"] },
   { to: "/settings", label: "Settings", icon: Settings, roles: ["admin", "superadmin"] },

@@ -1,6 +1,7 @@
 """Payroll endpoints: preview, run, history, payslip PDF, bank file CSV, my-payslips."""
 import io
 import csv
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -161,8 +162,122 @@ async def send_payslip_sms(
 
 
 @router.get("/sms/logs")
-async def list_sms_logs(user: dict = Depends(require_admin)):
-    rows = await db.sms_logs.find(
-        tenant_filter(user), {"_id": 0}
-    ).sort("sent_at", -1).to_list(500)
+async def list_sms_logs(
+    period: Optional[str] = None,
+    status: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    user: dict = Depends(require_admin),
+):
+    q: dict = {**tenant_filter(user)}
+    if period:
+        q["period"] = period
+    if status:
+        q["status"] = status
+    if batch_id:
+        q["batch_id"] = batch_id
+    rows = await db.sms_logs.find(q, {"_id": 0}).sort("sent_at", -1).to_list(2000)
     return rows
+
+
+@router.get("/sms/batches")
+async def list_sms_batches(user: dict = Depends(require_admin)):
+    """Distinct SMS batches with aggregate counts per status — for the audit page header view."""
+    pipeline = [
+        {"$match": tenant_filter(user)},
+        {"$group": {
+            "_id": "$batch_id",
+            "period": {"$first": "$period"},
+            "run_id": {"$first": "$run_id"},
+            "sent_by": {"$first": "$sent_by"},
+            "sent_at": {"$max": "$sent_at"},
+            "dry_run": {"$first": "$dry_run"},
+            "total": {"$sum": 1},
+            "sent": {"$sum": {"$cond": [{"$eq": ["$status", "sent"]}, 1, 0]}},
+            "would_send": {"$sum": {"$cond": [{"$eq": ["$status", "would_send"]}, 1, 0]}},
+            "failed": {"$sum": {"$cond": [{"$eq": ["$status", "failed"]}, 1, 0]}},
+            "skipped": {"$sum": {"$cond": [{"$eq": ["$status", "skipped"]}, 1, 0]}},
+        }},
+        {"$sort": {"sent_at": -1}},
+        {"$limit": 200},
+    ]
+    rows = []
+    async for r in db.sms_logs.aggregate(pipeline):
+        rows.append({
+            "batch_id": r["_id"],
+            "period": r.get("period"),
+            "run_id": r.get("run_id"),
+            "sent_by": r.get("sent_by"),
+            "sent_at": r.get("sent_at"),
+            "dry_run": r.get("dry_run", False),
+            "total": r["total"],
+            "sent": r["sent"],
+            "would_send": r["would_send"],
+            "failed": r["failed"],
+            "skipped": r["skipped"],
+        })
+    return rows
+
+
+@router.get("/sms/summary")
+async def sms_summary(user: dict = Depends(require_admin)):
+    """High-level KPIs for the audit page header."""
+    tf = tenant_filter(user)
+    pipeline = [
+        {"$match": tf},
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+    ]
+    by_status = {r["_id"]: r["count"] async for r in db.sms_logs.aggregate(pipeline)}
+    batch_count = len(await db.sms_logs.distinct("batch_id", tf))
+    last = await db.sms_logs.find(tf, {"_id": 0, "sent_at": 1}).sort("sent_at", -1).limit(1).to_list(1)
+    return {
+        "total_messages": sum(by_status.values()),
+        "by_status": by_status,
+        "batch_count": batch_count,
+        "last_sent_at": last[0]["sent_at"] if last else None,
+    }
+
+
+@router.get("/sms/logs.csv")
+async def export_sms_logs_csv(
+    period: Optional[str] = None,
+    status: Optional[str] = None,
+    batch_id: Optional[str] = None,
+    user: dict = Depends(require_admin),
+):
+    """Forensic CSV export of SMS deliveries — for Auditor General submissions."""
+    q: dict = {**tenant_filter(user)}
+    if period:
+        q["period"] = period
+    if status:
+        q["status"] = status
+    if batch_id:
+        q["batch_id"] = batch_id
+    rows = await db.sms_logs.find(q, {"_id": 0}).sort("sent_at", -1).to_list(10000)
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "sent_at", "period", "batch_id", "employee_name", "phone", "status",
+        "twilio_sid", "reason", "dry_run", "sent_by", "run_id",
+    ])
+    for r in rows:
+        writer.writerow([
+            r.get("sent_at", ""),
+            r.get("period", ""),
+            r.get("batch_id", ""),
+            r.get("employee_name", ""),
+            r.get("to", ""),
+            r.get("status", ""),
+            r.get("sid", ""),
+            r.get("reason", ""),
+            "yes" if r.get("dry_run") else "no",
+            r.get("sent_by", ""),
+            r.get("run_id", ""),
+        ])
+    await audit("sms_log_export_csv", "payroll/sms/logs.csv", user, {
+        "rows": len(rows),
+        "filters": {k: v for k, v in {"period": period, "status": status, "batch_id": batch_id}.items() if v},
+    })
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="salonehcm-sms-audit.csv"'},
+    )
