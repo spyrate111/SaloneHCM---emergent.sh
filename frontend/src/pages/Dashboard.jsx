@@ -7,6 +7,7 @@ import { Users, Wallet, Receipt, CalendarClock, ArrowUpRight } from "lucide-reac
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
 } from "recharts";
+import ChartShell from "../components/ChartShell";
 import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
 const BAR_LEFT_MARGIN = { left: 0 };
@@ -65,9 +66,9 @@ export default function Dashboard() {
               <h3 className="font-heading text-lg font-semibold text-[#1A1C1E]">Net payroll cost across periods</h3>
             </div>
           </div>
-          <div style={{ width: "100%", height: 256 }}>
+          <ChartShell height={256}>
             {data.runs_history?.length ? (
-              <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                 <AreaChart data={data.runs_history}>
                   <defs>
                     <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
@@ -85,14 +86,14 @@ export default function Dashboard() {
             ) : (
               <div className="h-full grid place-items-center text-sm text-[#686D76]">Run your first payroll to see trends.</div>
             )}
-          </div>
+          </ChartShell>
         </div>
 
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] mb-1">Headcount by department</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Departments</h3>
-          <div style={{ width: "100%", height: 256 }}>
-            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+          <ChartShell height={256}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <BarChart data={data.departments} layout="vertical" margin={BAR_LEFT_MARGIN}>
                 <CartesianGrid stroke="#EBE8E0" horizontal={false} />
                 <XAxis type="number" stroke="#686D76" fontSize={11} />
@@ -101,7 +102,7 @@ export default function Dashboard() {
                 <Bar dataKey="count" fill="#26547C" radius={BAR_RADIUS} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ChartShell>
         </div>
       </div>
 

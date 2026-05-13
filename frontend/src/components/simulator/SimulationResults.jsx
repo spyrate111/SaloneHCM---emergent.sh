@@ -2,6 +2,7 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
+import ChartShell from "../ChartShell";
 import { fmtSLE } from "../../lib/api";
 import { TOOLTIP_STYLE } from "../../lib/chartStyles";
 
@@ -29,8 +30,8 @@ export default function SimulationResults({ result }) {
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
         <h3 className="font-heading text-lg font-semibold mb-4">Department impact</h3>
-        <div style={CHART_BOX}>
-          <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+        <ChartShell height={288}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
             <BarChart data={result.by_department}>
               <CartesianGrid stroke="#EBE8E0" vertical={false} />
               <XAxis dataKey="name" stroke="#686D76" fontSize={11} />
@@ -41,7 +42,7 @@ export default function SimulationResults({ result }) {
               <Bar dataKey="projected" fill="#D1603D" radius={BAR_RADIUS} name="Projected" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </ChartShell>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">

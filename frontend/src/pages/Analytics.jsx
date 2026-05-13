@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, Legend,
 } from "recharts";
+import ChartShell from "../components/ChartShell";
 import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
 const PIE_COLORS = ["#133326", "#26547C", "#D1603D", "#8B6A14", "#2D7A5D", "#9A2A52"];
@@ -38,8 +39,8 @@ export default function Analytics() {
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Multi-line</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Payroll components over time</h3>
-          <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+          <ChartShell height={280}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <LineChart data={trend}>
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="period" stroke="#686D76" fontSize={11} />
@@ -52,14 +53,14 @@ export default function Analytics() {
                 <Line type="monotone" dataKey="nassit" stroke="#8B6A14" strokeWidth={2} dot={false} name="NASSIT" />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </ChartShell>
         </div>
 
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Leave</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Leave days approved by department</h3>
-          <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+          <ChartShell height={280}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <BarChart data={usage.by_department}>
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="name" stroke="#686D76" fontSize={11} />
@@ -68,14 +69,14 @@ export default function Analytics() {
                 <Bar dataKey="days" fill="#D1603D" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ChartShell>
         </div>
 
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Distribution</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Leave by type</h3>
-          <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+          <ChartShell height={280}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <PieChart>
                 <Pie data={usage.by_type} dataKey="days" nameKey="type" cx="50%" cy="50%" outerRadius={90} label={(e) => `${e.type} (${e.days}d)`}>
                   {usage.by_type.map((entry, i) => <Cell key={entry.type} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -83,14 +84,14 @@ export default function Analytics() {
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </ChartShell>
         </div>
 
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Activity</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Audit events — last 30 days</h3>
-          <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+          <ChartShell height={280}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <AreaChart data={audit.by_day}>
                 <defs>
                   <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
@@ -105,7 +106,7 @@ export default function Analytics() {
                 <Area type="monotone" dataKey="count" stroke="#26547C" strokeWidth={2} fill="url(#g2)" />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
+          </ChartShell>
         </div>
       </div>
 

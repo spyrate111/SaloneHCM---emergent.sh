@@ -102,43 +102,7 @@ function CyclesAdmin() {
             {cycles.map((c) => {
               const p = c.progress || {};
               return (
-                <>
-                  <tr key={c.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB] cursor-pointer" onClick={() => expand(c.id)} data-testid={`cycle-row-${c.id}`}>
-                    <td className="py-3 px-4 text-[#686D76]">{expanded === c.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
-                    <td className="py-3 px-4 font-medium">{c.name}</td>
-                    <td className="py-3 px-4 font-data">{c.period}</td>
-                    <td className="py-3 px-4 font-data">{c.employee_count}</td>
-                    <td className="py-3 px-4 font-data text-[#8B6A14]">{p.pending_self || 0}</td>
-                    <td className="py-3 px-4 font-data text-[#26547C]">{p.pending_manager || 0}</td>
-                    <td className="py-3 px-4 font-data text-[#2D7A5D] font-semibold">{p.completed || 0}</td>
-                  </tr>
-                  {expanded === c.id && (
-                    <tr><td colSpan={7} className="bg-[#F7F6F2] p-0">
-                      <div className="px-6 py-4">
-                        <h4 className="font-medium text-sm mb-3">Reviews in this cycle</h4>
-                        <table className="w-full text-xs">
-                          <thead><tr>{["Employee", "Department", "Self rating", "Manager rating", "Status"].map((h) => (
-                            <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-2 px-3 font-medium">{h}</th>
-                          ))}</tr></thead>
-                          <tbody>
-                            {(reviews[c.id] || []).map((r) => (
-                              <tr key={r.id} className="border-t border-[#E2DFD6]">
-                                <td className="py-2 px-3 font-medium">{r.employee_name}</td>
-                                <td className="py-2 px-3 text-[#525860]">{r.department}</td>
-                                <td className="py-2 px-3 font-data">{r.self_rating ?? "—"}</td>
-                                <td className="py-2 px-3 font-data">{r.manager_rating ?? "—"}</td>
-                                <td className="py-2 px-3">
-                                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_PILL[r.status]?.color}`}>{STATUS_PILL[r.status]?.label || r.status}</span>
-                                </td>
-                              </tr>
-                            ))}
-                            {!(reviews[c.id] || []).length && <tr><td colSpan={5} className="py-6 text-center text-[#686D76]">No reviews yet.</td></tr>}
-                          </tbody>
-                        </table>
-                      </div>
-                    </td></tr>
-                  )}
-                </>
+                <CycleRowGroup key={c.id} c={c} p={p} expanded={expanded === c.id} onExpand={() => expand(c.id)} reviews={reviews[c.id] || []} />
               );
             })}
             {!cycles.length && <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">No cycles yet — start one to kick off reviews for your team.</td></tr>}
@@ -178,6 +142,48 @@ function CyclesAdmin() {
         </div>
       )}
     </div>
+  );
+}
+
+function CycleRowGroup({ c, p, expanded, onExpand, reviews }) {
+  return (
+    <>
+      <tr className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB] cursor-pointer" onClick={onExpand} data-testid={`cycle-row-${c.id}`}>
+        <td className="py-3 px-4 text-[#686D76]">{expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
+        <td className="py-3 px-4 font-medium">{c.name}</td>
+        <td className="py-3 px-4 font-data">{c.period}</td>
+        <td className="py-3 px-4 font-data">{c.employee_count}</td>
+        <td className="py-3 px-4 font-data text-[#8B6A14]">{p.pending_self || 0}</td>
+        <td className="py-3 px-4 font-data text-[#26547C]">{p.pending_manager || 0}</td>
+        <td className="py-3 px-4 font-data text-[#2D7A5D] font-semibold">{p.completed || 0}</td>
+      </tr>
+      {expanded && (
+        <tr><td colSpan={7} className="bg-[#F7F6F2] p-0">
+          <div className="px-6 py-4">
+            <h4 className="font-medium text-sm mb-3">Reviews in this cycle</h4>
+            <table className="w-full text-xs">
+              <thead><tr>{["Employee", "Department", "Self rating", "Manager rating", "Status"].map((h) => (
+                <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-2 px-3 font-medium">{h}</th>
+              ))}</tr></thead>
+              <tbody>
+                {reviews.map((r) => (
+                  <tr key={r.id} className="border-t border-[#E2DFD6]">
+                    <td className="py-2 px-3 font-medium">{r.employee_name}</td>
+                    <td className="py-2 px-3 text-[#525860]">{r.department}</td>
+                    <td className="py-2 px-3 font-data">{r.self_rating ?? "—"}</td>
+                    <td className="py-2 px-3 font-data">{r.manager_rating ?? "—"}</td>
+                    <td className="py-2 px-3">
+                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_PILL[r.status]?.color}`}>{STATUS_PILL[r.status]?.label || r.status}</span>
+                    </td>
+                  </tr>
+                ))}
+                {!reviews.length && <tr><td colSpan={5} className="py-6 text-center text-[#686D76]">No reviews yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </td></tr>
+      )}
+    </>
   );
 }
 

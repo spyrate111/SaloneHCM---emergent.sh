@@ -6,6 +6,7 @@ import {
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
+import ChartShell from "../components/ChartShell";
 import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
 const LEGEND_STYLE = { fontSize: 12 };
@@ -49,8 +50,8 @@ export default function Ministry() {
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
         <h3 className="font-heading text-lg font-semibold mb-4">Gross payroll by ministry</h3>
-        <div style={CHART_BOX}>
-          <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
+        <ChartShell height={320}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50}>
             <BarChart data={chartData}>
               <CartesianGrid stroke="#EBE8E0" vertical={false} />
               <XAxis dataKey="name" stroke="#686D76" fontSize={11} interval={0} angle={-25} textAnchor="end" height={70} />
@@ -62,7 +63,7 @@ export default function Ministry() {
               <Bar dataKey="NASSIT" fill="#26547C" radius={BAR_RADIUS} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </ChartShell>
       </div>
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
