@@ -15,7 +15,7 @@ import scheduler as payroll_scheduler
 from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
-    documents, company, admin, users, schedules, ministry, public,
+    documents, company, admin, users, schedules, ministry, public, integrations,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -65,6 +65,7 @@ api.include_router(users.router)
 api.include_router(schedules.router)
 api.include_router(ministry.router)
 api.include_router(public.router)
+api.include_router(integrations.router)
 
 
 @api.get("/")

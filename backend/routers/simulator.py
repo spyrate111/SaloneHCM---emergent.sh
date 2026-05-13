@@ -173,6 +173,28 @@ async def save_scenario(body: ScenarioIn, user: dict = Depends(require_admin)):
     await db.payroll_scenarios.insert_one(doc)
     doc.pop("_id", None)
     await audit("scenario_save", f"payroll_scenarios/{sid}", user, {"title": body.title})
+
+    # Notify approver via Resend if email is configured
+    email_result = None
+    if doc.get("approver_email"):
+        try:
+            from email_service import send_scenario_approval_request, is_configured as _email_ok
+            if _email_ok():
+                summary_lines = [f"- {r.get('description') or r.get('type', 'rule')}" for r in doc["rules"]]
+                summary = "\n".join(summary_lines) or "(no rule descriptions)"
+                email_result = await send_scenario_approval_request(
+                    approver_email=doc["approver_email"],
+                    approver_name=doc["approver_email"].split("@")[0].replace(".", " ").title(),
+                    requester_name=user["email"].split("@")[0].replace(".", " ").title(),
+                    scenario_name=body.title,
+                    scenario_id=sid,
+                    summary=f"{body.description or ''}\n\nRules:\n{summary}".strip(),
+                    company_id=user["company_id"],
+                )
+        except Exception:
+            email_result = {"ok": False, "error": "email send failed"}
+    if email_result is not None:
+        doc["approver_email_status"] = email_result
     return doc
 
 
@@ -213,7 +235,26 @@ async def decide_scenario(sid: str, body: ScenarioDecision, user: dict = Depends
     )
     await audit(f"scenario_{body.decision}", f"payroll_scenarios/{sid}", user,
                 {"title": s["title"], "approver": user["email"]})
-    return {"ok": True, "status": body.decision, "approved_by": user["email"]}
+
+    # Notify the requester via Resend (best-effort)
+    email_result = None
+    try:
+        from email_service import send_scenario_decision, is_configured as _email_ok
+        if _email_ok() and s.get("created_by"):
+            email_result = await send_scenario_decision(
+                requester_email=s["created_by"],
+                requester_name=s["created_by"].split("@")[0].replace(".", " ").title(),
+                scenario_name=s["title"],
+                scenario_id=sid,
+                approver_name=user["email"].split("@")[0].replace(".", " ").title(),
+                decision=body.decision,
+                note=body.notes,
+                company_id=user["company_id"],
+            )
+    except Exception:
+        email_result = {"ok": False, "error": "email send failed"}
+
+    return {"ok": True, "status": body.decision, "approved_by": user["email"], "email": email_result}
 
 
 async def _do_apply_scenario(sid: str, user: dict) -> dict:

@@ -121,7 +121,11 @@ async def my_transparency_status(user: dict = Depends(require_admin)):
 
 
 def _make_slug(name: str) -> str:
-    return "".join(c if c.isalnum() else "-" for c in (name or "").lower()).strip("-")[:60] or "company"
+    raw = "".join(c if c.isalnum() else "-" for c in (name or "").lower()).strip("-")
+    # collapse repeated hyphens
+    while "--" in raw:
+        raw = raw.replace("--", "-")
+    return raw[:60]
 
 
 @router.post("/transparency/admin/toggle")
@@ -129,7 +133,12 @@ async def toggle_transparency(body: TransparencyToggleIn, user: dict = Depends(r
     c = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     if not c:
         raise HTTPException(404, "Company not found")
-    desired_slug = (body.slug or "").lower().strip() or c.get("transparency_slug") or _make_slug(c["name"])
+    if body.slug and body.slug.strip():
+        desired_slug = _make_slug(body.slug)
+        if not desired_slug:
+            raise HTTPException(400, "Slug must contain at least one alphanumeric character")
+    else:
+        desired_slug = c.get("transparency_slug") or _make_slug(c["name"]) or "company"
     # uniqueness check
     if body.enabled:
         clash = await db.companies.find_one(

@@ -67,15 +67,24 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Performance reviews UI + recruitment ATS expansions
 
 ### P2
-- Twilio bulk SMS payslips (Gov tier — requires user API keys)
-- Resend email approver notifications for scenarios (requires user API key)
-- Mobile ESS PWA
-- NRA export filing automation (Gov tier)
+- **DONE (iter12)** ~~Twilio bulk SMS payslips (Gov tier — requires user API keys)~~ — LIVE; user must enable +232 region in Twilio console
+- **DONE (iter12)** ~~Resend email approver notifications for scenarios (requires user API key)~~ — LIVE; user on free plan so deliverable destinations are restricted
+- Mobile ESS PWA — ICONS + manifest shipped iter9; offline-first still pending
+- **DONE (iter10)** ~~NRA export filing automation (Gov tier)~~
 - Cosmetic: Recharts width(-1) warning + UploadModal hydration warning
 
 ### P3
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
+
+## v1.4 (May 13 2026) — Public Open-Gov Transparency Portal + Live SMS/Email
+- **Public transparency portal**: `/api/public/transparency/{slug}` — first no-auth endpoint, anonymised ministry rollups, PII-free aggregates, view counter.
+- **Admin opt-in flow**: `POST /api/public/transparency/admin/toggle` (slug normalisation via `_make_slug`, rejects empty post-norm with 400, enforces uniqueness with 409).
+- **Frontend**: `/transparency/:slug` rendered outside `ProtectedRoute`. `TransparencyCard` mounted on Settings, feature-gated on `ministry_reports`.
+- **Twilio LIVE**: `TWILIO_*` env vars wired in `backend/.env`. SMS rejections logged with full reason. User must enable +232 in Twilio Geo Permissions to actually deliver.
+- **Resend LIVE**: `RESEND_API_KEY` + `SENDER_EMAIL=onboarding@resend.dev` wired. New module `/app/backend/email_service.py` (HTML templates, async-safe via `asyncio.to_thread`). Auto-fires from `simulator.py` on scenario submit/decide.
+- **New router** `/api/integrations/*` — `GET /status` + `POST /email/test` for admin smoke tests.
+- **Tests**: `test_iter11_transparency.py` (13/13) + `test_iter12_integrations.py` (9/9).
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`.
