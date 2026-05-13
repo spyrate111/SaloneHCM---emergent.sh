@@ -1,0 +1,48 @@
+{
+  "summary": "Iter11 — Public Open-Government Transparency Dashboard tested end-to-end. Backend: 12/13 pytest PASS in test_iter11_transparency.py — public read (no auth, 200), 404 on unknown slug, privacy invariant (zero PII keys / no emails in body), tenant isolation (Demo data absent from Gov public response), admin auth required on /admin/* endpoints (401/403), status & view-counter increment, slug clash returns 409, Demo publish/unpublish round-trip works. Frontend: /transparency/government-of-sierra-leone renders publicly (no /login redirect), org-name=Government of Sierra Leone, 4 KPI cards, 5 ministry rows ranked by gross, compliance shows '2 returns filed Most recent: 2026-01'. Settings TransparencyCard renders for Gov admin (slug editable, unpublish + transparency-open anchor → /transparency/government-of-sierra-leone) and is correctly HIDDEN on Demo Salone Ltd. enterprise tenant (no ministry_reports feature; verified after explicit tenant switch in superadmin session).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/public/transparency/admin/toggle",
+        "issue": "Slug normalisation is INCOMPLETE. routers/public.py line 132 only does `body.slug.lower().strip()` — it does NOT strip non-alphanumeric characters. Spec requires: 'body.slug normalises to lowercase alphanumeric + hyphens.' Sending {slug: ' Demo-Salone-TEST!!@@ '} persists slug='demo-salone-test!!@@' to db.companies.transparency_slug, and the public_url returned is /transparency/demo-salone-test!!@@. This is a real bug: the helper _make_slug() exists in the same file but is only used when body.slug is empty. Fix: always run user-supplied slug through _make_slug(). Cleanup already performed by the test (unpublished afterward), but Demo's persisted slug remains 'demo-salone-transparency-test' (clean) — no DB pollution remains."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_transparency.py",
+    "/app/test_reports/pytest/iter11_transparency.xml"
+  ],
+  "action_items": [
+    "Fix slug normalisation in /app/backend/routers/public.py toggle_transparency(): replace `desired_slug = (body.slug or '').lower().strip() or ...` with `desired_slug = _make_slug(body.slug) if body.slug else (c.get('transparency_slug') or _make_slug(c['name']))` so non-alphanumeric chars are stripped. Also enforce min length / reject empty post-normalisation."
+  ],
+  "critical_code_review_comments": [
+    "routers/public.py — privacy invariant code is solid: response shape contains zero employee-level keys (only aggregates by department). Verified via test_privacy_invariant_no_pii which walks the JSON tree and forbids any forbidden keys, plus regex-scans the raw response body for email-like strings.",
+    "Public endpoint correctly filters by both transparency_slug AND transparency_public=true (line 23) — a tenant that unpublishes immediately stops serving public data (verified in test_demo_can_publish_own_slug_then_unpublish: 200 → unpublish → 404).",
+    "transparency_views write is wrapped in try/except so a Mongo failure never breaks the citizen response (line 31-39).",
+    "Auth still required for /admin/* under the same /public router — verified 401/403 across status/toggle/views without token.",
+    "Tenant isolation verified: Gov public response contains no Demo Salone identifiers; Demo's own public response (during test_demo_can_publish_own_slug_then_unpublish) contains no Gov data.",
+    "TransparencyCard.jsx — slug input is client-side regex-sanitised to /[a-z0-9-]/g on each keystroke (line 73), which masks the backend bug for normal UI flow but does NOT protect against API-direct callers. Backend fix is still required.",
+    "Settings.jsx feature-gating works correctly: card visible on gov-tier with ministry_reports, hidden on enterprise tier without the feature.",
+    "Public route is correctly mounted OUTSIDE the Layout/ProtectedRoute wrapper in App.js — /transparency/:slug renders with no login redirect and no app chrome.",
+    "view counter increments are real (+2 on two public hits, verified in test_views_increment)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter11_transparency.py (NEW — 13 pytest cases covering public read, privacy invariant, tenant isolation, admin auth, slug clash 409, slug normalisation bug, status, views increment, publish/unpublish round-trip)"
+  ],
+  "success_rate": {
+    "backend": "92% (12/13) — only failing test is test_slug_normalisation_strips_non_alnum which exposes the real bug listed under minor backend issues",
+    "frontend": "100% on tested flows — public /transparency/:slug page (no-auth render, 4 KPIs, 5 ministry rows, compliance card), Gov Settings TransparencyCard (slug input, unpublish button, transparency-open anchor href correct), Demo Salone enterprise correctly HIDES the card"
+  },
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (Gov, has ministry_reports — sees TransparencyCard); admin@salonehcm.sl / Admin@2026 (superadmin, default Demo Salone enterprise — must explicitly switch tenant since session retained Gov context from prior test iterations)",
+  "seed_data_creation": "Two test artefacts persisted in Demo Salone tenant: transparency_slug='demo-salone-transparency-test' (currently transparency_public=false, harmless). No views or filings touched. Gov tenant unchanged — transparency_public=true with slug 'government-of-sierra-leone' (pre-existing).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "ONE real backend bug to fix: slug normalisation in /app/backend/routers/public.py:132 — must use _make_slug() on user-supplied slug, not just .lower().strip(). After fix, re-run pytest /app/backend/tests/test_iter11_transparency.py — all 13 should pass. The public transparency endpoint is the FIRST no-auth endpoint in the codebase and works correctly through K8s ingress at /api/public/*. Frontend Transparency.jsx + TransparencyCard.jsx are complete and pixel-clean. NOTE for tenant testing: superadmin's session retains the last-switched tenant across logins — when validating tier-gated UI, always explicitly switch tenant via the topbar 'Switch tenant' button or skip-to verifying with a dedicated tenant admin. Twilio + Resend creds remain pending.",
+  "rca of the issue": "Slug normalisation bug — routers/public.py line 132 reads `desired_slug = (body.slug or '').lower().strip() or c.get('transparency_slug') or _make_slug(c['name'])`. The trailing `_make_slug(c['name'])` branch is only hit when body.slug is empty AND the company has no existing slug. For ANY non-empty body.slug, only .lower() and .strip() are applied, allowing characters like '!', '@', spaces (after strip, internal spaces survive), '$', etc. to be persisted. Reproduction: POST /api/public/transparency/admin/toggle with {enabled:true, slug:' Demo-Salone-TEST!!@@ '} → DB stores 'demo-salone-test!!@@'. Mitigation: change the line to `desired_slug = _make_slug(body.slug) if (body.slug and body.slug.strip()) else (c.get('transparency_slug') or _make_slug(c['name']))`. Bonus: also reject empty post-normalisation result with 400."
+}

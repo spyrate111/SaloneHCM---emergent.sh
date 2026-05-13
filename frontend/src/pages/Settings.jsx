@@ -3,6 +3,7 @@ import api from "../lib/api";
 import { useFeatures, TIER_COLORS, TIER_DESCRIPTIONS } from "../lib/features";
 import { Target, Globe, Briefcase, Building2, Check, Lock, Sparkles } from "lucide-react";
 import TwoFactorCard from "../components/TwoFactorCard";
+import TransparencyCard from "../components/TransparencyCard";
 
 const FEATURE_LABELS = {
   employees: "Employee directory & profiles",
@@ -157,6 +158,8 @@ export default function Settings() {
       )}
 
       <TwoFactorCard />
+
+      {has("ministry_reports") && <TransparencyCard />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6" data-testid="company-card">

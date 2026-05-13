@@ -26,6 +26,7 @@ import Companies from "./pages/Companies";
 import SmsLogs from "./pages/SmsLogs";
 import Schedules from "./pages/Schedules";
 import Ministry from "./pages/Ministry";
+import Transparency from "./pages/Transparency";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/transparency/:slug" element={<Transparency />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/employees" element={<ProtectedRoute adminOnly><Employees /></ProtectedRoute>} />

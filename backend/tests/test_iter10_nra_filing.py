@@ -119,14 +119,13 @@ class TestMarkNRAFiled:
                            headers=_h(gov_token), timeout=20)
         if r1.status_code == 409:
             # already filed in a previous iteration — treat as initial state and skip create assertion
-            already = True
+            pass
         else:
             assert r1.status_code == 200, r1.text
             data = r1.json()
             assert data["run_id"] == gov_run_id
             assert data["nra_reference"].startswith("NRA-")
             assert data["nra_reference"].count("-") == 2  # NRA-{period}-{prefix}
-            already = False
         # Second call MUST be 409
         r2 = requests.post(f"{BASE}/api/compliance/file-nra/{gov_run_id}",
                            headers=_h(gov_token), timeout=20)
