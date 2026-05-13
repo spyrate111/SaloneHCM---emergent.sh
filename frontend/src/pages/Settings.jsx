@@ -5,6 +5,7 @@ import { Target, Globe, Briefcase, Building2, Check, Lock, Sparkles } from "luci
 import TwoFactorCard from "../components/TwoFactorCard";
 import TransparencyCard from "../components/TransparencyCard";
 import PushSetupCard from "../components/PushSetupCard";
+import DigestPrefsCard from "../components/DigestPrefsCard";
 
 const FEATURE_LABELS = {
   employees: "Employee directory & profiles",
@@ -161,6 +162,8 @@ export default function Settings() {
       <TwoFactorCard />
 
       <PushSetupCard />
+
+      <DigestPrefsCard />
 
       {has("ministry_reports") && <TransparencyCard />}
 

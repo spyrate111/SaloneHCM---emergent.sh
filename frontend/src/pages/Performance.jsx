@@ -151,6 +151,8 @@ function CyclesAdmin() {
 }
 
 function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
+  const [deptFilter, setDeptFilter] = useState(null);
+  const filtered = deptFilter ? reviews.filter((r) => r.department === deptFilter) : reviews;
   return (
     <>
       <tr className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB] cursor-pointer" onClick={onExpand} data-testid={`cycle-row-${c.id}`}>
@@ -165,15 +167,26 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
       {expanded && (
         <tr><td colSpan={7} className="bg-[#F7F6F2] p-0">
           <div className="px-6 py-4">
-            {analytics && <AnalyticsBlock a={analytics} />}
-            <h4 className="font-medium text-sm mt-5 mb-3">Reviews in this cycle</h4>
+            {analytics && <AnalyticsBlock a={analytics} onDeptClick={(d) => setDeptFilter(deptFilter === d ? null : d)} active={deptFilter} />}
+            <div className="flex items-center justify-between mt-5 mb-3">
+              <h4 className="font-medium text-sm">
+                Reviews in this cycle
+                {deptFilter && (
+                  <span className="ml-2 text-xs font-normal text-[#525860]">
+                    · filtered by <strong className="text-[#26547C]">{deptFilter}</strong>
+                    <button onClick={() => setDeptFilter(null)} className="ml-1.5 text-[#B83A3A] hover:underline" data-testid="clear-dept-filter">clear</button>
+                  </span>
+                )}
+              </h4>
+              <div className="text-xs text-[#686D76] font-data">{filtered.length} of {reviews.length}</div>
+            </div>
             <table className="w-full text-xs">
               <thead><tr>{["Employee", "Department", "Self rating", "Manager rating", "Status"].map((h) => (
                 <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-2 px-3 font-medium">{h}</th>
               ))}</tr></thead>
               <tbody>
-                {reviews.map((r) => (
-                  <tr key={r.id} className="border-t border-[#E2DFD6]">
+                {filtered.map((r) => (
+                  <tr key={r.id} className="border-t border-[#E2DFD6]" data-testid={`review-row-${r.id}`}>
                     <td className="py-2 px-3 font-medium">{r.employee_name}</td>
                     <td className="py-2 px-3 text-[#525860]">{r.department}</td>
                     <td className="py-2 px-3 font-data">{r.self_rating ?? "—"}</td>
@@ -183,7 +196,7 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
                     </td>
                   </tr>
                 ))}
-                {!reviews.length && <tr><td colSpan={5} className="py-6 text-center text-[#686D76]">No reviews yet.</td></tr>}
+                {!filtered.length && <tr><td colSpan={5} className="py-6 text-center text-[#686D76]">No reviews{deptFilter ? ` in ${deptFilter}` : ""} yet.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -193,7 +206,7 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
   );
 }
 
-function AnalyticsBlock({ a }) {
+function AnalyticsBlock({ a, onDeptClick, active }) {
   const distribution = a.rating_distribution || {};
   const maxN = Math.max(1, ...Object.values(distribution));
   return (
@@ -227,11 +240,16 @@ function AnalyticsBlock({ a }) {
         </div>
         {a.department_summary?.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-[#525860] mb-2">By department</div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-[#525860] mb-2">By department <span className="text-[#A1A5AB] normal-case tracking-normal">(click to drill in)</span></div>
             <table className="w-full text-xs">
               <tbody>
                 {a.department_summary.map((d) => (
-                  <tr key={d.department} className="border-b border-[#F1EEE6]">
+                  <tr
+                    key={d.department}
+                    onClick={() => onDeptClick && onDeptClick(d.department)}
+                    className={`border-b border-[#F1EEE6] cursor-pointer hover:bg-[#F1EEE6] transition ${active === d.department ? "bg-[#E5EEF6]" : ""}`}
+                    data-testid={`dept-row-${d.department.replace(/\s+/g, "-").toLowerCase()}`}
+                  >
                     <td className="py-1.5 font-medium">{d.department}</td>
                     <td className="py-1.5 font-data text-[#686D76]">{d.count}</td>
                     <td className="py-1.5 font-data font-medium text-right">{d.avg_rating.toFixed(1)}</td>

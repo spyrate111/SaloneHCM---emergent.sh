@@ -28,6 +28,7 @@ import Schedules from "./pages/Schedules";
 import Ministry from "./pages/Ministry";
 import Transparency from "./pages/Transparency";
 import Performance from "./pages/Performance";
+import Verify from "./pages/Verify";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/transparency/:slug" element={<Transparency />} />
+          <Route path="/verify/:cid" element={<Verify />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/employees" element={<ProtectedRoute adminOnly><Employees /></ProtectedRoute>} />
