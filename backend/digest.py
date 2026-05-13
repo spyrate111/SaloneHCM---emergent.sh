@@ -1,5 +1,6 @@
 """Daily admin digest — runs once per day, pushes a summary to each tenant admin."""
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -62,11 +63,12 @@ def _summarize(snap: dict) -> str:
 
 
 async def _send_daily_digest() -> None:
-    """For each admin user, compute their tenant snapshot and fire a push."""
+    """For each admin user, compute their tenant snapshot and fire their preferred channels."""
     import push_service
+    from email_service import _wrap_html, _send as _email_send, is_configured as _email_ok
     admins = await db.users.find(
         {"role": {"$in": ["admin", "superadmin"]}},
-        {"_id": 0, "id": 1, "email": 1, "company_id": 1},
+        {"_id": 0, "id": 1, "email": 1, "company_id": 1, "name": 1, "digest_prefs": 1},
     ).to_list(500)
 
     by_tenant: dict[str, dict] = {}
@@ -78,16 +80,35 @@ async def _send_daily_digest() -> None:
             by_tenant[cid] = await _aggregate_for_tenant(cid)
         snap = by_tenant[cid]
         body = _summarize(snap)
-        try:
-            await push_service.fanout_to_user(a["id"], {
-                "title": "SaloneHCM · Daily digest",
-                "body": body,
-                "url": "/dashboard",
-                "kind": "daily_digest",
-                "tag": "daily-digest",
-            })
-        except Exception:
-            logger.warning("daily digest push failed for %s", a["email"])
+        prefs = a.get("digest_prefs") or {"push": True, "email": False}
+        if prefs.get("push"):
+            try:
+                await push_service.fanout_to_user(a["id"], {
+                    "title": "SaloneHCM · Daily digest",
+                    "body": body,
+                    "url": "/dashboard",
+                    "kind": "daily_digest",
+                    "tag": "daily-digest",
+                })
+            except Exception:
+                logger.warning("daily digest push failed for %s", a["email"])
+        if prefs.get("email") and _email_ok():
+            try:
+                lines = [f"<li>{p}</li>" for p in body.split(" · ")] if body and body != "All clear — no pending actions." else ['<li style="color:#2D7A5D;">All clear — no pending actions.</li>']
+                html = _wrap_html(
+                    title="Daily digest",
+                    body_html=f"""
+                      <p>Good morning {a.get('name','')},</p>
+                      <p>Here's your SaloneHCM digest for today:</p>
+                      <ul style="font-size:13px;color:#1A1C1E;">{''.join(lines)}</ul>
+                      <p style="color:#525860;font-size:12px;">Open the SaloneHCM dashboard for details.</p>
+                    """,
+                    cta_label="Open dashboard",
+                    cta_url=(os.environ.get("FRONTEND_URL", "") + "/dashboard"),
+                )
+                await _email_send(a["email"], "SaloneHCM · Daily digest", html)
+            except Exception:
+                logger.warning("daily digest email failed for %s", a["email"])
 
     # Persist a log so admins can inspect
     try:

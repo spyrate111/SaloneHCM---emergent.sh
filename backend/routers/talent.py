@@ -1,4 +1,5 @@
 """Talent: job postings, applicants, performance reviews, training programs + completions."""
+import os
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -269,9 +270,79 @@ async def add_completion(body: CompletionIn, user: dict = Depends(get_current_us
             {"id": body.program_id, **tenant_filter(user)},
             {"$set": {"next_due_at": _next_due(program["frequency"], body.completed_on)}},
         )
+        # Talent → Performance cross-link: 3+ recurring completions ⇒ auto-flag a review
+        try:
+            await _maybe_trigger_perf_review(eid, body.program_id, program, user)
+        except Exception:
+            pass
 
     await audit("training_completed", f"training_completions/{cid}", user)
     return doc
+
+
+async def _maybe_trigger_perf_review(employee_id: str, program_id: str, program: dict, user: dict) -> None:
+    """When an employee has completed THIS recurring program ≥ THRESHOLD times,
+    auto-create a one-off performance review tied to it.
+    """
+    THRESHOLD = 3
+    tf = tenant_filter(user)
+    count = await db.training_completions.count_documents({
+        "employee_id": employee_id, "program_id": program_id, **tf,
+    })
+    if count < THRESHOLD:
+        return
+    # Already triggered for this employee/program combo?
+    already = await db.performance_reviews_v2.find_one({
+        "employee_id": employee_id,
+        "source": "auto_recurring_training",
+        "source_program_id": program_id,
+        **tf,
+    }, {"_id": 0, "id": 1})
+    if already:
+        return
+    emp = await db.employees.find_one({"id": employee_id, **tf}, {"_id": 0})
+    if not emp:
+        return
+    rid = str(uuid.uuid4())
+    cycle_name = f"Auto-review · {program.get('title', 'recurring program')}"
+    period = now_utc().strftime("%Y-%m")
+    doc = with_tenant({
+        "id": rid,
+        "cycle_id": f"auto_{program_id}",
+        "cycle_name": cycle_name,
+        "period": period,
+        "employee_id": employee_id,
+        "employee_name": f'{emp.get("first_name","")} {emp.get("last_name","")}'.strip(),
+        "department": emp.get("department", ""),
+        "manager_id": emp.get("manager_id"),
+        "status": "pending_self",
+        "source": "auto_recurring_training",
+        "source_program_id": program_id,
+        "source_count": count,
+        "self_assessment": None,
+        "self_rating": None,
+        "manager_score": None,
+        "manager_rating": None,
+        "promotion_recommendation": None,
+        "salary_action": None,
+        "acknowledged_at": None,
+        "employee_comments": None,
+        "created_at": iso(now_utc()),
+        "updated_at": iso(now_utc()),
+    }, user)
+    await db.performance_reviews_v2.insert_one(doc)
+
+    # Notify the employee via push
+    try:
+        import push_service
+        await push_service.fanout_to_employee(employee_id, {
+            "title": "Performance review opened",
+            "body": f"Auto-triggered by {count} completions of '{program.get('title','')}'.",
+            "url": "/performance",
+            "kind": "perf_auto_review",
+        })
+    except Exception:
+        pass
 
 
 @router.get("/completions/{cid}/certificate.pdf")
@@ -348,6 +419,29 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
     c.setFillColor(colors.HexColor("#686D76"))
     c.drawString(2.4 * cm, 2.2 * cm, f"Completed on: {completion.get('completed_on','—')}")
     c.drawRightString(W - 2.4 * cm, 2.2 * cm, f"Certificate ID: {cid}")
+
+    # QR code → public verify URL
+    try:
+        import qrcode as _qr
+        from reportlab.lib.utils import ImageReader
+        import io as _io2
+        frontend_url = os.environ.get("FRONTEND_URL", "")
+        verify_url = f"{frontend_url}/verify/{cid}" if frontend_url else f"/verify/{cid}"
+        q = _qr.QRCode(border=1, box_size=4)
+        q.add_data(verify_url)
+        q.make(fit=True)
+        img = q.make_image(fill_color="#133326", back_color="#FFFFFF").convert("RGB")
+        b = _io2.BytesIO()
+        img.save(b, format="PNG")
+        b.seek(0)
+        # bottom-right of inner border
+        size = 2.6 * cm
+        c.drawImage(ImageReader(b), W - 2.4 * cm - size, 2.6 * cm, width=size, height=size)
+        c.setFont("Helvetica", 7)
+        c.setFillColor(colors.HexColor("#A1A5AB"))
+        c.drawRightString(W - 2.4 * cm - size - 0.2 * cm, 3.6 * cm, "Scan to verify")
+    except Exception:
+        pass
 
     c.showPage()
     c.save()

@@ -197,6 +197,30 @@ async def delete_user(uid: str, user: dict = Depends(require_admin)):
     return {"ok": True}
 
 
+class DigestPrefsIn(BaseModel):
+    push: bool = True
+    email: bool = False
+
+
+@router.get("/me/digest-prefs")
+async def get_digest_prefs(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "digest_prefs": 1})
+    prefs = (u or {}).get("digest_prefs") or {"push": True, "email": False}
+    return prefs
+
+
+@router.put("/me/digest-prefs")
+async def set_digest_prefs(body: DigestPrefsIn, user: dict = Depends(get_current_user)):
+    if user["role"] not in ("admin", "superadmin"):
+        raise HTTPException(403, "Digest is admin-only")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"digest_prefs": body.model_dump()}},
+    )
+    await audit("digest_prefs_update", f"users/{user['id']}", user, body.model_dump())
+    return {"ok": True, **body.model_dump()}
+
+
 @router.get("/unlinked-employees")
 async def unlinked_employees(user: dict = Depends(require_admin)):
     """Employees in this tenant that don't have a user account yet — for the invite form picker."""

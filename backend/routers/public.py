@@ -13,6 +13,29 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 
 # ===== Public read-only endpoints (no auth) =====
+@router.get("/certificate/{cid}")
+async def public_certificate_verify(cid: str):
+    """Anyone can verify a Certificate ID — returns ONLY the data printed on the certificate.
+    No PII beyond what the printed PDF already contains (employee name, program, completion date)."""
+    completion = await db.training_completions.find_one({"id": cid}, {"_id": 0})
+    if not completion:
+        return {"valid": False, "reason": "not_found"}
+    program = await db.training_programs.find_one({"id": completion["program_id"]}, {"_id": 0}) or {}
+    employee = await db.employees.find_one({"id": completion["employee_id"]}, {"_id": 0}) or {}
+    company = await db.companies.find_one({"id": completion.get("company_id")}, {"_id": 0}) or {}
+    return {
+        "valid": True,
+        "certificate_id": cid,
+        "employee_name": f"{employee.get('first_name','')} {employee.get('last_name','')}".strip() or "—",
+        "program_title": program.get("title") or "—",
+        "skill_area": program.get("skill_area") or "—",
+        "hours": program.get("hours") or 0,
+        "score": completion.get("score"),
+        "completed_on": completion.get("completed_on"),
+        "issued_by": company.get("name") or "SaloneHCM",
+    }
+
+
 @router.get("/transparency/{slug}")
 async def public_transparency(slug: str, request: Request):
     """Anonymised ministry payroll rollup — no auth required.
