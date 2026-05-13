@@ -30,7 +30,7 @@ export default function SimulationResults({ result }) {
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
         <h3 className="font-heading text-lg font-semibold mb-4">Department impact</h3>
         <div style={CHART_BOX}>
-          <ResponsiveContainer width="100%" height="100%" debounce={50}>
+          <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
             <BarChart data={result.by_department}>
               <CartesianGrid stroke="#EBE8E0" vertical={false} />
               <XAxis dataKey="name" stroke="#686D76" fontSize={11} />

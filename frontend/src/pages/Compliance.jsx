@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
 import { toast } from "sonner";
-import { Download, ShieldCheck, FileCheck, Receipt, AlertCircle } from "lucide-react";
+import { Download, ShieldCheck, FileCheck, Receipt, AlertCircle, Mail } from "lucide-react";
 
 export default function Compliance() {
   const { has } = useFeatures();
@@ -45,6 +45,16 @@ export default function Compliance() {
       load();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Mark filed failed");
+    }
+  };
+
+  const emailNra = async (rid, period) => {
+    try {
+      const { data } = await api.post(`/compliance/nra-paye-return.csv/${rid}/email`, {});
+      if (data?.ok) toast.success(`NRA-PAYE-Return-${period}.csv emailed to ${data.to}`);
+      else toast.error(data?.error || "Email failed");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Email failed");
     }
   };
 
@@ -127,6 +137,14 @@ export default function Compliance() {
                           className="inline-flex items-center gap-1 text-xs bg-[#26547C] hover:bg-[#1D4363] text-white px-2.5 py-1.5 rounded"
                         >
                           <Download className="w-3.5 h-3.5" /> NRA PAYE
+                        </button>
+                        <button
+                          data-testid={`email-nra-paye-${r.run_id}`}
+                          onClick={() => emailNra(r.run_id, r.period)}
+                          className="inline-flex items-center gap-1 text-xs bg-white border border-[#26547C] text-[#26547C] hover:bg-[#E5EEF6] px-2.5 py-1.5 rounded"
+                          title="Email this NRA PAYE Return CSV to your inbox"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> Email me
                         </button>
                         <button
                           data-testid={`export-nassit-${r.run_id}`}

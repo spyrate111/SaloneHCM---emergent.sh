@@ -16,6 +16,7 @@ from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
     documents, company, admin, users, schedules, ministry, public, integrations,
+    push, performance,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -66,6 +67,8 @@ api.include_router(schedules.router)
 api.include_router(ministry.router)
 api.include_router(public.router)
 api.include_router(integrations.router)
+api.include_router(push.router)
+api.include_router(performance.router)
 
 
 @api.get("/")

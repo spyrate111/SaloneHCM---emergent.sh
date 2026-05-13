@@ -39,7 +39,7 @@ export default function Analytics() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Multi-line</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Payroll components over time</h3>
           <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <LineChart data={trend}>
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="period" stroke="#686D76" fontSize={11} />
@@ -59,7 +59,7 @@ export default function Analytics() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Leave</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Leave days approved by department</h3>
           <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <BarChart data={usage.by_department}>
                 <CartesianGrid stroke="#EBE8E0" vertical={false} />
                 <XAxis dataKey="name" stroke="#686D76" fontSize={11} />
@@ -75,7 +75,7 @@ export default function Analytics() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Distribution</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Leave by type</h3>
           <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <PieChart>
                 <Pie data={usage.by_type} dataKey="days" nameKey="type" cx="50%" cy="50%" outerRadius={90} label={(e) => `${e.type} (${e.days}d)`}>
                   {usage.by_type.map((entry, i) => <Cell key={entry.type} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
@@ -90,7 +90,7 @@ export default function Analytics() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Activity</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Audit events — last 30 days</h3>
           <div style={{ width: "100%", height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <AreaChart data={audit.by_day}>
                 <defs>
                   <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">

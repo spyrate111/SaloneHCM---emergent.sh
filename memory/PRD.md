@@ -77,6 +77,16 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
+## v1.5 (May 13 2026) — Email CSVs · Performance Reviews · ATS Kanban · Web Push · 2FA strict
+- **"Email me the CSV" buttons** on SMS Logs (`POST /api/payroll/sms/logs.csv/email`) and Compliance NRA Filings (`POST /api/compliance/nra-paye-return.csv/{rid}/email`). Resend-attachment-powered. Verified delivered to `delivered@resend.dev` sandbox.
+- **Performance Review Cycles** at `/performance` page + `routers/performance.py`. Full self-assessment → manager-score → acknowledge flow. Manager score auto-fires a push notification to the employee. New collections: `review_cycles`, `performance_reviews_v2`.
+- **ATS pipeline Kanban** on `/talent` Recruitment tab. 6 stages (applied → screening → interview → offer → hired → rejected) with column-per-stage layout. Stage history persisted to applicant doc. New endpoints: `GET /talent/applicants/pipeline`, `POST /talent/applicants/{aid}/notes`.
+- **Offline-first ESS PWA** — `sw.js` v3: stale-while-revalidate cache for `my-payslip`/`my-payslips`/`me` endpoints, IndexedDB queue for offline `/api/attendance` POSTs with background-sync drain, navigate-fallback to `/dashboard`.
+- **VAPID Web Push notifications** — `routers/push.py` + `push_service.py` (pywebpush). `PushSetupCard` on Settings with Enable/Disable/Send-test buttons. Service worker handles push + notificationclick events. VAPID keys committed to `.env` + `REACT_APP_VAPID_PUBLIC_KEY` for the frontend.
+- **Super-admin 2FA strict enforcement** — deterministic TOTP secret `KRSXG5BANFXSAYTBORQXG43LMR2A` seeded on `admin@salonehcm.sl`. Login returns 401 `{code: totp_required}` without code, 401 `{code: totp_invalid}` on wrong code. `tests/conftest.py` auto-injects the code via a `requests.post` monkey-patch so 13 existing test files keep working.
+- **Recharts width(-1) warning fixed** — `<ResponsiveContainer width="99%" minWidth={0} minHeight={0}>` across Dashboard, Analytics, Ministry, SimulationResults (the well-known recharts/React 19 race fix).
+- **Tests**: `test_iter13_batch.py` (18/18) covering 2FA enforcement, CSV emails, VAPID subscribe/unsubscribe, performance flow end-to-end, ATS pipeline + history. **40 tests pass** in combined suite (iter11 + iter12 + iter13).
+
 ## v1.4 (May 13 2026) — Public Open-Gov Transparency Portal + Live SMS/Email
 - **Public transparency portal**: `/api/public/transparency/{slug}` — first no-auth endpoint, anonymised ministry rollups, PII-free aggregates, view counter.
 - **Admin opt-in flow**: `POST /api/public/transparency/admin/toggle` (slug normalisation via `_make_slug`, rejects empty post-norm with 400, enforces uniqueness with 409).

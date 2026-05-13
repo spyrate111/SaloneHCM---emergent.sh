@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
+import { toast } from "sonner";
 import {
   MessageSquare, ArrowLeft, Search, Check, AlertCircle, SkipForward, Send,
-  Clock, FlaskConical, Download,
+  Clock, FlaskConical, Download, Mail,
 } from "lucide-react";
 
 const STATUS_PILL = {
@@ -67,6 +68,25 @@ export default function SmsLogs() {
     }
   };
 
+  const emailCsv = async () => {
+    const body = {};
+    if (selectedBatch) body.batch_id = selectedBatch;
+    else {
+      if (filterStatus) body.status = filterStatus;
+      if (filterPeriod) body.period = filterPeriod;
+    }
+    try {
+      const { data } = await api.post("/payroll/sms/logs.csv/email", body);
+      if (data?.ok) {
+        toast.success(`CSV emailed to ${data.to} (${data.rows} rows)`);
+      } else {
+        toast.error(data?.error || "Email failed");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Email failed");
+    }
+  };
+
   const visibleLogs = logs.filter((l) => {
     if (!q) return true;
     const t = q.toLowerCase();
@@ -91,13 +111,23 @@ export default function SmsLogs() {
           </p>
         </div>
         {summary && summary.total_messages > 0 && (
-          <button
-            data-testid="export-csv"
-            onClick={downloadCsv}
-            className="inline-flex items-center gap-2 bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] text-sm px-4 py-2.5 rounded-md transition"
-          >
-            <Download className="w-4 h-4" strokeWidth={1.5} /> Export CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="email-csv"
+              onClick={emailCsv}
+              className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+              title="Email the filtered audit CSV to your inbox"
+            >
+              <Mail className="w-4 h-4" strokeWidth={1.5} /> Email me the CSV
+            </button>
+            <button
+              data-testid="export-csv"
+              onClick={downloadCsv}
+              className="inline-flex items-center gap-2 bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] text-sm px-4 py-2.5 rounded-md transition"
+            >
+              <Download className="w-4 h-4" strokeWidth={1.5} /> Export CSV
+            </button>
+          </div>
         )}
       </div>
 

@@ -22,8 +22,8 @@ def is_configured() -> bool:
     return bool(RESEND_API_KEY)
 
 
-async def _send(to: str, subject: str, html: str) -> dict:
-    """Single send via Resend, returned as {ok, id?, error?}."""
+async def _send(to: str, subject: str, html: str, attachments: Optional[list] = None) -> dict:
+    """Single send via Resend, returned as {ok, id?, error?}. Optional `attachments` is a list of {filename, content_b64}."""
     if not is_configured():
         return {"ok": False, "error": "resend_not_configured", "dry_run": True}
     try:
@@ -33,6 +33,8 @@ async def _send(to: str, subject: str, html: str) -> dict:
             "subject": subject,
             "html": html,
         }
+        if attachments:
+            params["attachments"] = attachments
         result = await asyncio.to_thread(resend.Emails.send, params)
         return {"ok": True, "id": result.get("id") if isinstance(result, dict) else getattr(result, "id", None)}
     except Exception as e:
@@ -174,6 +176,36 @@ async def send_user_invite(
     await _log("user_invite", invite_email, company_name, res, {
         "role": role,
         "inviter_name": inviter_name,
+        "company_id": company_id,
+    })
+    return res
+
+
+async def send_csv_attachment(
+    to: str,
+    subject: str,
+    title: str,
+    body_text: str,
+    csv_bytes: bytes,
+    filename: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Email a CSV as attachment — used by 'Email me the audit CSV' buttons."""
+    import base64 as _b64
+    html = _wrap_html(
+        title=title,
+        body_html=f"""
+          <p>{body_text}</p>
+          <p style="color:#525860;font-size:12px;">Attached: <code style="background:#F7F6F2;padding:2px 6px;border-radius:4px;">{filename}</code></p>
+        """,
+    )
+    attachments = [{
+        "filename": filename,
+        "content": _b64.b64encode(csv_bytes).decode(),
+    }]
+    res = await _send(to, subject, html, attachments=attachments)
+    await _log("csv_export", to, filename, res, {
+        "bytes": len(csv_bytes),
         "company_id": company_id,
     })
     return res

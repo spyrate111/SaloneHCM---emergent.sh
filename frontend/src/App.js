@@ -27,6 +27,7 @@ import SmsLogs from "./pages/SmsLogs";
 import Schedules from "./pages/Schedules";
 import Ministry from "./pages/Ministry";
 import Transparency from "./pages/Transparency";
+import Performance from "./pages/Performance";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/benefits" element={<Benefits />} />
             <Route path="/talent" element={<Talent />} />
+            <Route path="/performance" element={<Performance />} />
             <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />

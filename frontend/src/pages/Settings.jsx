@@ -4,6 +4,7 @@ import { useFeatures, TIER_COLORS, TIER_DESCRIPTIONS } from "../lib/features";
 import { Target, Globe, Briefcase, Building2, Check, Lock, Sparkles } from "lucide-react";
 import TwoFactorCard from "../components/TwoFactorCard";
 import TransparencyCard from "../components/TransparencyCard";
+import PushSetupCard from "../components/PushSetupCard";
 
 const FEATURE_LABELS = {
   employees: "Employee directory & profiles",
@@ -158,6 +159,8 @@ export default function Settings() {
       )}
 
       <TwoFactorCard />
+
+      <PushSetupCard />
 
       {has("ministry_reports") && <TransparencyCard />}
 

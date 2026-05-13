@@ -23,6 +23,7 @@ const NAV = [
   { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ["admin", "superadmin", "employee"], feature: "attendance" },
   { to: "/benefits", label: "Benefits", icon: Heart, roles: ["admin", "superadmin", "employee"], feature: "benefits" },
   { to: "/talent", label: "Talent", icon: GraduationCap, roles: ["admin", "superadmin", "employee"], feature: "talent" },
+  { to: "/performance", label: "Performance", icon: Sparkles, roles: ["admin", "superadmin", "employee"], feature: "talent" },
   { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "superadmin", "employee"], feature: "documents" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "superadmin"], feature: "analytics" },
   { to: "/ministry", label: "Ministry rollup", icon: Landmark, roles: ["admin", "superadmin"], feature: "ministry_reports" },

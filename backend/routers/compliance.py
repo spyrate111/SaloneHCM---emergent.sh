@@ -2,13 +2,48 @@
 import io
 import csv
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
 from payroll_engine import PAYE_BANDS, NASSIT_EMPLOYEE, NASSIT_EMPLOYER
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
+
+
+def _build_nra_csv(run: dict, employees: list, company: dict) -> bytes:
+    emp_map = {e["id"]: e for e in employees}
+    period = run["period"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["NRA PAYE RETURN"])
+    w.writerow(["Period", period])
+    w.writerow(["Employer TIN", (company or {}).get("tin", "")])
+    w.writerow(["Employer Name", (company or {}).get("name", "")])
+    w.writerow([])
+    w.writerow([
+        "tin", "employee_name", "nassit_no", "department",
+        "gross_sle", "taxable_sle", "paye_sle",
+        "nassit_employee_sle", "nassit_employer_sle", "net_sle",
+    ])
+    for s in run["slips"]:
+        emp = emp_map.get(s["employee_id"], {})
+        taxable = round(s["gross"] - s["nassit_employee"], 2)
+        w.writerow([
+            emp.get("tin", ""), s["employee_name"], emp.get("nassit_no", ""),
+            emp.get("department", ""), f'{s["gross"]:.2f}', f'{taxable:.2f}',
+            f'{s["paye"]:.2f}', f'{s["nassit_employee"]:.2f}',
+            f'{s["nassit_employer"]:.2f}', f'{s["net"]:.2f}',
+        ])
+    t = run["totals"]
+    w.writerow([])
+    w.writerow(["TOTAL", "", "", "",
+                f'{t["gross"]:.2f}', f'{t["gross"] - t["nassit_employee"]:.2f}',
+                f'{t["paye"]:.2f}', f'{t["nassit_employee"]:.2f}',
+                f'{t["nassit_employer"]:.2f}', f'{t["net"]:.2f}'])
+    return buf.getvalue().encode()
 
 
 @router.get("/summary")
@@ -210,3 +245,40 @@ async def mark_nra_filed(rid: str, user: dict = Depends(require_feature("nra_exp
 @router.get("/filings")
 async def list_filings(user: dict = Depends(require_admin)):
     return await db.nra_filings.find(tenant_filter(user), {"_id": 0}).sort("filed_at", -1).to_list(500)
+
+
+class EmailFilingIn(BaseModel):
+    to: Optional[str] = None
+
+
+@router.post("/nra-paye-return.csv/{rid}/email")
+async def email_nra_paye_csv(rid: str, body: EmailFilingIn, user: dict = Depends(require_feature("nra_export"))):
+    """Email the NRA PAYE Return CSV to the requester (or another email)."""
+    if user.get("role") not in ("admin", "superadmin"):
+        raise HTTPException(403, "Admin only")
+    from email_service import send_csv_attachment, is_configured as _ec
+    if not _ec():
+        raise HTTPException(503, "Email service not configured")
+    tf = tenant_filter(user)
+    r = await db.payroll_runs.find_one({"id": rid, **tf}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "Run not found")
+    employees = await db.employees.find(tf, {"_id": 0}).to_list(2000)
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+    csv_bytes = _build_nra_csv(r, employees, company or {})
+    to = (body.to or user["email"]).strip().lower()
+    res = await send_csv_attachment(
+        to=to,
+        subject=f"[SaloneHCM] NRA PAYE Return — {r['period']}",
+        title=f"NRA PAYE Return · {r['period']}",
+        body_text=(
+            f"Attached is the <strong>NRA PAYE Return</strong> for "
+            f"<strong>{(company or {}).get('name','your company')}</strong>, period "
+            f"<strong>{r['period']}</strong>. Total PAYE: <strong>SLE {r['totals']['paye']:.2f}</strong>."
+        ),
+        csv_bytes=csv_bytes,
+        filename=f"NRA-PAYE-Return-{r['period']}.csv",
+        company_id=user["company_id"],
+    )
+    await audit("nra_paye_email", f"payroll_runs/{rid}", user, {"to": to, "period": r["period"], "ok": res.get("ok")})
+    return {**res, "period": r["period"], "to": to}

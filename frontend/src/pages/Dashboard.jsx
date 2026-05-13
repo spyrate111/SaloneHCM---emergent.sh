@@ -67,7 +67,7 @@ export default function Dashboard() {
           </div>
           <div style={{ width: "100%", height: 256 }}>
             {data.runs_history?.length ? (
-              <ResponsiveContainer width="100%" height="100%" debounce={50}>
+              <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
                 <AreaChart data={data.runs_history}>
                   <defs>
                     <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
@@ -92,7 +92,7 @@ export default function Dashboard() {
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] mb-1">Headcount by department</div>
           <h3 className="font-heading text-lg font-semibold mb-4">Departments</h3>
           <div style={{ width: "100%", height: 256 }}>
-            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+            <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
               <BarChart data={data.departments} layout="vertical" margin={BAR_LEFT_MARGIN}>
                 <CartesianGrid stroke="#EBE8E0" horizontal={false} />
                 <XAxis type="number" stroke="#686D76" fontSize={11} />

@@ -281,3 +281,63 @@ async def export_sms_logs_csv(
         io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="salonehcm-sms-audit.csv"'},
     )
+
+
+def _build_sms_csv_bytes(rows: list) -> bytes:
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "sent_at", "period", "batch_id", "employee_name", "phone", "status",
+        "twilio_sid", "reason", "dry_run", "sent_by", "run_id",
+    ])
+    for r in rows:
+        writer.writerow([
+            r.get("sent_at", ""), r.get("period", ""), r.get("batch_id", ""),
+            r.get("employee_name", ""), r.get("to", ""), r.get("status", ""),
+            r.get("sid", ""), r.get("reason", ""),
+            "yes" if r.get("dry_run") else "no",
+            r.get("sent_by", ""), r.get("run_id", ""),
+        ])
+    return buf.getvalue().encode()
+
+
+class EmailExportIn(BaseModel):
+    to: Optional[str] = None  # defaults to caller's own email
+    period: Optional[str] = None
+    status: Optional[str] = None
+    batch_id: Optional[str] = None
+
+
+@router.post("/sms/logs.csv/email")
+async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_admin)):
+    """Email the audit CSV to the requester (or another email)."""
+    from email_service import send_csv_attachment, is_configured as _ec
+    if not _ec():
+        raise HTTPException(503, "Email service not configured")
+    q: dict = {**tenant_filter(user)}
+    if body.period:
+        q["period"] = body.period
+    if body.status:
+        q["status"] = body.status
+    if body.batch_id:
+        q["batch_id"] = body.batch_id
+    rows = await db.sms_logs.find(q, {"_id": 0}).sort("sent_at", -1).to_list(10000)
+    csv_bytes = _build_sms_csv_bytes(rows)
+    to = (body.to or user["email"]).strip().lower()
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "name": 1})
+    res = await send_csv_attachment(
+        to=to,
+        subject=f"[SaloneHCM] SMS audit log ({len(rows)} rows)",
+        title="SMS audit export",
+        body_text=(
+            f"Attached is your SaloneHCM SMS audit log for "
+            f"<strong>{(company or {}).get('name','your company')}</strong>. "
+            f"Filters applied: {body.model_dump(exclude={'to'})}. "
+            f"Total entries: <strong>{len(rows)}</strong>."
+        ),
+        csv_bytes=csv_bytes,
+        filename=f"salonehcm-sms-audit-{(body.period or 'all')}.csv",
+        company_id=user["company_id"],
+    )
+    await audit("sms_log_email", "payroll/sms/logs.csv/email", user, {"to": to, "rows": len(rows), "ok": res.get("ok")})
+    return {**res, "rows": len(rows), "to": to}

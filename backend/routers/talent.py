@@ -34,6 +34,10 @@ class ApplicantStageUpdate(BaseModel):
     stage: Literal["applied", "screening", "interview", "offer", "hired", "rejected"]
 
 
+class ApplicantNoteIn(BaseModel):
+    note: str = Field(..., min_length=1, max_length=2000)
+
+
 @router.get("/postings")
 async def list_postings(user: dict = Depends(get_current_user)):
     return await db.job_postings.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
@@ -80,14 +84,57 @@ async def create_applicant(body: ApplicantIn, user: dict = Depends(require_admin
 
 @router.patch("/applicants/{aid}/stage")
 async def update_stage(aid: str, body: ApplicantStageUpdate, user: dict = Depends(require_admin)):
+    tf = tenant_filter(user)
+    existing = await db.applicants.find_one({"id": aid, **tf}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Not found")
+    history_entry = {
+        "from": existing.get("stage", "applied"),
+        "to": body.stage,
+        "by": user["email"],
+        "ts": iso(now_utc()),
+    }
+    await db.applicants.update_one(
+        {"id": aid, **tf},
+        {
+            "$set": {"stage": body.stage, "stage_updated_at": iso(now_utc())},
+            "$push": {"stage_history": history_entry},
+        },
+    )
+    await audit("applicant_stage", f"applicants/{aid}", user, {"stage": body.stage})
+    return {"ok": True, "stage": body.stage}
+
+
+@router.post("/applicants/{aid}/notes")
+async def add_applicant_note(aid: str, body: ApplicantNoteIn, user: dict = Depends(require_admin)):
+    tf = tenant_filter(user)
+    note = {
+        "id": str(uuid.uuid4()),
+        "note": body.note,
+        "by": user["email"],
+        "ts": iso(now_utc()),
+    }
     res = await db.applicants.update_one(
-        {"id": aid, **tenant_filter(user)},
-        {"$set": {"stage": body.stage}},
+        {"id": aid, **tf}, {"$push": {"notes": note}}
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
-    await audit("applicant_stage", f"applicants/{aid}", user, {"stage": body.stage})
-    return {"ok": True, "stage": body.stage}
+    await audit("applicant_note", f"applicants/{aid}", user, {"len": len(body.note)})
+    return note
+
+
+@router.get("/applicants/pipeline")
+async def applicants_pipeline(user: dict = Depends(require_admin)):
+    """Return applicants grouped by stage — used by the Kanban UI."""
+    tf = tenant_filter(user)
+    rows = await db.applicants.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    postings = {p["id"]: p["title"] for p in await db.job_postings.find(tf, {"_id": 0}).to_list(500)}
+    stages = ["applied", "screening", "interview", "offer", "hired", "rejected"]
+    grouped: dict = {s: [] for s in stages}
+    for r in rows:
+        r["posting_title"] = postings.get(r.get("posting_id"), "—")
+        grouped.setdefault(r.get("stage", "applied"), []).append(r)
+    return {"stages": stages, "grouped": grouped, "total": len(rows)}
 
 
 # ---- Performance reviews ----

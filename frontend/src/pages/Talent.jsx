@@ -37,11 +37,9 @@ export default function Talent() {
       </div>
       <div className="flex border-b border-[#E2DFD6] gap-1" role="tablist">
         <Tab active={tab === "recruitment"} onClick={() => setTab("recruitment")} icon={Briefcase} testId="tab-recruitment">Recruitment</Tab>
-        <Tab active={tab === "performance"} onClick={() => setTab("performance")} icon={Star} testId="tab-performance">Performance</Tab>
         <Tab active={tab === "learning"} onClick={() => setTab("learning")} icon={GraduationCap} testId="tab-learning">Learning</Tab>
       </div>
       {tab === "recruitment" && <Recruitment isAdmin={isAdmin} />}
-      {tab === "performance" && <Performance isAdmin={isAdmin} />}
       {tab === "learning" && <Learning isAdmin={isAdmin} />}
     </div>
   );
@@ -49,7 +47,7 @@ export default function Talent() {
 
 function Recruitment({ isAdmin }) {
   const [postings, setPostings] = useState([]);
-  const [applicants, setApplicants] = useState([]);
+  const [pipeline, setPipeline] = useState({ stages: [], grouped: {}, total: 0 });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", department: "", location: "Freetown", employment_type: "Full-time", salary_min_sle: 0, salary_max_sle: 0, description: "", status: "open" });
 
@@ -57,8 +55,8 @@ function Recruitment({ isAdmin }) {
     const ps = await api.get("/talent/postings");
     setPostings(ps.data);
     if (isAdmin) {
-      const ap = await api.get("/talent/applicants");
-      setApplicants(ap.data);
+      const ap = await api.get("/talent/applicants/pipeline");
+      setPipeline(ap.data);
     }
   }, [isAdmin]);
   useEffect(() => { load(); }, [load]);
@@ -99,29 +97,38 @@ function Recruitment({ isAdmin }) {
       </div>
 
       {isAdmin && (
-        <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#E2DFD6]"><h3 className="font-heading text-lg font-semibold">Applicants</h3></div>
-          <table className="w-full text-sm">
-            <thead className="bg-[#F7F6F2]">
-              <tr>{["Name", "Posting", "Stage", "Email", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {applicants.map((a) => (
-                <tr key={a.id} className="border-t border-[#E2DFD6]">
-                  <td className="py-3 px-4 font-medium">{a.name}</td>
-                  <td className="py-3 px-4 text-[#525860]">{a.posting_title}</td>
-                  <td className="py-3 px-4">
-                    <select value={a.stage} onChange={(e) => advance(a.id, e.target.value)} className={`text-[11px] uppercase tracking-wider px-2 py-1 rounded-full ${STAGE_BG[a.stage]} border-0 outline-none cursor-pointer`}>
-                      {STAGES.map((s) => <option key={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-3 px-4 text-[#525860] text-xs">{a.email}</td>
-                  <td className="py-3 px-4 text-right text-xs text-[#686D76]">{a.phone}</td>
-                </tr>
+        <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="applicant-kanban">
+          <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="font-heading text-lg font-semibold">Applicant pipeline</h3>
+              <p className="text-xs text-[#686D76] mt-0.5">Drag-free quick advance — use each card's dropdown to move stages. {pipeline.total} candidates in flight.</p>
+            </div>
+          </div>
+          <div className="p-4 overflow-x-auto">
+            <div className="grid grid-cols-6 gap-3 min-w-[1100px]">
+              {pipeline.stages.map((s) => (
+                <div key={s} className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-2.5 min-h-[280px]" data-testid={`kanban-col-${s}`}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${STAGE_BG[s]}`}>{s}</span>
+                    <span className="text-[11px] text-[#686D76] font-data">{(pipeline.grouped[s] || []).length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {(pipeline.grouped[s] || []).map((a) => (
+                      <div key={a.id} className="bg-white border border-[#E2DFD6] rounded-md p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]" data-testid={`kanban-card-${a.id}`}>
+                        <div className="text-[13px] font-medium text-[#1A1C1E] truncate">{a.name}</div>
+                        <div className="text-[11px] text-[#525860] truncate mt-0.5">{a.posting_title}</div>
+                        <div className="text-[11px] text-[#686D76] truncate mt-0.5 font-data">{a.email}</div>
+                        <select value={a.stage} onChange={(e) => advance(a.id, e.target.value)} className="mt-2 w-full text-[11px] border border-[#E2DFD6] bg-[#FDFCFB] rounded px-1.5 py-1 outline-none">
+                          {STAGES.map((st) => <option key={st} value={st}>Move to: {st}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                    {!(pipeline.grouped[s] || []).length && <div className="text-[11px] text-[#A1A5AB] text-center py-6">—</div>}
+                  </div>
+                </div>
               ))}
-              {!applicants.length && <tr><td colSpan={5} className="py-10 text-center text-sm text-[#686D76]">No applicants yet.</td></tr>}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       )}
 

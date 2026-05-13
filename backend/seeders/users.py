@@ -3,6 +3,10 @@ import os
 import uuid
 from core import db, hash_password, verify_password, now_utc, iso, logger
 
+# Deterministic TOTP seed for the platform superadmin — committed for the testing agent's use.
+# 2FA strict enforcement for superadmin: backend rejects login without a valid 6-digit code.
+SUPERADMIN_TOTP_SECRET = "KRSXG5BANFXSAYTBORQXG43LMR2A"
+
 
 async def seed_admin(company_id: str) -> None:
     admin_email = os.environ["ADMIN_EMAIL"].lower()
@@ -16,9 +20,12 @@ async def seed_admin(company_id: str) -> None:
             "role": "superadmin",
             "company_id": company_id,
             "password_hash": hash_password(admin_password),
+            "twofa_enabled": True,
+            "twofa_secret": SUPERADMIN_TOTP_SECRET,
+            "twofa_enabled_at": iso(now_utc()),
             "created_at": iso(now_utc()),
         })
-        logger.info("Seeded superadmin: %s", admin_email)
+        logger.info("Seeded superadmin (2FA enabled): %s", admin_email)
         return
     # Make sure password matches current env and company_id is set
     updates = {}
@@ -26,8 +33,13 @@ async def seed_admin(company_id: str) -> None:
         updates["password_hash"] = hash_password(admin_password)
     if not existing.get("company_id"):
         updates["company_id"] = company_id
-    # Auto-promote seed admin to superadmin (idempotent)
     if existing.get("role") != "superadmin":
         updates["role"] = "superadmin"
+    # Ensure 2FA stays enabled on the seed superadmin with the deterministic secret
+    if not existing.get("twofa_enabled") or existing.get("twofa_secret") != SUPERADMIN_TOTP_SECRET:
+        updates["twofa_enabled"] = True
+        updates["twofa_secret"] = SUPERADMIN_TOTP_SECRET
+        if not existing.get("twofa_enabled_at"):
+            updates["twofa_enabled_at"] = iso(now_utc())
     if updates:
         await db.users.update_one({"email": admin_email}, {"$set": updates})

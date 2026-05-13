@@ -50,7 +50,7 @@ export default function Ministry() {
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
         <h3 className="font-heading text-lg font-semibold mb-4">Gross payroll by ministry</h3>
         <div style={CHART_BOX}>
-          <ResponsiveContainer width="100%" height="100%" debounce={50}>
+          <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0} debounce={50}>
             <BarChart data={chartData}>
               <CartesianGrid stroke="#EBE8E0" vertical={false} />
               <XAxis dataKey="name" stroke="#686D76" fontSize={11} interval={0} angle={-25} textAnchor="end" height={70} />
