@@ -1,19 +1,51 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
+import api from "../lib/api";
 
 const BG = "https://images.unsplash.com/photo-1676029461383-215556e79bc8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwyfHxzaWVycmElMjBsZW9uZSUyMGxhbmRzY2FwZSUyMHN1bnNldHxlbnwwfHx8fDE3Nzg0MjIzODZ8MA&ixlib=rb-4.1.0&q=85";
 
 export default function Login() {
+  const [params] = useSearchParams();
+  const inviteToken = params.get("invite");
+  const [mode, setMode] = useState(inviteToken ? "accept" : "login");
   const [email, setEmail] = useState("admin@salonehcm.sl");
   const [password, setPassword] = useState("Admin@2026");
   const [totpCode, setTotpCode] = useState("");
   const [needsTotp, setNeedsTotp] = useState(false);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [invite, setInvite] = useState(null);
+  const [inviteErr, setInviteErr] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const { login, applyAuth } = useAuth();
   const nav = useNavigate();
+
+  // Look up invite metadata on mount when ?invite=<token>
+  useEffect(() => {
+    if (!inviteToken) return;
+    setMode("accept");
+    api.get(`/auth/invite/${inviteToken}`)
+      .then((r) => { setInvite(r.data); setEmail(r.data.email); })
+      .catch((e) => {
+        const d = e?.response?.data?.detail;
+        setInviteErr((d && typeof d === "object") ? d.message : "Invitation invalid or expired");
+      });
+  }, [inviteToken]);
+
+  const acceptInvite = async (e) => {
+    e.preventDefault();
+    setErr(""); setLoading(true);
+    try {
+      const r = await api.post("/auth/accept-invite", { token: inviteToken, password: newPassword });
+      applyAuth(r.data);
+      nav("/dashboard");
+    } catch (er) {
+      const d = er?.response?.data?.detail;
+      setErr((d && typeof d === "object") ? d.message : (typeof d === "string" ? d : "Could not accept invitation"));
+    } finally { setLoading(false); }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -76,10 +108,70 @@ export default function Login() {
             <div className="w-10 h-10 rounded-md bg-[#133326] grid place-items-center font-heading font-bold text-white">S</div>
             <div className="font-heading font-bold text-lg">SaloneHCM</div>
           </div>
-          <div className="text-[11px] uppercase tracking-[0.22em] text-[#525860] mb-3">Welcome back</div>
-          <h2 className="font-heading text-3xl sm:text-4xl font-bold text-[#1A1C1E] mb-2">Sign in to your workspace</h2>
-          <p className="text-[#525860] text-sm mb-8">Manage payroll, employees, and compliance for your Sierra Leonean business.</p>
+          <div className="text-[11px] uppercase tracking-[0.22em] text-[#525860] mb-3">
+            {mode === "accept" ? "You've been invited" : "Welcome back"}
+          </div>
+          <h2 className="font-heading text-3xl sm:text-4xl font-bold text-[#1A1C1E] mb-2">
+            {mode === "accept" ? (invite ? `Join ${invite.company?.name || "your team"}` : "Accept your invitation") : "Sign in to your workspace"}
+          </h2>
+          <p className="text-[#525860] text-sm mb-8">
+            {mode === "accept"
+              ? "Set a password to activate your SaloneHCM account."
+              : "Manage payroll, employees, and compliance for your Sierra Leonean business."}
+          </p>
 
+          {mode === "accept" ? (
+            <>
+              {inviteErr ? (
+                <div className="bg-[#FBEAEA] border border-[#F2D0D0] text-[#B83A3A] text-sm rounded-md p-4 flex gap-2" data-testid="invite-error">
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">{inviteErr}</div>
+                    <button onClick={() => { setMode("login"); setInviteErr(""); }} className="underline text-xs mt-1">Sign in with existing credentials instead →</button>
+                  </div>
+                </div>
+              ) : invite ? (
+                <form onSubmit={acceptInvite} className="space-y-5" data-testid="accept-invite-form">
+                  <div className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-4 text-sm flex items-start gap-3">
+                    <UserCheck className="w-5 h-5 text-[#26547C] mt-0.5" strokeWidth={1.5} />
+                    <div>
+                      <div className="font-medium">{invite.name || invite.email}</div>
+                      <div className="text-xs text-[#525860] font-data">{invite.email} · {invite.role}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Choose a password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1A5AB]" strokeWidth={1.5} />
+                      <input
+                        data-testid="accept-password-input"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        placeholder="At least 8 characters"
+                        autoFocus
+                        className="w-full bg-white border border-[#E2DFD6] rounded-md pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]"
+                      />
+                    </div>
+                  </div>
+                  {err && <div data-testid="login-error" className="text-sm text-[#B83A3A] bg-[#FBEAEA] border border-[#F2D0D0] rounded-md px-3 py-2">{err}</div>}
+                  <button
+                    data-testid="accept-submit-button"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+                  >
+                    {loading ? "Activating…" : "Accept invitation"}
+                    <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
+                  </button>
+                </form>
+              ) : (
+                <div className="text-sm text-[#686D76]">Loading invitation details…</div>
+              )}
+            </>
+          ) : (
           <form onSubmit={submit} className="space-y-5" data-testid="login-form">
             <div>
               <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Email</label>
@@ -146,6 +238,7 @@ export default function Login() {
               <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
             </button>
           </form>
+          )}
 
           <div className="mt-8 text-xs text-[#525860] bg-white border border-[#E2DFD6] rounded-md p-4">
             <div className="font-semibold uppercase tracking-wider text-[10px] text-[#1A1C1E] mb-2">Demo accounts</div>

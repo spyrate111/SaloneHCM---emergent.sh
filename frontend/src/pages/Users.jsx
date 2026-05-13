@@ -3,7 +3,7 @@ import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import {
-  Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search,
+  Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search, Mail, Clock,
 } from "lucide-react";
 
 const ROLE_PILL = {
@@ -15,18 +15,22 @@ const ROLE_PILL = {
 export default function Users() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
+  const [invites, setInvites] = useState([]);
   const [unlinked, setUnlinked] = useState([]);
   const [open, setOpen] = useState(false);
   const [resetting, setResetting] = useState(null);
   const [q, setQ] = useState("");
+  const [inviteMode, setInviteMode] = useState("magic"); // "magic" | "password"
 
   const load = useCallback(async () => {
-    const [u, e] = await Promise.all([
+    const [u, e, i] = await Promise.all([
       api.get("/users"),
       api.get("/users/unlinked-employees").catch(() => ({ data: [] })),
+      api.get("/users/invites").catch(() => ({ data: [] })),
     ]);
     setUsers(u.data);
     setUnlinked(e.data);
+    setInvites(i.data);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -37,13 +41,30 @@ export default function Users() {
     const payload = Object.fromEntries(fd.entries());
     if (!payload.employee_id) delete payload.employee_id;
     try {
-      await api.post("/users/invite", payload);
-      toast.success("User invited");
+      if (inviteMode === "magic") {
+        delete payload.password;
+        const r = await api.post("/users/invite-magic", payload);
+        toast.success(r.data?.email_status?.ok ? `Magic-link email sent to ${payload.email}` : "Invite created (email may be sandboxed)");
+      } else {
+        await api.post("/users/invite", payload);
+        toast.success("User created");
+      }
       setOpen(false);
       ev.currentTarget.reset();
       load();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Invite failed");
+    }
+  };
+
+  const revokeInvite = async (iid) => {
+    if (!window.confirm("Revoke this pending invite?")) return;
+    try {
+      await api.delete(`/users/invites/${iid}`);
+      toast.success("Invite revoked");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Revoke failed");
     }
   };
 
@@ -94,6 +115,32 @@ export default function Users() {
           <UserPlus className="w-4 h-4" strokeWidth={1.5} /> Invite user
         </button>
       </div>
+
+      {invites.length > 0 && (
+        <section className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="pending-invites">
+          <div className="px-5 py-3 border-b border-[#E2DFD6] flex items-center gap-2">
+            <Clock className="w-4 h-4 text-[#8B6A14]" strokeWidth={1.5} />
+            <h3 className="font-heading text-sm font-semibold">Pending invitations · {invites.length}</h3>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {invites.map((iv) => (
+                <tr key={iv.id} className="border-t border-[#E2DFD6]" data-testid={`invite-row-${iv.id}`}>
+                  <td className="py-2.5 px-5">
+                    <div className="font-medium">{iv.name}</div>
+                    <div className="text-xs text-[#686D76] font-data">{iv.email}</div>
+                  </td>
+                  <td className="py-2.5 px-5 text-xs text-[#525860] capitalize">{iv.role}</td>
+                  <td className="py-2.5 px-5 text-xs text-[#525860] font-data">expires {new Date(iv.expires_at).toLocaleDateString()}</td>
+                  <td className="py-2.5 px-5 text-right">
+                    <button data-testid={`invite-revoke-${iv.id}`} onClick={() => revokeInvite(iv.id)} className="text-xs text-[#B83A3A] hover:underline">Revoke</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-[#E2DFD6] flex items-center gap-3">
@@ -189,6 +236,19 @@ export default function Users() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+            <div className="flex gap-2 p-1 bg-[#F7F6F2] border border-[#E2DFD6] rounded-md" data-testid="invite-mode-toggle">
+              <button type="button" onClick={() => setInviteMode("magic")} data-testid="invite-mode-magic" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "magic" ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
+                <Mail className="w-3.5 h-3.5" /> Magic link
+              </button>
+              <button type="button" onClick={() => setInviteMode("password")} data-testid="invite-mode-password" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "password" ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
+                <KeyRound className="w-3.5 h-3.5" /> Set password
+              </button>
+            </div>
+            <div className="text-[11px] text-[#525860] -mt-2">
+              {inviteMode === "magic"
+                ? "Sends an email with a one-time link — the user sets their own password on first click."
+                : "Creates the account immediately with the password you choose."}
+            </div>
             <Field label="Full name"><input data-testid="invite-name" required name="name" placeholder="Jane Doe" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
             <Field label="Email"><input data-testid="invite-email" required type="email" name="email" placeholder="jane@company.sl" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
             <Field label="Role">
@@ -198,7 +258,16 @@ export default function Users() {
               </select>
             </Field>
             <Field label="Initial password (share securely)">
-              <input data-testid="invite-password" required name="password" type="password" minLength={8} placeholder="At least 8 chars" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+              <input
+                data-testid="invite-password"
+                required={inviteMode === "password"}
+                disabled={inviteMode === "magic"}
+                name="password"
+                type="password"
+                minLength={8}
+                placeholder={inviteMode === "magic" ? "(set on first click)" : "At least 8 chars"}
+                className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data disabled:bg-[#F7F6F2] disabled:text-[#A1A5AB]"
+              />
             </Field>
             {unlinked.length > 0 && (
               <Field label="Link to existing employee (optional)">
@@ -213,7 +282,8 @@ export default function Users() {
             <div className="flex items-center justify-end gap-2 pt-2">
               <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6] hover:bg-[#F7F6F2]">Cancel</button>
               <button type="submit" data-testid="invite-submit" className="inline-flex items-center gap-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md">
-                <UserPlus className="w-4 h-4" strokeWidth={1.5} /> Send invite
+                {inviteMode === "magic" ? <Mail className="w-4 h-4" strokeWidth={1.5} /> : <UserPlus className="w-4 h-4" strokeWidth={1.5} />}
+                {inviteMode === "magic" ? "Send magic link" : "Create account"}
               </button>
             </div>
           </form>

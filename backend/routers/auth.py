@@ -63,6 +63,87 @@ async def logout(response: Response):
     return {"ok": True}
 
 
+# --------- Magic-link invite acceptance ---------
+
+class AcceptInviteIn(LoginIn.__bases__[0]):
+    """Reused base — but we declare a fresh model below."""
+    pass
+
+
+from pydantic import BaseModel, EmailStr, Field
+class _AcceptInviteIn(BaseModel):
+    token: str = Field(..., min_length=10, max_length=200)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+@router.get("/invite/{token}")
+async def lookup_invite(token: str):
+    """Frontend hits this with the token from the magic-link to render the accept form."""
+    invite = await db.user_invites.find_one({"token": token, "consumed_at": None}, {"_id": 0})
+    if not invite:
+        raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
+    # Expiry check
+    if invite.get("expires_at") and invite["expires_at"] < iso(now_utc()):
+        raise HTTPException(410, detail={"code": "invite_expired", "message": "This invitation has expired"})
+    company = await db.companies.find_one({"id": invite["company_id"]}, {"_id": 0, "id": 1, "name": 1})
+    return {
+        "email": invite["email"],
+        "name": invite.get("name"),
+        "role": invite.get("role", "employee"),
+        "company": company,
+        "expires_at": invite.get("expires_at"),
+    }
+
+
+@router.post("/accept-invite")
+@limiter.limit("10/minute")
+async def accept_invite(request: Request, body: _AcceptInviteIn, response: Response):
+    invite = await db.user_invites.find_one({"token": body.token, "consumed_at": None})
+    if not invite:
+        raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
+    if invite.get("expires_at") and invite["expires_at"] < iso(now_utc()):
+        raise HTTPException(410, detail={"code": "invite_expired", "message": "Invitation has expired"})
+
+    # Idempotent: if a user already exists for this email, update password; else create.
+    existing = await db.users.find_one({"email": invite["email"]})
+    if existing:
+        await db.users.update_one({"id": existing["id"]}, {"$set": {"password_hash": hash_password(body.password)}})
+        user_id = existing["id"]
+    else:
+        import uuid as _uuid
+        user_id = str(_uuid.uuid4())
+        await db.users.insert_one({
+            "id": user_id,
+            "email": invite["email"],
+            "name": invite.get("name") or invite["email"].split("@")[0].title(),
+            "role": invite.get("role", "employee"),
+            "company_id": invite["company_id"],
+            "employee_id": invite.get("employee_id"),
+            "password_hash": hash_password(body.password),
+            "created_at": iso(now_utc()),
+            "created_by": invite.get("invited_by"),
+            "accepted_invite": invite["token"],
+        })
+
+    await db.user_invites.update_one(
+        {"token": body.token},
+        {"$set": {"consumed_at": iso(now_utc()), "consumed_by_user_id": user_id}},
+    )
+
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+    token = make_access(user["id"], user["email"], user["role"])
+    _set_cookie(response, token)
+    await audit("invite_accept", f"users/{user_id}", user, {"email": user["email"]})
+    return {
+        "id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"],
+        "employee_id": user.get("employee_id"),
+        "company_id": user["company_id"], "company": _public_company(company),
+        "twofa_enabled": bool(user.get("twofa_enabled")),
+        "token": token,
+    }
+
+
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})

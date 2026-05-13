@@ -57,6 +57,7 @@ function CyclesAdmin() {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [reviews, setReviews] = useState({});
+  const [analytics, setAnalytics] = useState({});
   const [form, setForm] = useState({ name: "", period: `${new Date().getFullYear()}-H1`, description: "" });
 
   const load = useCallback(async () => {
@@ -68,8 +69,12 @@ function CyclesAdmin() {
   const expand = async (cid) => {
     if (expanded === cid) { setExpanded(null); return; }
     setExpanded(cid);
-    const r = await api.get(`/performance/cycles/${cid}/reviews`);
+    const [r, a] = await Promise.all([
+      api.get(`/performance/cycles/${cid}/reviews`),
+      api.get(`/performance/cycles/${cid}/analytics`),
+    ]);
     setReviews((m) => ({ ...m, [cid]: r.data }));
+    setAnalytics((m) => ({ ...m, [cid]: a.data }));
   };
 
   const submit = async (e) => {
@@ -102,7 +107,7 @@ function CyclesAdmin() {
             {cycles.map((c) => {
               const p = c.progress || {};
               return (
-                <CycleRowGroup key={c.id} c={c} p={p} expanded={expanded === c.id} onExpand={() => expand(c.id)} reviews={reviews[c.id] || []} />
+                <CycleRowGroup key={c.id} c={c} p={p} expanded={expanded === c.id} onExpand={() => expand(c.id)} reviews={reviews[c.id] || []} analytics={analytics[c.id]} />
               );
             })}
             {!cycles.length && <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">No cycles yet — start one to kick off reviews for your team.</td></tr>}
@@ -145,7 +150,7 @@ function CyclesAdmin() {
   );
 }
 
-function CycleRowGroup({ c, p, expanded, onExpand, reviews }) {
+function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
   return (
     <>
       <tr className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB] cursor-pointer" onClick={onExpand} data-testid={`cycle-row-${c.id}`}>
@@ -160,7 +165,8 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews }) {
       {expanded && (
         <tr><td colSpan={7} className="bg-[#F7F6F2] p-0">
           <div className="px-6 py-4">
-            <h4 className="font-medium text-sm mb-3">Reviews in this cycle</h4>
+            {analytics && <AnalyticsBlock a={analytics} />}
+            <h4 className="font-medium text-sm mt-5 mb-3">Reviews in this cycle</h4>
             <table className="w-full text-xs">
               <thead><tr>{["Employee", "Department", "Self rating", "Manager rating", "Status"].map((h) => (
                 <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-2 px-3 font-medium">{h}</th>
@@ -184,6 +190,74 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews }) {
         </td></tr>
       )}
     </>
+  );
+}
+
+function AnalyticsBlock({ a }) {
+  const distribution = a.rating_distribution || {};
+  const maxN = Math.max(1, ...Object.values(distribution));
+  return (
+    <div className="bg-white border border-[#E2DFD6] rounded-md p-4" data-testid="cycle-analytics">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-[#525860]">Cycle analytics</div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+        <Kpi label="Avg self" value={a.avg_self_rating?.toFixed(1) || "0.0"} sub="/5" />
+        <Kpi label="Avg manager" value={a.avg_manager_rating?.toFixed(1) || "0.0"} sub="/5" tone="primary" />
+        <Kpi label="Completion" value={`${Math.round((a.completion_rate || 0) * 100)}%`} sub={`${a.completed}/${a.total_reviews}`} tone="success" />
+        <Kpi label="Acknowledged" value={`${Math.round((a.acknowledgement_rate || 0) * 100)}%`} sub={`${a.acknowledged}/${a.completed}`} />
+        <Kpi label="Strong promo" value={a.promotion_recommendations?.strong || 0} sub="candidates" tone="warning" />
+      </div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[#525860] mb-2">Manager rating distribution</div>
+          <div className="space-y-1.5">
+            {[5, 4, 3, 2, 1].map((r) => {
+              const n = distribution[String(r)] || 0;
+              const pct = (n / maxN) * 100;
+              return (
+                <div key={r} className="flex items-center gap-3 text-xs">
+                  <div className="w-12 font-data text-[#525860]">{r} star{r > 1 ? "s" : ""}</div>
+                  <div className="flex-1 bg-[#F7F6F2] rounded h-3 overflow-hidden">
+                    <div className="h-full bg-[#26547C]" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="w-8 text-right font-data text-[#1A1C1E]">{n}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {a.department_summary?.length > 0 && (
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-[#525860] mb-2">By department</div>
+            <table className="w-full text-xs">
+              <tbody>
+                {a.department_summary.map((d) => (
+                  <tr key={d.department} className="border-b border-[#F1EEE6]">
+                    <td className="py-1.5 font-medium">{d.department}</td>
+                    <td className="py-1.5 font-data text-[#686D76]">{d.count}</td>
+                    <td className="py-1.5 font-data font-medium text-right">{d.avg_rating.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value, sub, tone }) {
+  const colors = {
+    primary: "text-[#26547C]",
+    success: "text-[#2D7A5D]",
+    warning: "text-[#8B6A14]",
+  };
+  return (
+    <div className="bg-[#F7F6F2] rounded-md p-3 border border-[#E2DFD6]">
+      <div className="text-[9px] uppercase tracking-[0.14em] text-[#686D76]">{label}</div>
+      <div className={`font-heading font-bold text-xl mt-1 ${colors[tone] || "text-[#1A1C1E]"}`}>{value}</div>
+      <div className="text-[10px] text-[#A1A5AB] mt-0.5 font-data">{sub}</div>
+    </div>
   );
 }
 

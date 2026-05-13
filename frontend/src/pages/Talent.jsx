@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Briefcase, Star, GraduationCap, Plus, X } from "lucide-react";
+import { Briefcase, Star, GraduationCap, Plus, X, RefreshCw, Download } from "lucide-react";
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 const STAGE_BG = {
@@ -272,7 +272,7 @@ function Learning({ isAdmin }) {
   const [programs, setPrograms] = useState([]);
   const [completions, setCompletions] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", provider: "", hours: 8, skill_area: "", description: "" });
+  const [form, setForm] = useState({ title: "", provider: "", hours: 8, skill_area: "", description: "", is_recurring: false, frequency: "annual" });
 
   const load = useCallback(async () => {
     const [p, c] = await Promise.all([api.get("/talent/programs"), api.get("/talent/completions")]);
@@ -282,13 +282,27 @@ function Learning({ isAdmin }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    await api.post("/talent/programs", { ...form, hours: Number(form.hours) });
+    const payload = { ...form, hours: Number(form.hours) };
+    if (!payload.is_recurring) { delete payload.frequency; delete payload.next_due_at; }
+    await api.post("/talent/programs", payload);
     setOpen(false); load();
   };
 
   const markComplete = async (programId) => {
     await api.post("/talent/completions", { program_id: programId, completed_on: new Date().toISOString().split("T")[0], score: 90 });
     load();
+  };
+
+  const downloadCert = async (cid) => {
+    try {
+      const resp = await api.get(`/talent/completions/${cid}/certificate.pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(resp.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `certificate-${cid.slice(0, 8)}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Certificate download failed", e);
+    }
   };
 
   return (
@@ -303,13 +317,23 @@ function Learning({ isAdmin }) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {programs.map((p) => (
-          <div key={p.id} className="bg-white border border-[#E2DFD6] rounded-lg p-5 flex flex-col">
-            <div className="w-9 h-9 rounded-md bg-[#E5EEF6] grid place-items-center"><GraduationCap className="w-[18px] h-[18px] text-[#26547C]" strokeWidth={1.5} /></div>
+          <div key={p.id} className="bg-white border border-[#E2DFD6] rounded-lg p-5 flex flex-col" data-testid={`program-card-${p.id}`}>
+            <div className="flex items-start justify-between">
+              <div className="w-9 h-9 rounded-md bg-[#E5EEF6] grid place-items-center"><GraduationCap className="w-[18px] h-[18px] text-[#26547C]" strokeWidth={1.5} /></div>
+              {p.is_recurring && (
+                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full bg-[#FBF1DE] text-[#8B6A14]" data-testid={`recurring-badge-${p.id}`}>
+                  <RefreshCw className="w-3 h-3" /> Recurring · {p.frequency}
+                </span>
+              )}
+            </div>
             <div className="mt-3 flex-1">
               <div className="text-[10px] uppercase tracking-wider text-[#525860]">{p.skill_area}</div>
               <h3 className="font-heading text-base font-semibold mt-0.5">{p.title}</h3>
               <div className="text-xs text-[#686D76] mt-1">{p.provider || "Internal"} · {p.hours}h</div>
               {p.description && <p className="text-xs text-[#686D76] mt-2">{p.description}</p>}
+              {p.is_recurring && p.next_due_at && (
+                <div className="mt-2 text-[10px] text-[#8B6A14] font-data">Next due: {new Date(p.next_due_at).toLocaleDateString()}</div>
+              )}
             </div>
             <button onClick={() => markComplete(p.id)} className="mt-3 text-xs bg-[#133326] hover:bg-[#0F281E] text-white rounded px-3 py-2 font-medium">Mark complete</button>
           </div>
@@ -321,19 +345,27 @@ function Learning({ isAdmin }) {
         <div className="px-6 py-4 border-b border-[#E2DFD6]"><h3 className="font-heading text-lg font-semibold">Completions</h3></div>
         <table className="w-full text-sm">
           <thead className="bg-[#F7F6F2]">
-            <tr>{["Employee", "Program", "Skill", "Date", "Score"].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+            <tr>{["Employee", "Program", "Skill", "Date", "Score", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody>
             {completions.map((c) => (
-              <tr key={c.id} className="border-t border-[#E2DFD6]">
+              <tr key={c.id} className="border-t border-[#E2DFD6]" data-testid={`completion-row-${c.id}`}>
                 <td className="py-3 px-4">{c.employee_name}</td>
-                <td className="py-3 px-4 font-medium">{c.program_title}</td>
+                <td className="py-3 px-4 font-medium">
+                  {c.program_title}
+                  {c.program_is_recurring && <span className="ml-2 text-[10px] uppercase tracking-wider text-[#8B6A14]">recurring</span>}
+                </td>
                 <td className="py-3 px-4 text-[#525860]">{c.program_skill_area}</td>
                 <td className="py-3 px-4 font-data">{c.completed_on}</td>
                 <td className="py-3 px-4 font-data">{c.score ?? "—"}{c.score && "%"}</td>
+                <td className="py-3 px-4 text-right">
+                  <button data-testid={`cert-download-${c.id}`} onClick={() => downloadCert(c.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-2.5 py-1.5 rounded">
+                    <Download className="w-3.5 h-3.5" /> Certificate
+                  </button>
+                </td>
               </tr>
             ))}
-            {!completions.length && <tr><td colSpan={5} className="py-10 text-center text-sm text-[#686D76]">No completions yet.</td></tr>}
+            {!completions.length && <tr><td colSpan={6} className="py-10 text-center text-sm text-[#686D76]">No completions yet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -359,6 +391,23 @@ function Learning({ isAdmin }) {
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Description</label>
                 <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+              </div>
+              <div className="border-t border-[#F1EEE6] pt-3">
+                <label className="inline-flex items-center gap-2 text-sm cursor-pointer" data-testid="program-recurring-toggle">
+                  <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} className="w-4 h-4 accent-[#133326]" />
+                  <span><RefreshCw className="w-3.5 h-3.5 inline mr-1" />Recurring (mandatory refresher)</span>
+                </label>
+                {form.is_recurring && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Frequency</label>
+                    <select data-testid="program-frequency" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="biannual">Biannual</option>
+                      <option value="annual">Annual</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">

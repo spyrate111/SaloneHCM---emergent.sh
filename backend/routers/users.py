@@ -77,6 +77,97 @@ async def invite_user(body: InviteIn, user: dict = Depends(require_admin)):
     return _public(doc)
 
 
+class MagicInviteIn(BaseModel):
+    email: EmailStr
+    name: str = Field(..., min_length=2, max_length=120)
+    role: Role = "employee"
+    employee_id: Optional[str] = None  # link to an existing employee record
+
+
+@router.post("/invite-magic")
+async def invite_magic(body: MagicInviteIn, user: dict = Depends(require_admin)):
+    """Email a magic-link invite via Resend. The recipient sets their password on first click."""
+    import secrets as _s
+    from datetime import timedelta
+    from email_service import send_user_invite, is_configured as _ec
+    if not _ec():
+        raise HTTPException(503, "Email service not configured")
+
+    email = body.email.lower().strip()
+    # Block if there's an active user already
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, "Email already in use")
+    if body.employee_id:
+        emp = await db.employees.find_one(
+            {"id": body.employee_id, **tenant_filter(user)},
+            {"_id": 0, "id": 1},
+        )
+        if not emp:
+            raise HTTPException(404, "Employee not found in your organization")
+
+    # Invalidate any existing un-consumed invite for this email
+    await db.user_invites.update_many(
+        {"email": email, "consumed_at": None},
+        {"$set": {"superseded_at": iso(now_utc())}},
+    )
+
+    token = _s.token_urlsafe(32)
+    expires_at = iso(now_utc() + timedelta(days=7))
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "name": 1, "id": 1})
+    invite_doc = with_tenant({
+        "id": str(uuid.uuid4()),
+        "token": token,
+        "email": email,
+        "name": body.name,
+        "role": body.role,
+        "employee_id": body.employee_id,
+        "invited_by": user["email"],
+        "invited_by_id": user["id"],
+        "expires_at": expires_at,
+        "created_at": iso(now_utc()),
+        "consumed_at": None,
+    }, user)
+    await db.user_invites.insert_one(invite_doc)
+
+    email_res = await send_user_invite(
+        invite_email=email,
+        invite_name=body.name,
+        inviter_name=user["email"].split("@")[0].replace(".", " ").title(),
+        company_name=(company or {}).get("name", "your company"),
+        invite_token=token,
+        role=body.role,
+        company_id=user["company_id"],
+    )
+    await audit("user_invite_magic", f"user_invites/{invite_doc['id']}", user, {
+        "email": email, "role": body.role, "email_ok": email_res.get("ok"),
+    })
+    return {
+        "id": invite_doc["id"], "email": email, "role": body.role,
+        "expires_at": expires_at, "email_status": email_res,
+    }
+
+
+@router.get("/invites")
+async def list_invites(user: dict = Depends(require_admin)):
+    """List active (pending) magic-link invites for this tenant."""
+    return await db.user_invites.find(
+        {**tenant_filter(user), "consumed_at": None, "superseded_at": None},
+        {"_id": 0, "token": 0},
+    ).sort("created_at", -1).to_list(200)
+
+
+@router.delete("/invites/{iid}")
+async def revoke_invite(iid: str, user: dict = Depends(require_admin)):
+    r = await db.user_invites.update_one(
+        {"id": iid, **tenant_filter(user), "consumed_at": None, "superseded_at": None},
+        {"$set": {"superseded_at": iso(now_utc())}},
+    )
+    if not r.matched_count:
+        raise HTTPException(404, "Invite not found, already consumed, or already revoked")
+    await audit("invite_revoke", f"user_invites/{iid}", user, {})
+    return {"ok": True}
+
+
 @router.post("/{uid}/reset-password")
 async def reset_password(uid: str, body: ResetPasswordIn, user: dict = Depends(require_admin)):
     target = await db.users.find_one({"id": uid, **tenant_filter(user)}, {"_id": 0})

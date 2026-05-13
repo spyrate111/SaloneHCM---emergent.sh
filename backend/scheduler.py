@@ -109,6 +109,12 @@ def start():
         return
     scheduler.add_job(_evaluate_due, IntervalTrigger(seconds=TICK_SECONDS),
                       id="payroll_scheduler", replace_existing=True, max_instances=1, coalesce=True)
+    # Attach daily admin digest (07:00 UTC)
+    try:
+        from digest import attach as attach_digest
+        attach_digest(scheduler)
+    except Exception:
+        logger.exception("Failed to attach daily digest job")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

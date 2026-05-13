@@ -41,6 +41,20 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const applyAuth = useCallback((data) => {
+    if (data?.token) setToken(data.token);
+    setUser({
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      employee_id: data.employee_id,
+      company_id: data.company_id,
+      company: data.company,
+      twofa_enabled: !!data.twofa_enabled,
+    });
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.post("/auth/logout");
@@ -62,7 +76,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, logout, refetch }), [user, loading, login, logout, refetch]);
+  const value = useMemo(() => ({ user, loading, login, applyAuth, logout, refetch }), [user, loading, login, applyAuth, logout, refetch]);
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
