@@ -2,6 +2,13 @@ import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Briefcase, Star, GraduationCap, Plus, X, RefreshCw, Download } from "lucide-react";
+import {
+  DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay,
+} from "@dnd-kit/core";
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 const STAGE_BG = {
@@ -101,34 +108,10 @@ function Recruitment({ isAdmin }) {
           <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-center justify-between flex-wrap gap-2">
             <div>
               <h3 className="font-heading text-lg font-semibold">Applicant pipeline</h3>
-              <p className="text-xs text-[#686D76] mt-0.5">Drag-free quick advance — use each card's dropdown to move stages. {pipeline.total} candidates in flight.</p>
+              <p className="text-xs text-[#686D76] mt-0.5">Drag any card between columns to advance the stage. {pipeline.total} candidates in flight.</p>
             </div>
           </div>
-          <div className="p-4 overflow-x-auto">
-            <div className="grid grid-cols-6 gap-3 min-w-[1100px]">
-              {pipeline.stages.map((s) => (
-                <div key={s} className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-2.5 min-h-[280px]" data-testid={`kanban-col-${s}`}>
-                  <div className="flex items-center justify-between mb-2.5">
-                    <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${STAGE_BG[s]}`}>{s}</span>
-                    <span className="text-[11px] text-[#686D76] font-data">{(pipeline.grouped[s] || []).length}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {(pipeline.grouped[s] || []).map((a) => (
-                      <div key={a.id} className="bg-white border border-[#E2DFD6] rounded-md p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]" data-testid={`kanban-card-${a.id}`}>
-                        <div className="text-[13px] font-medium text-[#1A1C1E] truncate">{a.name}</div>
-                        <div className="text-[11px] text-[#525860] truncate mt-0.5">{a.posting_title}</div>
-                        <div className="text-[11px] text-[#686D76] truncate mt-0.5 font-data">{a.email}</div>
-                        <select value={a.stage} onChange={(e) => advance(a.id, e.target.value)} className="mt-2 w-full text-[11px] border border-[#E2DFD6] bg-[#FDFCFB] rounded px-1.5 py-1 outline-none">
-                          {STAGES.map((st) => <option key={st} value={st}>Move to: {st}</option>)}
-                        </select>
-                      </div>
-                    ))}
-                    {!(pipeline.grouped[s] || []).length && <div className="text-[11px] text-[#A1A5AB] text-center py-6">—</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <KanbanBoard pipeline={pipeline} onMove={advance} />
         </div>
       )}
 
@@ -420,3 +403,105 @@ function Learning({ isAdmin }) {
     </div>
   );
 }
+
+function KanbanBoard({ pipeline, onMove }) {
+  // Local mirror so the UI updates instantly while the server call runs
+  const [grouped, setGrouped] = useState(pipeline.grouped);
+  useEffect(() => { setGrouped(pipeline.grouped); }, [pipeline.grouped]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const [activeId, setActiveId] = useState(null);
+
+  const findCard = (id) => {
+    for (const s of pipeline.stages) {
+      const c = (grouped[s] || []).find((a) => a.id === id);
+      if (c) return { card: c, stage: s };
+    }
+    return null;
+  };
+
+  const onDragEnd = ({ active, over }) => {
+    setActiveId(null);
+    if (!over) return;
+    const src = findCard(active.id);
+    if (!src) return;
+    // Container ids are the stage names (we set them on SortableContext id below)
+    const destStage = pipeline.stages.includes(over.id) ? over.id : findCard(over.id)?.stage;
+    if (!destStage || destStage === src.stage) return;
+    setGrouped((g) => {
+      const fromList = (g[src.stage] || []).filter((a) => a.id !== active.id);
+      const toList = [{ ...src.card, stage: destStage }, ...(g[destStage] || [])];
+      return { ...g, [src.stage]: fromList, [destStage]: toList };
+    });
+    onMove(active.id, destStage);
+  };
+
+  const active = activeId ? findCard(activeId)?.card : null;
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={(e) => setActiveId(e.active.id)} onDragEnd={onDragEnd}>
+      <div className="p-4 overflow-x-auto">
+        <div className="grid grid-cols-6 gap-3 min-w-[1100px]">
+          {pipeline.stages.map((s) => (
+            <KanbanColumn key={s} stage={s} items={grouped[s] || []} />
+          ))}
+        </div>
+      </div>
+      <DragOverlay>{active ? <KanbanCardView a={active} dragging /> : null}</DragOverlay>
+    </DndContext>
+  );
+}
+
+function KanbanColumn({ stage, items }) {
+  const { setNodeRef, isOver } = useSortable({ id: stage, data: { type: "column" } });
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid={`kanban-col-${stage}`}
+      className={`bg-[#F7F6F2] border rounded-md p-2.5 min-h-[280px] transition ${isOver ? "border-[#26547C] bg-[#E5EEF6]" : "border-[#E2DFD6]"}`}
+    >
+      <div className="flex items-center justify-between mb-2.5">
+        <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-full ${STAGE_BG[stage]}`}>{stage}</span>
+        <span className="text-[11px] text-[#686D76] font-data">{items.length}</span>
+      </div>
+      <SortableContext id={stage} items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2 min-h-[200px]">
+          {items.map((a) => <KanbanCard key={a.id} a={a} />)}
+          {!items.length && <div className="text-[11px] text-[#A1A5AB] text-center py-6">—</div>}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
+function KanbanCard({ a }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: a.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={style}
+      data-testid={`kanban-card-${a.id}`}
+      className="bg-white border border-[#E2DFD6] rounded-md p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] cursor-grab active:cursor-grabbing"
+    >
+      <KanbanCardView a={a} />
+    </div>
+  );
+}
+
+function KanbanCardView({ a, dragging }) {
+  return (
+    <div className={dragging ? "bg-white border border-[#26547C] rounded-md p-2.5 shadow-lg" : ""}>
+      <div className="text-[13px] font-medium text-[#1A1C1E] truncate">{a.name}</div>
+      <div className="text-[11px] text-[#525860] truncate mt-0.5">{a.posting_title}</div>
+      <div className="text-[11px] text-[#686D76] truncate mt-0.5 font-data">{a.email}</div>
+    </div>
+  );
+}
+

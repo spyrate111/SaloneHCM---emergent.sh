@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Star, Plus, X, ChevronRight, ChevronDown, Award, CheckCircle2, Clock3 } from "lucide-react";
+import { Star, Plus, X, ChevronRight, ChevronDown, Award, CheckCircle2, Clock3, Download } from "lucide-react";
 
 const STATUS_PILL = {
   pending_self: { label: "Pending self-review", color: "bg-[#FBF1DE] text-[#8B6A14]" },
@@ -13,8 +14,13 @@ const STATUS_PILL = {
 
 export default function Performance() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
-  const [tab, setTab] = useState(isAdmin ? "cycles" : "mine");
+  // Deep-link from digest: ?status=pending_manager → land on team tab
+  const initialTab = params.get("status") === "pending_manager" && !isAdmin ? "mine"
+    : params.get("status") === "pending_manager" ? "team"
+    : isAdmin ? "cycles" : "mine";
+  const [tab, setTab] = useState(initialTab);
 
   return (
     <div className="space-y-6" data-testid="performance-page">
@@ -88,6 +94,18 @@ function CyclesAdmin() {
     }
   };
 
+  const downloadSummary = async (cid, period) => {
+    try {
+      const resp = await api.get(`/performance/cycles/${cid}/summary.pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(resp.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `review-cycle-${period}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error("Could not download summary PDF");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -107,7 +125,7 @@ function CyclesAdmin() {
             {cycles.map((c) => {
               const p = c.progress || {};
               return (
-                <CycleRowGroup key={c.id} c={c} p={p} expanded={expanded === c.id} onExpand={() => expand(c.id)} reviews={reviews[c.id] || []} analytics={analytics[c.id]} />
+                <CycleRowGroup key={c.id} c={c} p={p} expanded={expanded === c.id} onExpand={() => expand(c.id)} reviews={reviews[c.id] || []} analytics={analytics[c.id]} onDownloadSummary={() => downloadSummary(c.id, c.period)} />
               );
             })}
             {!cycles.length && <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">No cycles yet — start one to kick off reviews for your team.</td></tr>}
@@ -150,7 +168,7 @@ function CyclesAdmin() {
   );
 }
 
-function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
+function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics, onDownloadSummary }) {
   const [deptFilter, setDeptFilter] = useState(null);
   const filtered = deptFilter ? reviews.filter((r) => r.department === deptFilter) : reviews;
   return (
@@ -167,6 +185,15 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics }) {
       {expanded && (
         <tr><td colSpan={7} className="bg-[#F7F6F2] p-0">
           <div className="px-6 py-4">
+            <div className="flex justify-end mb-3">
+              <button
+                data-testid={`cycle-pdf-${c.id}`}
+                onClick={(e) => { e.stopPropagation(); onDownloadSummary && onDownloadSummary(); }}
+                className="inline-flex items-center gap-2 text-xs bg-white border border-[#E2DFD6] hover:bg-[#FDFCFB] text-[#133326] px-3 py-1.5 rounded"
+              >
+                <Download className="w-3.5 h-3.5" /> Download PDF summary
+              </button>
+            </div>
             {analytics && <AnalyticsBlock a={analytics} onDeptClick={(d) => setDeptFilter(deptFilter === d ? null : d)} active={deptFilter} />}
             <div className="flex items-center justify-between mt-5 mb-3">
               <h4 className="font-medium text-sm">

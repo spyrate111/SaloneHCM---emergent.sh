@@ -62,6 +62,37 @@ def _summarize(snap: dict) -> str:
     return " · ".join(parts) or "All clear — no pending actions."
 
 
+def _email_items(snap: dict) -> list[dict]:
+    """Build deep-linked items for the HTML email."""
+    frontend = os.environ.get("FRONTEND_URL", "")
+    items = []
+    if snap["pending_leaves"]:
+        items.append({
+            "label": f"<strong>{snap['pending_leaves']}</strong> pending leave request{'s' if snap['pending_leaves'] != 1 else ''}",
+            "url": f"{frontend}/leave?status=pending",
+            "cta": "Review leaves",
+        })
+    if snap["upcoming_runs"]:
+        items.append({
+            "label": f"<strong>{len(snap['upcoming_runs'])}</strong> scheduled payroll run{'s' if len(snap['upcoming_runs']) != 1 else ''} due in the next 72h",
+            "url": f"{frontend}/payroll?due=soon",
+            "cta": "View schedules",
+        })
+    if snap["outstanding_filings"]:
+        items.append({
+            "label": f"<strong>{len(snap['outstanding_filings'])}</strong> NRA PAYE filing{'s' if len(snap['outstanding_filings']) != 1 else ''} outstanding",
+            "url": f"{frontend}/compliance?outstanding=true",
+            "cta": "File now",
+        })
+    if snap["pending_manager_reviews"]:
+        items.append({
+            "label": f"<strong>{snap['pending_manager_reviews']}</strong> performance review{'s' if snap['pending_manager_reviews'] != 1 else ''} awaiting manager",
+            "url": f"{frontend}/performance",
+            "cta": "Score reviews",
+        })
+    return items
+
+
 async def _send_daily_digest() -> None:
     """For each admin user, compute their tenant snapshot and fire their preferred channels."""
     import push_service
@@ -94,15 +125,28 @@ async def _send_daily_digest() -> None:
                 logger.warning("daily digest push failed for %s", a["email"])
         if prefs.get("email") and _email_ok():
             try:
-                lines = [f"<li>{p}</li>" for p in body.split(" · ")] if body and body != "All clear — no pending actions." else ['<li style="color:#2D7A5D;">All clear — no pending actions.</li>']
-                html = _wrap_html(
-                    title="Daily digest",
-                    body_html=f"""
+                items = _email_items(snap)
+                if items:
+                    rows = "".join([
+                        f'''<tr><td style="padding:10px 0;border-bottom:1px solid #E2DFD6;">
+                              <div style="font-size:13px;">{it["label"]}</div>
+                              <a href="{it["url"]}" style="color:#26547C;font-size:12px;text-decoration:none;">{it["cta"]} →</a>
+                            </td></tr>'''
+                        for it in items
+                    ])
+                    body_html = f"""
                       <p>Good morning {a.get('name','')},</p>
                       <p>Here's your SaloneHCM digest for today:</p>
-                      <ul style="font-size:13px;color:#1A1C1E;">{''.join(lines)}</ul>
-                      <p style="color:#525860;font-size:12px;">Open the SaloneHCM dashboard for details.</p>
-                    """,
+                      <table style="width:100%;border-collapse:collapse;">{rows}</table>
+                    """
+                else:
+                    body_html = f"""
+                      <p>Good morning {a.get('name','')},</p>
+                      <p style="color:#2D7A5D;font-weight:600;">All clear — no pending actions today. 🎉</p>
+                    """
+                html = _wrap_html(
+                    title="Daily digest",
+                    body_html=body_html,
                     cta_label="Open dashboard",
                     cta_url=(os.environ.get("FRONTEND_URL", "") + "/dashboard"),
                 )

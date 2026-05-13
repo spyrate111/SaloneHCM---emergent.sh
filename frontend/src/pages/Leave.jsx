@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Check, X, Plus } from "lucide-react";
+import { Check, X, Plus, Filter } from "lucide-react";
 import { DatePicker } from "../components/ui/date-picker";
 
 export default function Leave() {
   const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const statusFilter = params.get("status") || "";
   const [list, setList] = useState([]);
   const [emps, setEmps] = useState([]);
   const [open, setOpen] = useState(false);
@@ -27,6 +30,8 @@ export default function Leave() {
 
   const STATUS_BG = { pending: "bg-[#FBF1DE] text-[#8B6A14]", approved: "bg-[#E6F4EC] text-[#2D7A5D]", rejected: "bg-[#FBEAEA] text-[#B83A3A]" };
 
+  const filtered = statusFilter ? list.filter((l) => l.status === statusFilter) : list;
+
   return (
     <div className="space-y-6" data-testid="leave-page">
       <div className="flex items-end justify-between flex-wrap gap-3">
@@ -40,13 +45,20 @@ export default function Leave() {
         </button>
       </div>
 
+      {statusFilter && (
+        <div data-testid="leave-filter-banner" className="bg-[#E5EEF6] border border-[#26547C]/30 rounded-md px-4 py-2.5 text-sm text-[#26547C] inline-flex items-center gap-2">
+          <Filter className="w-3.5 h-3.5" /> Filtered by <strong className="capitalize">{statusFilter}</strong>
+          <button data-testid="leave-clear-filter" onClick={() => setParams({})} className="ml-2 text-xs text-[#B83A3A] hover:underline">clear</button>
+        </div>
+      )}
+
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-[#F7F6F2]">
             <tr>{["Employee", "Type", "Period", "Days", "Reason", "Status", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody>
-            {list.map((l) => (
+            {filtered.map((l) => (
               <tr key={l.id} className="border-t border-[#E2DFD6]" data-testid={`leave-row-${l.id}`}>
                 <td className="py-3 px-4 font-medium">{l.employee_name}</td>
                 <td className="py-3 px-4 capitalize">{l.leave_type}</td>

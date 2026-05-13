@@ -77,6 +77,13 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
+## v1.8 (May 13 2026) — Digest deep-links · ATS Drag-and-Drop · Performance PDF · Krio/Mende portal
+- **Digest email deep-links** — `_email_items()` helper builds a table of `{label, url, cta}` per pending item; URLs deep-link directly into filtered pages (`/leave?status=pending`, `/payroll?due=soon`, `/compliance?outstanding=true`, `/performance`). The Leave page now reads `?status=` and applies a filter banner with "clear" button. The Performance page auto-lands on the "team" tab when `?status=pending_manager`.
+- **ATS Kanban drag-and-drop** — replaced the dropdown with @dnd-kit/core (PointerSensor, distance=4 to allow normal click-on-cards). Drag-overlay shows the floating card; columns highlight blue/cyan when something is dragged over; optimistic UI updates the column list locally before the server PATCH lands.
+- **Performance PDF summary** — `GET /api/performance/cycles/{cid}/summary.pdf` renders a ReportLab A4 doc with cycle header, KPI grid (totals/avg ratings/completion %), manager-rating distribution bar chart (Unicode `█` bars), and a per-review table with comments. Added "Download PDF summary" button on the expanded cycle row.
+- **Krio + Mende translations on Transparency portal** — new `lib/i18nTransparency.js` dictionary covering all static labels (header, KPIs, table headers, footer). Language picker in the header with English / Krio / Mɛnde toggles. Language persisted to `localStorage`. Numeric data (SLE values, headcounts) remain language-neutral.
+- **Tests**: `test_iter16_batch.py` (5/5) — PDF summary download + 404 + auth-gating + digest deep-link URLs + empty-snap-empty-items. **Combined suite: 69/69 across iter11–iter16.**
+
 ## v1.7 (May 13 2026) — Talent↔Performance link · Cert verify · Drill-through · Digest channels
 - **Talent → Performance auto-trigger** — when an employee reaches **3 completions** of a recurring program, `_maybe_trigger_perf_review` auto-creates a one-off Performance Review (status `pending_self`, `source=auto_recurring_training`) and fires a push notification to the employee. Idempotent (won't dupe on the 4th completion).
 - **Public certificate verification** — new no-auth route `/verify/{cid}` (`pages/Verify.jsx`) + backend `GET /api/public/certificate/{cid}` returning the same data printed on the PDF (no extra PII). QR code linking to this URL now appears in the bottom-right of every PDF certificate (qrcode + ImageReader → drawn at 2.6cm × 2.6cm). PDFs grew from ~2KB → ~5KB+ as a result.
