@@ -340,6 +340,255 @@ async def spend_by_budget_code(run_id: str, user: dict = Depends(require_admin))
     return {"period": run["period"], "rows": rows, "total_rows": len(rows)}
 
 
+async def _budget_rows(run_id: str, tf: dict) -> tuple[dict, list]:
+    run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    emps = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(5000)}
+    by_code: dict = {}
+    for s in run.get("slips", []):
+        emp = emps.get(s["employee_id"], {})
+        code = emp.get("budget_code", "UNCODED")
+        ministry = emp.get("mda_ministry", "—")
+        bucket = by_code.setdefault(code, {
+            "budget_code": code, "ministry": ministry, "employee_count": 0,
+            "gross": 0.0, "paye": 0.0, "nassit_employer": 0.0, "net": 0.0,
+        })
+        bucket["employee_count"] += 1
+        bucket["gross"] += s["gross"]
+        bucket["paye"] += s["paye"]
+        bucket["nassit_employer"] += s["nassit_employer"]
+        bucket["net"] += s["net"]
+    rows = sorted(by_code.values(), key=lambda r: -r["gross"])
+    for r in rows:
+        for k in ("gross", "paye", "nassit_employer", "net"):
+            r[k] = round(r[k], 2)
+    return run, rows
+
+
+@router.get("/reports/by-budget-code/{run_id}.csv")
+async def spend_by_budget_code_csv(run_id: str, user: dict = Depends(require_admin)):
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+    run, rows = await _budget_rows(run_id, tenant_filter(user))
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Budget code spend report"])
+    w.writerow(["Period", run["period"]])
+    w.writerow([])
+    w.writerow(["Budget code", "Ministry", "Employees", "Gross (SLE)", "PAYE (SLE)", "NASSIT-Er (SLE)", "Net (SLE)"])
+    for r in rows:
+        w.writerow([r["budget_code"], r["ministry"], r["employee_count"],
+                    f"{r['gross']:.2f}", f"{r['paye']:.2f}", f"{r['nassit_employer']:.2f}", f"{r['net']:.2f}"])
+    w.writerow([])
+    w.writerow(["TOTAL", "", sum(r["employee_count"] for r in rows),
+                f"{sum(r['gross'] for r in rows):.2f}",
+                f"{sum(r['paye'] for r in rows):.2f}",
+                f"{sum(r['nassit_employer'] for r in rows):.2f}",
+                f"{sum(r['net'] for r in rows):.2f}"])
+    await audit("budget_report_csv", f"payroll_runs/{run_id}", user, {"rows": len(rows)})
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="budget-spend-{run["period"]}.csv"'},
+    )
+
+
+@router.get("/reports/by-budget-code/{run_id}.pdf")
+async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_admin)):
+    import io
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    run, rows = await _budget_rows(run_id, tenant_filter(user))
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
+    styles = getSampleStyleSheet()
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#133326"), alignment=0, spaceAfter=6)
+    small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
+
+    story = [
+        Paragraph(f"Budget Code Spend Report · {run['period']}", h1),
+        Paragraph(f"<b>{company.get('name','—')}</b> &nbsp;&nbsp;<b>Generated:</b> {iso(now_utc())[:10]}", small),
+        Spacer(1, 0.4 * cm),
+    ]
+
+    data = [["Budget code", "Ministry", "Employees", "Gross", "PAYE", "NASSIT-Er", "Net"]]
+    for r in rows:
+        data.append([r["budget_code"], r["ministry"], str(r["employee_count"]),
+                     f"{r['gross']:,.2f}", f"{r['paye']:,.2f}",
+                     f"{r['nassit_employer']:,.2f}", f"{r['net']:,.2f}"])
+    data.append([
+        "TOTAL", "", str(sum(r["employee_count"] for r in rows)),
+        f"{sum(r['gross'] for r in rows):,.2f}",
+        f"{sum(r['paye'] for r in rows):,.2f}",
+        f"{sum(r['nassit_employer'] for r in rows):,.2f}",
+        f"{sum(r['net'] for r in rows):,.2f}",
+    ])
+    t = Table(data, colWidths=[3.5 * cm, 6 * cm, 2 * cm, 3 * cm, 3 * cm, 3 * cm, 3 * cm])
+    t.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
+        ("FONT", (0, 1), (-1, -1), "Helvetica", 9),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F7F6F2")),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#1A1C1E")),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
+        ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#F7F6F2")),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t)
+    doc.build(story)
+    buf.seek(0)
+
+    await audit("budget_report_pdf", f"payroll_runs/{run_id}", user, {"rows": len(rows)})
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="budget-spend-{run["period"]}.pdf"'},
+    )
+
+
+async def _ghost_data(run_id: str, tf: dict) -> dict:
+    run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    acked = set([a["employee_id"] for a in await db.payslip_acks.find(
+        {"run_id": run_id, **tf}, {"_id": 0, "employee_id": 1}
+    ).to_list(5000)])
+    emps = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(5000)}
+    suspects = []
+    for s in run.get("slips", []):
+        if s["employee_id"] not in acked:
+            e = emps.get(s["employee_id"], {})
+            suspects.append({
+                "employee_id": s["employee_id"],
+                "employee_name": s["employee_name"],
+                "department": e.get("department", ""),
+                "ministry": e.get("mda_ministry", ""),
+                "budget_code": e.get("budget_code", ""),
+                "grade_code": e.get("grade_code", ""),
+                "net_unacknowledged_sle": s["net"],
+                "hire_date": e.get("hire_date"),
+            })
+    return {
+        "run": run,
+        "period": run["period"],
+        "total_slips": len(run.get("slips", [])),
+        "acknowledged": len(acked),
+        "ghost_suspects": len(suspects),
+        "ghost_rate": round(len(suspects) / max(1, len(run.get("slips", []))), 3),
+        "suspects": sorted(suspects, key=lambda r: -r["net_unacknowledged_sle"]),
+    }
+
+
+@router.get("/ghost-workers/{run_id}.csv")
+async def ghost_workers_csv(run_id: str, user: dict = Depends(require_admin)):
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+    data = await _ghost_data(run_id, tenant_filter(user))
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Ghost-worker audit"])
+    w.writerow(["Period", data["period"]])
+    w.writerow(["Total slips", data["total_slips"]])
+    w.writerow(["Acknowledged", data["acknowledged"]])
+    w.writerow(["Suspects", data["ghost_suspects"]])
+    w.writerow(["Unack rate", f'{data["ghost_rate"]:.1%}'])
+    w.writerow([])
+    w.writerow(["employee_id", "employee_name", "department", "ministry",
+                "grade_code", "budget_code", "net_unacknowledged_sle", "hire_date"])
+    for s in data["suspects"]:
+        w.writerow([s["employee_id"], s["employee_name"], s["department"],
+                    s["ministry"], s["grade_code"], s["budget_code"],
+                    f"{s['net_unacknowledged_sle']:.2f}", s["hire_date"] or ""])
+    await audit("ghost_report_csv", f"payroll_runs/{run_id}", user, {"suspects": data["ghost_suspects"]})
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="ghost-worker-audit-{data["period"]}.csv"'},
+    )
+
+
+@router.get("/ghost-workers/{run_id}.pdf")
+async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
+    import io
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    data = await _ghost_data(run_id, tenant_filter(user))
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
+    styles = getSampleStyleSheet()
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#B83A3A"), alignment=0, spaceAfter=6)
+    small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
+
+    story = [
+        Paragraph(f"Ghost-Worker Audit · {data['period']}", h1),
+        Paragraph(
+            f"<b>{company.get('name','—')}</b> &nbsp;|&nbsp; "
+            f"Total slips: <b>{data['total_slips']}</b> &nbsp;|&nbsp; "
+            f"Acknowledged: <b>{data['acknowledged']}</b> &nbsp;|&nbsp; "
+            f"Unacknowledged: <b style='color:#B83A3A'>{data['ghost_suspects']}</b> "
+            f"({data['ghost_rate']:.0%})",
+            small,
+        ),
+        Spacer(1, 0.4 * cm),
+    ]
+    if data["suspects"]:
+        rows = [["Employee", "Department", "Ministry", "Grade", "Budget code", "Net SLE", "Hire date"]]
+        total = 0.0
+        for s in data["suspects"]:
+            rows.append([
+                s["employee_name"], s["department"] or "—", s["ministry"] or "—",
+                s["grade_code"] or "—", s["budget_code"] or "—",
+                f"{s['net_unacknowledged_sle']:,.2f}", s["hire_date"] or "—",
+            ])
+            total += s["net_unacknowledged_sle"]
+        rows.append(["TOTAL", "", "", "", "", f"{total:,.2f}", ""])
+        t = Table(rows, colWidths=[5 * cm, 3.4 * cm, 4 * cm, 1.6 * cm, 3 * cm, 3 * cm, 2.4 * cm])
+        t.setStyle(TableStyle([
+            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
+            ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FBEAEA")),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#B83A3A")),
+            ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
+            ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
+            ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
+            ("ALIGN", (5, 1), (5, -1), "RIGHT"),
+            ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#B83A3A")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(t)
+    else:
+        story.append(Paragraph(
+            "<font color='#2D7A5D'><b>No ghost workers detected — all payslips acknowledged.</b></font>",
+            styles["BodyText"],
+        ))
+    doc.build(story)
+    buf.seek(0)
+
+    await audit("ghost_report_pdf", f"payroll_runs/{run_id}", user, {"suspects": data["ghost_suspects"]})
+    return StreamingResponse(
+        buf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="ghost-worker-audit-{data["period"]}.pdf"'},
+    )
+
+
 # ============ Ghost-worker detection / Payslip acknowledgement ============
 
 class AcknowledgeIn(BaseModel):
@@ -377,36 +626,10 @@ async def acknowledge_my_payslip(run_id: str, body: AcknowledgeIn, user: dict = 
 @router.get("/ghost-workers/{run_id}")
 async def ghost_workers_report(run_id: str, user: dict = Depends(require_admin)):
     """List employees whose payslip was issued but never acknowledged → potential ghost workers."""
-    tf = tenant_filter(user)
-    run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
-    if not run:
-        raise HTTPException(404, "Run not found")
-    acked = set([a["employee_id"] for a in await db.payslip_acks.find(
-        {"run_id": run_id, **tf}, {"_id": 0, "employee_id": 1}
-    ).to_list(5000)])
-    emps = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(5000)}
-    suspects = []
-    for s in run.get("slips", []):
-        if s["employee_id"] not in acked:
-            e = emps.get(s["employee_id"], {})
-            suspects.append({
-                "employee_id": s["employee_id"],
-                "employee_name": s["employee_name"],
-                "department": e.get("department", ""),
-                "ministry": e.get("mda_ministry", ""),
-                "budget_code": e.get("budget_code", ""),
-                "grade_code": e.get("grade_code", ""),
-                "net_unacknowledged_sle": s["net"],
-                "hire_date": e.get("hire_date"),
-            })
-    return {
-        "period": run["period"],
-        "total_slips": len(run.get("slips", [])),
-        "acknowledged": len(acked),
-        "ghost_suspects": len(suspects),
-        "ghost_rate": round(len(suspects) / max(1, len(run.get("slips", []))), 3),
-        "suspects": sorted(suspects, key=lambda r: -r["net_unacknowledged_sle"]),
-    }
+    data = await _ghost_data(run_id, tenant_filter(user))
+    # Strip the raw run object from the JSON response
+    data.pop("run", None)
+    return data
 
 
 # ============ Ministry-of-Finance approval workflow ============
