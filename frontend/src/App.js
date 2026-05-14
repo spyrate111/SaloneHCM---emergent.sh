@@ -29,6 +29,7 @@ import Ministry from "./pages/Ministry";
 import Transparency from "./pages/Transparency";
 import Performance from "./pages/Performance";
 import Verify from "./pages/Verify";
+import CivilService from "./pages/CivilService";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="/benefits" element={<Benefits />} />
             <Route path="/talent" element={<Talent />} />
             <Route path="/performance" element={<Performance />} />
+            <Route path="/civil-service" element={<CivilService />} />
             <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />

@@ -68,7 +68,11 @@ async def seed(company_id: str) -> None:
 async def seed_gov_admin(company_id: str) -> None:
     """Plant a dedicated Gov tenant admin so super-admin isn't the only entry."""
     email = "admin@gov.sl"
-    if await db.users.find_one({"email": email}):
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        # Ensure mof_approver flag exists on the seed gov admin
+        if not existing.get("mof_approver"):
+            await db.users.update_one({"email": email}, {"$set": {"mof_approver": True}})
         return
     await db.users.insert_one({
         "id": str(uuid.uuid4()),
@@ -77,6 +81,7 @@ async def seed_gov_admin(company_id: str) -> None:
         "role": "admin",
         "company_id": company_id,
         "password_hash": hash_password("GovAdmin@2026"),
+        "mof_approver": True,
         "created_at": iso(now_utc()),
     })
     logger.info("Seeded Gov admin: %s", email)

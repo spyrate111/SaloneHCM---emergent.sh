@@ -9,7 +9,7 @@ import {
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
   Heart, GraduationCap, BarChart3, FlaskConical, FolderArchive,
   Building2, UserCog, ChevronDown, ArrowRightLeft, MessageSquare,
-  Repeat, Landmark, Menu, X,
+  Repeat, Landmark, Award, Menu, X,
 } from "lucide-react";
 
 const NAV = [
@@ -27,6 +27,7 @@ const NAV = [
   { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ["admin", "superadmin", "employee"], feature: "documents" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "superadmin"], feature: "analytics" },
   { to: "/ministry", label: "Ministry rollup", icon: Landmark, roles: ["admin", "superadmin"], feature: "ministry_reports" },
+  { to: "/civil-service", label: "Civil Service", icon: Award, roles: ["admin", "superadmin"], feature: "civil_service" },
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "superadmin", "employee"], feature: "ai_assistant" },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin", "superadmin"] },
   { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin", "superadmin"], feature: "audit_log" },

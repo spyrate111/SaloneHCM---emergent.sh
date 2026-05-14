@@ -1,6 +1,6 @@
 """SaloneHCM seed orchestrator — runs per-domain seeders in order."""
 from core import db, logger
-from . import companies, users, employees, benefits, talent, gov
+from . import companies, users, employees, benefits, talent, gov, civil_service
 from . import migrate
 
 
@@ -23,4 +23,8 @@ async def seed() -> None:
     # (bulk SMS payslips, ministry reports) can be exercised end-to-end.
     await gov.seed_gov_admin(company_id=gov_id)
     await gov.seed(company_id=gov_id)
+
+    # Civil-service config for the Gov tenant
+    await civil_service.seed_civil_service(company_id=gov_id)
+    await civil_service.upgrade_gov_employees(company_id=gov_id)
     logger.info("Seed complete")

@@ -1,13 +1,24 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE, API, getToken } from "../lib/api";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 import SmsPayslipButton from "../components/SmsPayslipButton";
-import { Calculator, Play, Check, FileText, Download } from "lucide-react";
+import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+const MOF_PILL = {
+  draft: { label: "Draft", color: "bg-[#EBE8E0] text-[#525860]" },
+  submitted: { label: "Awaiting MoF", color: "bg-[#FBF1DE] text-[#8B6A14]" },
+  approved: { label: "MoF approved", color: "bg-[#E6F4EC] text-[#2D7A5D]" },
+  released: { label: "Released", color: "bg-[#E5EEF6] text-[#26547C]" },
+  rejected: { label: "Rejected", color: "bg-[#FBEAEA] text-[#B83A3A]" },
+};
+
 export default function Payroll() {
   const { has } = useFeatures();
+  const { user } = useAuth();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -37,6 +48,39 @@ export default function Payroll() {
     const a = document.createElement("a");
     a.href = url; a.download = `bank-file-${period}.csv`; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const submitMoF = async (rid) => {
+    if (!window.confirm("Submit this payroll run to MoF for approval?")) return;
+    try {
+      await api.post(`/civil-service/runs/${rid}/submit-for-approval`, { note: "" });
+      toast.success("Submitted for MoF approval");
+      loadRuns();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Submit failed");
+    }
+  };
+
+  const approveMoF = async (rid) => {
+    try {
+      await api.post(`/civil-service/runs/${rid}/mof-approve`, { note: "Approved" });
+      toast.success("Approved");
+      loadRuns();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Approve failed");
+    }
+  };
+
+  const rejectMoF = async (rid) => {
+    const note = window.prompt("Reason for rejection?");
+    if (!note) return;
+    try {
+      await api.post(`/civil-service/runs/${rid}/mof-reject`, { note });
+      toast.success("Rejected");
+      loadRuns();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Reject failed");
+    }
   };
 
   const doPreview = async () => {
@@ -155,19 +199,41 @@ export default function Payroll() {
         </div>
         <table className="w-full text-sm">
           <thead className="bg-[#F7F6F2]">
-            <tr>{["Period", "Employees", "Gross", "PAYE", "NASSIT", "Net", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+            <tr>{["Period", "Employees", "Gross", "PAYE", "NASSIT", "Net", "MoF", ""].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody>
-            {runs.map((r) => (
-              <tr key={r.id} className="border-t border-[#E2DFD6]">
+            {runs.map((r) => {
+              const pill = MOF_PILL[r.mof_status || "draft"];
+              return (
+              <tr key={r.id} className="border-t border-[#E2DFD6]" data-testid={`payroll-run-row-${r.id}`}>
                 <td className="py-3 px-4 font-medium">{r.period}</td>
                 <td className="py-3 px-4 font-data">{r.totals.employee_count}</td>
                 <td className="py-3 px-4 font-data">{fmtSLE(r.totals.gross)}</td>
                 <td className="py-3 px-4 font-data">{fmtSLE(r.totals.paye)}</td>
                 <td className="py-3 px-4 font-data">{fmtSLE(r.totals.nassit_employee + r.totals.nassit_employer)}</td>
                 <td className="py-3 px-4 font-data font-semibold">{fmtSLE(r.totals.net)}</td>
+                <td className="py-3 px-4">
+                  {has("mof_approval") && (
+                    <span data-testid={`mof-status-${r.id}`} className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${pill.color}`}>{pill.label}</span>
+                  )}
+                </td>
                 <td className="py-3 px-4 text-right">
-                  <div className="inline-flex gap-1.5">
+                  <div className="inline-flex gap-1.5 flex-wrap justify-end">
+                    {has("mof_approval") && (r.mof_status || "draft") === "draft" && (
+                      <button data-testid={`mof-submit-${r.id}`} onClick={() => submitMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-[#26547C] hover:bg-[#1D4363] text-white px-2.5 py-1.5 rounded">
+                        <Send className="w-3.5 h-3.5" /> Submit to MoF
+                      </button>
+                    )}
+                    {has("mof_approval") && r.mof_status === "submitted" && user?.mof_approver && (
+                      <>
+                        <button data-testid={`mof-approve-${r.id}`} onClick={() => approveMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-[#2D7A5D] hover:bg-[#256449] text-white px-2.5 py-1.5 rounded">
+                          <ShieldCheck className="w-3.5 h-3.5" /> Approve
+                        </button>
+                        <button data-testid={`mof-reject-${r.id}`} onClick={() => rejectMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#B83A3A] text-[#B83A3A] hover:bg-[#FBEAEA] px-2.5 py-1.5 rounded">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Reject
+                        </button>
+                      </>
+                    )}
                     <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded">
                       <Download className="w-3.5 h-3.5" /> Bank file
                     </button>
@@ -176,8 +242,9 @@ export default function Payroll() {
                   </div>
                 </td>
               </tr>
-            ))}
-            {!runs.length && <tr><td colSpan={7} className="py-10 text-center text-sm text-[#686D76]">No payroll runs yet.</td></tr>}
+              );
+            })}
+            {!runs.length && <tr><td colSpan={8} className="py-10 text-center text-sm text-[#686D76]">No payroll runs yet.</td></tr>}
           </tbody>
         </table>
       </div>

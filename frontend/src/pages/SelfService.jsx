@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
 import api, { fmtSLE, API, getToken } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, CheckCircle2, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SelfService() {
   const { user } = useAuth();
   const [slip, setSlip] = useState(null);
   const [history, setHistory] = useState([]);
   const [leaves, setLeaves] = useState([]);
+  const [ackBusy, setAckBusy] = useState(null);
+  const [acks, setAcks] = useState({}); // {run_id: true}
 
-  useEffect(() => {
+  const refresh = () => {
     api.get("/payroll/my-payslip").then((r) => setSlip(r.data.slip));
     api.get("/payroll/my-payslips").then((r) => setHistory(r.data));
     api.get("/leave").then((r) => setLeaves(r.data));
-  }, []);
+  };
+
+  useEffect(() => { refresh(); }, []);
 
   const downloadPdf = async (rid, eid, name, period) => {
     const token = getToken();
@@ -23,6 +28,19 @@ export default function SelfService() {
     const a = document.createElement("a");
     a.href = url; a.download = `payslip-${name.replace(/\s/g, "_")}-${period}.pdf`; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const acknowledge = async (rid) => {
+    setAckBusy(rid);
+    try {
+      await api.post(`/civil-service/payslip-ack/${rid}`, { note: "Acknowledged via ESS" });
+      setAcks((a) => ({ ...a, [rid]: true }));
+      toast.success("Payslip acknowledged");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not acknowledge");
+    } finally {
+      setAckBusy(null);
+    }
   };
 
   return (
@@ -88,13 +106,30 @@ export default function SelfService() {
                 <td className="py-3 px-4 font-data text-[#B83A3A]">− {fmtSLE(h.slip.paye)}</td>
                 <td className="py-3 px-4 font-data font-semibold">{fmtSLE(h.slip.net)}</td>
                 <td className="py-3 px-4 text-right">
-                  <button
-                    data-testid={`download-payslip-${h.run_id}`}
-                    onClick={() => downloadPdf(h.run_id, h.slip.employee_id, h.slip.employee_name, h.period)}
-                    className="inline-flex items-center gap-1.5 text-xs bg-[#133326] hover:bg-[#0F281E] text-white px-3 py-1.5 rounded"
-                  >
-                    <Download className="w-3.5 h-3.5" /> PDF
-                  </button>
+                  <div className="inline-flex items-center gap-1.5">
+                    <button
+                      data-testid={`download-payslip-${h.run_id}`}
+                      onClick={() => downloadPdf(h.run_id, h.slip.employee_id, h.slip.employee_name, h.period)}
+                      className="inline-flex items-center gap-1.5 text-xs bg-[#133326] hover:bg-[#0F281E] text-white px-3 py-1.5 rounded"
+                    >
+                      <Download className="w-3.5 h-3.5" /> PDF
+                    </button>
+                    {acks[h.run_id] ? (
+                      <span data-testid={`ack-done-${h.run_id}`} className="inline-flex items-center gap-1 text-xs text-[#2D7A5D] font-medium px-2">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Acknowledged
+                      </span>
+                    ) : (
+                      <button
+                        data-testid={`ack-payslip-${h.run_id}`}
+                        onClick={() => acknowledge(h.run_id)}
+                        disabled={ackBusy === h.run_id}
+                        className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#2D7A5D] text-[#2D7A5D] hover:bg-[#E6F4EC] px-3 py-1.5 rounded disabled:opacity-50"
+                        title="Confirm you received this payslip (ghost-worker check)"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" /> Acknowledge
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

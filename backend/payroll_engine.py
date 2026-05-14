@@ -38,10 +38,14 @@ def calc_paye(taxable: float) -> float:
     return round(tax, 2)
 
 
-def calc_payslip(emp: dict) -> dict:
+def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
     basic = float(emp.get("basic_salary_sle", 0))
-    allow = float(emp.get("allowances_sle", 0))
-    gross = basic + allow
+    legacy_allow = float(emp.get("allowances_sle", 0))
+    breakdown = dict(allowance_breakdown or {})
+    if legacy_allow and "Other allowances" not in breakdown:
+        breakdown["Other allowances"] = legacy_allow
+    allow_total = round(sum(breakdown.values()), 2)
+    gross = basic + allow_total
     nassit_emp = round(basic * NASSIT_EMPLOYEE, 2)
     nassit_er = round(basic * NASSIT_EMPLOYER, 2)
     taxable = max(0.0, gross - nassit_emp)
@@ -51,12 +55,17 @@ def calc_payslip(emp: dict) -> dict:
         "employee_id": emp["id"],
         "employee_name": f'{emp["first_name"]} {emp["last_name"]}',
         "basic": basic,
-        "allowances": allow,
+        "allowances": allow_total,
+        "allowance_breakdown": breakdown,
         "gross": round(gross, 2),
         "nassit_employee": nassit_emp,
         "nassit_employer": nassit_er,
         "paye": paye,
         "net": net,
+        "grade_code": emp.get("grade_code"),
+        "step_number": emp.get("step_number"),
+        "budget_code": emp.get("budget_code"),
+        "mda_ministry": emp.get("mda_ministry"),
     }
 
 
@@ -66,9 +75,19 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         {"status": "active", "company_id": user["company_id"]},
         {"_id": 0},
     ).to_list(2000)
-    slips = [calc_payslip(e) for e in emps]
-    rid = str(uuid.uuid4())
     period = f"{year}-{month:02d}"
+
+    # Pull allowance breakdown per employee using the civil-service module
+    try:
+        from routers.civil_service import get_active_allowance_amounts
+        slips = []
+        for e in emps:
+            breakdown = await get_active_allowance_amounts(e, user["company_id"], period)
+            slips.append(calc_payslip(e, allowance_breakdown=breakdown))
+    except Exception:
+        slips = [calc_payslip(e) for e in emps]
+
+    rid = str(uuid.uuid4())
     doc = {
         "id": rid,
         "company_id": user["company_id"],
@@ -85,6 +104,7 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
             "net": round(sum(s["net"] for s in slips), 2),
         },
         "status": "completed",
+        "mof_status": "draft",
         "created_at": iso(now_utc()),
     }
     await db.payroll_runs.insert_one(doc)

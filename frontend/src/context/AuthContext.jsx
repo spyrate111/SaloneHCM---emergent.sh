@@ -37,6 +37,7 @@ export function AuthProvider({ children }) {
       company_id: data.company_id,
       company: data.company,
       twofa_enabled: !!data.twofa_enabled,
+      mof_approver: !!data.mof_approver,
     });
     return data;
   }, []);
@@ -52,6 +53,7 @@ export function AuthProvider({ children }) {
       company_id: data.company_id,
       company: data.company,
       twofa_enabled: !!data.twofa_enabled,
+      mof_approver: !!data.mof_approver,
     });
   }, []);
 

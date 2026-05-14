@@ -27,6 +27,7 @@ TIER_FEATURES = {
         "simulator", "scenarios", "scenario_compare", "decision_brief_pdf",
         "ai_action_mode",
         "gov_payroll", "ministry_reports", "bulk_sms_payslips", "nra_export",
+        "civil_service", "mof_approval", "ghost_worker_detection",
     ],
 }
 

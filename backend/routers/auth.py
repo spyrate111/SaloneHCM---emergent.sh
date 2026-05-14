@@ -53,6 +53,7 @@ async def login(request: Request, body: LoginIn, response: Response):
         "employee_id": user.get("employee_id"),
         "company_id": user["company_id"], "company": _public_company(company),
         "twofa_enabled": bool(user.get("twofa_enabled")),
+        "mof_approver": bool(user.get("mof_approver")),
         "token": token,
     }
 
@@ -140,6 +141,7 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
         "employee_id": user.get("employee_id"),
         "company_id": user["company_id"], "company": _public_company(company),
         "twofa_enabled": bool(user.get("twofa_enabled")),
+        "mof_approver": bool(user.get("mof_approver")),
         "token": token,
     }
 
