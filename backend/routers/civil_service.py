@@ -312,34 +312,6 @@ async def get_active_allowance_amounts(emp: dict, company_id: str, period: str) 
 
 # ============ Reports ============
 
-@router.get("/reports/by-budget-code/{run_id}")
-async def spend_by_budget_code(run_id: str, user: dict = Depends(require_admin)):
-    tf = tenant_filter(user)
-    run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
-    if not run:
-        raise HTTPException(404, "Run not found")
-    emps = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(5000)}
-    by_code: dict = {}
-    for s in run.get("slips", []):
-        emp = emps.get(s["employee_id"], {})
-        code = emp.get("budget_code", "UNCODED")
-        ministry = emp.get("mda_ministry", "—")
-        bucket = by_code.setdefault(code, {
-            "budget_code": code, "ministry": ministry, "employee_count": 0,
-            "gross": 0.0, "paye": 0.0, "nassit_employer": 0.0, "net": 0.0,
-        })
-        bucket["employee_count"] += 1
-        bucket["gross"] += s["gross"]
-        bucket["paye"] += s["paye"]
-        bucket["nassit_employer"] += s["nassit_employer"]
-        bucket["net"] += s["net"]
-    rows = sorted(by_code.values(), key=lambda r: -r["gross"])
-    for r in rows:
-        for k in ("gross", "paye", "nassit_employer", "net"):
-            r[k] = round(r[k], 2)
-    return {"period": run["period"], "rows": rows, "total_rows": len(rows)}
-
-
 async def _budget_rows(run_id: str, tf: dict) -> tuple[dict, list]:
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
@@ -454,6 +426,12 @@ async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_adm
         buf, media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="budget-spend-{run["period"]}.pdf"'},
     )
+
+
+@router.get("/reports/by-budget-code/{run_id}")
+async def spend_by_budget_code(run_id: str, user: dict = Depends(require_admin)):
+    run, rows = await _budget_rows(run_id, tenant_filter(user))
+    return {"period": run["period"], "rows": rows, "total_rows": len(rows)}
 
 
 async def _ghost_data(run_id: str, tf: dict) -> dict:
@@ -589,7 +567,14 @@ async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
     )
 
 
-# ============ Ghost-worker detection / Payslip acknowledgement ============
+@router.get("/ghost-workers/{run_id}")
+async def ghost_workers_report(run_id: str, user: dict = Depends(require_admin)):
+    """List employees whose payslip was issued but never acknowledged → potential ghost workers."""
+    data = await _ghost_data(run_id, tenant_filter(user))
+    # Strip the raw run object from the JSON response
+    data.pop("run", None)
+    return data
+
 
 class AcknowledgeIn(BaseModel):
     note: Optional[str] = None
@@ -623,13 +608,62 @@ async def acknowledge_my_payslip(run_id: str, body: AcknowledgeIn, user: dict = 
     return {"ok": True, "acknowledged_at": iso(now_utc())}
 
 
-@router.get("/ghost-workers/{run_id}")
-async def ghost_workers_report(run_id: str, user: dict = Depends(require_admin)):
-    """List employees whose payslip was issued but never acknowledged → potential ghost workers."""
-    data = await _ghost_data(run_id, tenant_filter(user))
-    # Strip the raw run object from the JSON response
-    data.pop("run", None)
-    return data
+# ============ Step Increments (admin) ============
+
+class StepIncrementRunIn(BaseModel):
+    dry_run: bool = True
+    target_date: Optional[str] = None  # YYYY-MM-DD to simulate a specific day
+
+
+@router.post("/step-increments/run")
+async def run_step_increments(body: StepIncrementRunIn, user: dict = Depends(require_admin)):
+    """Manually trigger the step-increment job for this tenant. `dry_run=True` previews without writing."""
+    from step_increments import _eligible_today_for_tenant, apply_increments
+    from datetime import datetime as _dt
+    target = None
+    if body.target_date:
+        try:
+            target = _dt.fromisoformat(body.target_date).replace(tzinfo=None)
+            from datetime import timezone as _tz
+            target = target.replace(tzinfo=_tz.utc)
+        except Exception:
+            raise HTTPException(400, "target_date must be YYYY-MM-DD")
+    eligible = await _eligible_today_for_tenant(user["company_id"], target_date=target)
+    res = await apply_increments(user["company_id"], eligible, user_email=user["email"], dry_run=body.dry_run)
+    await audit("step_increments_run", "civil_service/step-increments", user, {
+        "dry_run": body.dry_run, "count": res["count"], "target_date": body.target_date,
+    })
+    return res
+
+
+@router.get("/step-increments/history")
+async def step_increment_history(user: dict = Depends(require_admin)):
+    return await db.step_increments.find(
+        tenant_filter(user), {"_id": 0}
+    ).sort("applied_at", -1).to_list(500)
+
+
+# ============ Acting Allowance edit ============
+
+class ActingPatch(BaseModel):
+    acting_role_title: Optional[str] = None
+    monthly_allowance_sle: Optional[float] = Field(default=None, ge=0)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+@router.patch("/actings/{aid}")
+async def patch_acting(aid: str, body: ActingPatch, user: dict = Depends(require_admin)):
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not patch:
+        return {"ok": True, "updated": 0}
+    r = await db.civil_service_actings.update_one(
+        {"id": aid, **tenant_filter(user)}, {"$set": patch}
+    )
+    if not r.matched_count:
+        raise HTTPException(404, "Acting not found")
+    await audit("acting_update", f"civil_service_actings/{aid}", user, patch)
+    return {"ok": True, "updated": patch}
 
 
 # ============ Ministry-of-Finance approval workflow ============

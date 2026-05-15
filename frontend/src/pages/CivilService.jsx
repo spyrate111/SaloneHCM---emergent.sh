@@ -5,13 +5,15 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import {
   Award, Building2, Coins, UserCog, Plus, Trash2, AlertTriangle,
-  Layers, Tag, ShieldAlert, X, CheckCircle2,
+  Layers, Tag, ShieldAlert, X, CheckCircle2, Calendar, Download, FileText, Play,
 } from "lucide-react";
 
 const TABS = [
   { id: "grades", label: "Grades & Steps", icon: Layers },
   { id: "allowances", label: "Allowance Rules", icon: Coins },
   { id: "budgets", label: "Budget Codes", icon: Tag },
+  { id: "actings", label: "Acting Allowances", icon: UserCog },
+  { id: "increments", label: "Step Increments", icon: Calendar },
   { id: "ghosts", label: "Ghost-Worker Audit", icon: ShieldAlert },
 ];
 
@@ -60,6 +62,8 @@ export default function CivilService() {
       {tab === "grades" && <GradesTab />}
       {tab === "allowances" && <AllowancesTab />}
       {tab === "budgets" && <BudgetCodesTab />}
+      {tab === "actings" && <ActingsTab />}
+      {tab === "increments" && <IncrementsTab />}
       {tab === "ghosts" && <GhostsTab />}
     </div>
   );
@@ -378,6 +382,232 @@ function BudgetCodesTab() {
   );
 }
 
+// =============== Acting Allowances ===============
+
+function ActingsTab() {
+  const [actings, setActings] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ employee_id: "", acting_role_title: "", monthly_allowance_sle: 0, start_date: new Date().toISOString().split("T")[0], end_date: "" });
+
+  const load = useCallback(async () => {
+    const [a, e] = await Promise.all([api.get("/civil-service/actings"), api.get("/employees")]);
+    setActings(a.data);
+    setEmployees(e.data);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = { ...form, monthly_allowance_sle: Number(form.monthly_allowance_sle) };
+      if (!payload.end_date) delete payload.end_date;
+      await api.post("/civil-service/actings", payload);
+      toast.success("Acting role created");
+      setOpen(false);
+      setForm({ employee_id: "", acting_role_title: "", monthly_allowance_sle: 0, start_date: new Date().toISOString().split("T")[0], end_date: "" });
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not create");
+    }
+  };
+
+  const remove = async (aid) => {
+    if (!window.confirm("Delete this acting allowance?")) return;
+    await api.delete(`/civil-service/actings/${aid}`);
+    toast.success("Deleted"); load();
+  };
+
+  const today = new Date().toISOString().split("T")[0];
+  const isActive = (a) => a.start_date <= today && (!a.end_date || a.end_date >= today);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-xl font-semibold">Acting allowances</h2>
+          <p className="text-xs text-[#686D76] mt-0.5">Temporary acting-in-role allowances automatically appear on payslips during the active period.</p>
+        </div>
+        <button data-testid="acting-new" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#D1603D] hover:bg-[#B84F2F] text-white text-sm px-4 py-2 rounded-md">
+          <Plus className="w-4 h-4" /> New acting
+        </button>
+      </div>
+      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-[#F7F6F2]">
+            <tr>{["Employee", "Acting role", "Monthly allowance", "Start", "End", "Status", ""].map((h) => (
+              <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {actings.map((a) => (
+              <tr key={a.id} className="border-t border-[#E2DFD6]" data-testid={`acting-row-${a.id}`}>
+                <td className="py-3 px-4 font-medium">{a.employee_name}</td>
+                <td className="py-3 px-4 text-[#525860]">{a.acting_role_title}</td>
+                <td className="py-3 px-4 font-data">{fmtSLE(a.monthly_allowance_sle)}</td>
+                <td className="py-3 px-4 font-data">{a.start_date}</td>
+                <td className="py-3 px-4 font-data">{a.end_date || <span className="text-[#A1A5AB]">open</span>}</td>
+                <td className="py-3 px-4">
+                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${isActive(a) ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{isActive(a) ? "Active" : "Inactive"}</span>
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <button onClick={() => remove(a.id)} className="text-xs text-[#B83A3A] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                </td>
+              </tr>
+            ))}
+            {!actings.length && <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">No acting allowances configured.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {open && (
+        <Modal title="New acting allowance" onClose={() => setOpen(false)}>
+          <form onSubmit={submit} className="space-y-3">
+            <Field label="Employee">
+              <select data-testid="acting-employee" required value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                <option value="">— Select —</option>
+                {employees.map((em) => <option key={em.id} value={em.id}>{em.first_name} {em.last_name} · {em.job_title}</option>)}
+              </select>
+            </Field>
+            <Field label="Acting role title">
+              <input data-testid="acting-role" required value={form.acting_role_title} onChange={(e) => setForm({ ...form, acting_role_title: e.target.value })} placeholder="e.g. Acting Director General" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+            </Field>
+            <Field label="Monthly allowance (SLE)">
+              <input data-testid="acting-amount" required type="number" min="0" step="50" value={form.monthly_allowance_sle} onChange={(e) => setForm({ ...form, monthly_allowance_sle: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Start date">
+                <input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+              </Field>
+              <Field label="End date (optional)">
+                <input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+              </Field>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
+              <button data-testid="acting-submit" type="submit" className="text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2 rounded-md">Create</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// =============== Step Increments ===============
+
+function IncrementsTab() {
+  const [history, setHistory] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [targetDate, setTargetDate] = useState(new Date().toISOString().split("T")[0]);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await api.get("/civil-service/step-increments/history");
+    setHistory(r.data);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const runDry = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post("/civil-service/step-increments/run", { dry_run: true, target_date: targetDate });
+      setPreview(r.data);
+      if (r.data.count === 0) toast.info("No employees eligible on this date");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Preview failed");
+    } finally { setBusy(false); }
+  };
+
+  const apply = async () => {
+    if (!window.confirm(`Apply step increments to ${preview.count} employee(s)? This will bump their basic salary.`)) return;
+    setBusy(true);
+    try {
+      const r = await api.post("/civil-service/step-increments/run", { dry_run: false, target_date: targetDate });
+      toast.success(`Applied ${r.data.count} step increments`);
+      setPreview(null); load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Apply failed");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="font-heading text-xl font-semibold">Annual step increments</h2>
+        <p className="text-xs text-[#686D76] mt-0.5">Automatically bumps each civil servant by +1 step on their work anniversary. Runs daily at 02:00 UTC; admins can also preview/apply manually.</p>
+      </div>
+      <div className="bg-white border border-[#E2DFD6] rounded-lg p-5">
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Target date</label>
+            <input data-testid="increment-target-date" type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+          </div>
+          <button data-testid="increment-preview" disabled={busy} onClick={runDry} className="inline-flex items-center gap-2 bg-white border border-[#26547C] text-[#26547C] hover:bg-[#E5EEF6] text-sm px-4 py-2 rounded-md disabled:opacity-50">
+            <Play className="w-4 h-4" /> Preview eligibility
+          </button>
+          {preview && preview.count > 0 && (
+            <button data-testid="increment-apply" disabled={busy} onClick={apply} className="inline-flex items-center gap-2 bg-[#D1603D] hover:bg-[#B84F2F] text-white text-sm px-4 py-2 rounded-md disabled:opacity-50">
+              Apply {preview.count} increment{preview.count > 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
+        {preview && preview.count > 0 && (
+          <div data-testid="increment-preview-table" className="mt-5">
+            <div className="text-sm font-medium mb-2 text-[#1A1C1E]">{preview.count} employee{preview.count > 1 ? "s" : ""} eligible:</div>
+            <table className="w-full text-xs border border-[#E2DFD6] rounded">
+              <thead className="bg-[#F7F6F2]">
+                <tr>{["Employee", "Grade", "From step", "To step", "Δ SLE"].map((h) => (
+                  <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-2 px-3 font-medium">{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {preview.applied.map((a) => (
+                  <tr key={a.employee_id} className="border-t border-[#E2DFD6]" data-testid={`increment-row-${a.employee_id}`}>
+                    <td className="py-2 px-3 font-medium">{a.employee_name}</td>
+                    <td className="py-2 px-3 font-data">{a.grade_code}</td>
+                    <td className="py-2 px-3 font-data">{a.from_step}</td>
+                    <td className="py-2 px-3 font-data text-[#2D7A5D] font-semibold">{a.to_step}</td>
+                    <td className="py-2 px-3 font-data text-[#26547C]">+{fmtSLE(a.delta_sle)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {preview && preview.count === 0 && (
+          <div className="mt-4 text-sm text-[#686D76] bg-[#F7F6F2] rounded-md px-3 py-2">No employees have an anniversary on {targetDate}.</div>
+        )}
+      </div>
+
+      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
+        <div className="px-6 py-3 border-b border-[#E2DFD6]">
+          <h3 className="font-heading text-sm font-semibold">Increment history</h3>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-[#F7F6F2]">
+            <tr>{["Date", "Employee", "Grade", "Step", "Basic delta", "Applied by"].map((h) => (
+              <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+            ))}</tr>
+          </thead>
+          <tbody>
+            {history.map((h) => (
+              <tr key={`${h.employee_id}-${h.year}`} className="border-t border-[#E2DFD6]">
+                <td className="py-2.5 px-4 font-data text-xs">{(h.applied_at || "").slice(0, 10)}</td>
+                <td className="py-2.5 px-4 font-medium">{h.employee_name}</td>
+                <td className="py-2.5 px-4 font-data">{h.grade_code}</td>
+                <td className="py-2.5 px-4 font-data">{h.from_step} → {h.to_step}</td>
+                <td className="py-2.5 px-4 font-data text-[#2D7A5D]">+{fmtSLE(h.delta_sle)}</td>
+                <td className="py-2.5 px-4 text-xs text-[#525860]">{h.applied_by}</td>
+              </tr>
+            ))}
+            {!history.length && <tr><td colSpan={6} className="py-10 text-center text-sm text-[#686D76]">No step increments recorded yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // =============== Ghost-worker Audit ===============
 
 function GhostsTab() {
@@ -400,17 +630,43 @@ function GhostsTab() {
     } finally { setLoading(false); }
   };
 
+  const downloadReport = async (kind) => {
+    if (!selected) return;
+    const url = `/civil-service/ghost-workers/${selected}.${kind}`;
+    try {
+      const resp = await api.get(url, { responseType: "blob" });
+      const blob = URL.createObjectURL(resp.data);
+      const a = document.createElement("a");
+      a.href = blob; a.download = `ghost-worker-${report?.period || "report"}.${kind}`; a.click();
+      URL.revokeObjectURL(blob);
+    } catch (e) {
+      toast.error("Download failed");
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="font-heading text-xl font-semibold">Ghost-worker audit</h2>
           <p className="text-xs text-[#686D76] mt-0.5">Employees who never acknowledged their payslip — potential ghost workers.</p>
         </div>
-        <select data-testid="ghost-run-select" value={selected || ""} onChange={(e) => e.target.value && loadReport(e.target.value)} className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-          <option value="">Select payroll run…</option>
-          {runs.map((r) => <option key={r.id} value={r.id}>{r.period} — {r.totals?.employee_count} slips</option>)}
-        </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select data-testid="ghost-run-select" value={selected || ""} onChange={(e) => e.target.value && loadReport(e.target.value)} className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+            <option value="">Select payroll run…</option>
+            {runs.map((r) => <option key={r.id} value={r.id}>{r.period} — {r.totals?.employee_count} slips</option>)}
+          </select>
+          {report && (
+            <>
+              <button data-testid="ghost-pdf" onClick={() => downloadReport("pdf")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-3 py-2 rounded-md">
+                <FileText className="w-3.5 h-3.5" /> PDF
+              </button>
+              <button data-testid="ghost-csv" onClick={() => downloadReport("csv")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-3 py-2 rounded-md">
+                <Download className="w-3.5 h-3.5" /> CSV
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {loading && <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center text-sm text-[#686D76]">Loading…</div>}

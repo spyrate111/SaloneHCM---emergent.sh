@@ -115,6 +115,12 @@ def start():
         attach_digest(scheduler)
     except Exception:
         logger.exception("Failed to attach daily digest job")
+    # Attach annual step-increment job
+    try:
+        from step_increments import attach as attach_step_inc
+        attach_step_inc(scheduler)
+    except Exception:
+        logger.exception("Failed to attach step-increment job")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

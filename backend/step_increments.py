@@ -50,9 +50,10 @@ async def _eligible_today_for_tenant(company_id: str, target_date: Optional[date
             continue
         # Idempotency: skip if we already recorded an increment for (employee, year)
         existing = await db.step_increments.find_one(
-            {"company_id": company_id, "employee_id": e["id"], "year": year}, {"_id": 0, "id": 1}
+            {"company_id": company_id, "employee_id": e["id"], "year": year},
+            {"_id": 1},
         )
-        if existing:
+        if existing is not None:
             continue
         # Skip if already on max step
         max_step = await db.civil_service_steps.find_one(
