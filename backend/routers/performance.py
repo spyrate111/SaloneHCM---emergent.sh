@@ -233,73 +233,91 @@ async def acknowledge_review(rid: str, body: AcknowledgeIn, user: dict = Depends
     return {"ok": True}
 
 
-@router.get("/cycles/{cid}/summary.pdf")
-async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
-    """Download a PDF summary of an entire review cycle (analytics + table)."""
-    from fastapi.responses import StreamingResponse
-    import io as _io
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.lib.units import cm
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
-    )
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_LEFT
-
-    tf = tenant_filter(user)
-    cycle = await db.review_cycles.find_one({"id": cid, **tf}, {"_id": 0})
-    if not cycle:
-        raise HTTPException(404, "Cycle not found")
-    reviews = await db.performance_reviews_v2.find(
-        {"cycle_id": cid, **tf}, {"_id": 0}
-    ).sort("employee_name", 1).to_list(2000)
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
-
-    # Build the same analytics inline (avoid calling the function)
+def _compute_cycle_metrics(reviews: list) -> dict:
+    """Pure aggregation helper — shared by JSON analytics endpoint and PDF summary."""
     completed = [r for r in reviews if r["status"] == "completed"]
-    mgr_ratings = [r["manager_rating"] for r in completed if r.get("manager_rating")]
     self_ratings = [r["self_rating"] for r in reviews if r.get("self_rating")]
+    mgr_ratings = [r["manager_rating"] for r in completed if r.get("manager_rating")]
     distribution = {str(i): 0 for i in range(1, 6)}
     for r in completed:
-        if r.get("manager_rating"):
-            distribution[str(int(r["manager_rating"]))] += 1
-    acked = sum(1 for r in completed if r.get("acknowledged_at"))
-
-    buf = _io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
-    styles = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=20, textColor=colors.HexColor("#133326"), spaceAfter=8, alignment=TA_LEFT)
-    h2 = ParagraphStyle("h2", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=13, textColor=colors.HexColor("#26547C"), spaceBefore=12, spaceAfter=6)
-    body = ParagraphStyle("body", parent=styles["BodyText"], fontName="Helvetica", fontSize=10, leading=14, textColor=colors.HexColor("#1A1C1E"))
-    small = ParagraphStyle("small", parent=body, fontSize=9, textColor=colors.HexColor("#525860"))
-
-    story = []
-    story.append(Paragraph(f"Performance Review Summary · {cycle['name']}", h1))
-    story.append(Paragraph(
-        f"<b>Organisation:</b> {company.get('name','—')} &nbsp;&nbsp;<b>Period:</b> {cycle['period']} &nbsp;&nbsp;<b>Generated:</b> {iso(now_utc())[:10]}",
-        small,
-    ))
-    story.append(Spacer(1, 0.4 * cm))
-
-    # KPI grid
-    kpi_data = [
-        ["Total reviews", str(len(reviews)),
-         "Completed", str(len(completed)),
-         "Acknowledged", str(acked)],
-        ["Avg self rating", f"{(sum(self_ratings) / max(1, len(self_ratings))):.2f}" if self_ratings else "—",
-         "Avg manager rating", f"{(sum(mgr_ratings) / max(1, len(mgr_ratings))):.2f}" if mgr_ratings else "—",
-         "Completion %", f"{(len(completed) / max(1, len(reviews)) * 100):.0f}%"],
+        rating = r.get("manager_rating")
+        if rating:
+            key = str(int(rating))
+            if key in distribution:
+                distribution[key] += 1
+    promo = {"none": 0, "consider": 0, "strong": 0}
+    salary = {"none": 0, "merit": 0, "promotion": 0}
+    for r in completed:
+        promo[r.get("promotion_recommendation") or "none"] += 1
+        salary[r.get("salary_action") or "none"] += 1
+    by_dept: dict = {}
+    for r in completed:
+        d = r.get("department") or "—"
+        by_dept.setdefault(d, []).append(r.get("manager_rating") or 0)
+    dept_summary = [
+        {"department": d, "count": len(v), "avg_rating": round(sum(v) / max(1, len(v)), 2)}
+        for d, v in sorted(by_dept.items())
     ]
-    t = Table(kpi_data, colWidths=[3 * cm] * 6)
+    acked = sum(1 for r in completed if r.get("acknowledged_at"))
+    total = len(reviews)
+    return {
+        "total_reviews": total,
+        "completed_count": len(completed),
+        "completed": len(completed),
+        "completion_rate": round(len(completed) / max(1, total), 3),
+        "acknowledged": acked,
+        "acknowledgement_rate": round(acked / max(1, len(completed)), 3),
+        "avg_self_rating": round(sum(self_ratings) / max(1, len(self_ratings)), 2) if self_ratings else 0,
+        "avg_manager_rating": round(sum(mgr_ratings) / max(1, len(mgr_ratings)), 2) if mgr_ratings else 0,
+        "rating_distribution": distribution,
+        "promotion_recommendations": promo,
+        "salary_actions": salary,
+        "department_summary": dept_summary,
+    }
+
+
+def _pdf_styles():
+    """Return reusable Paragraph/Table styles for the cycle summary PDF."""
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT
+    base = getSampleStyleSheet()
+    return {
+        "h1": ParagraphStyle("h1", parent=base["Title"], fontName="Helvetica-Bold", fontSize=20,
+                             textColor=colors.HexColor("#133326"), spaceAfter=8, alignment=TA_LEFT),
+        "h2": ParagraphStyle("h2", parent=base["Heading2"], fontName="Helvetica-Bold", fontSize=13,
+                             textColor=colors.HexColor("#26547C"), spaceBefore=12, spaceAfter=6),
+        "small": ParagraphStyle("small", parent=base["BodyText"], fontName="Helvetica", fontSize=9,
+                                textColor=colors.HexColor("#525860")),
+    }
+
+
+def _kpi_table(metrics: dict):
+    """Top KPI grid for cycle summary PDF."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle
+    total = metrics["total_reviews"]
+    completed = metrics["completed_count"]
+    data = [
+        ["Total reviews", str(total),
+         "Completed", str(completed),
+         "Acknowledged", str(metrics["acknowledged"])],
+        ["Avg self rating", f'{metrics["avg_self_rating"]:.2f}' if metrics["avg_self_rating"] else "—",
+         "Avg manager rating", f'{metrics["avg_manager_rating"]:.2f}' if metrics["avg_manager_rating"] else "—",
+         "Completion %", f"{(completed / max(1, total) * 100):.0f}%"],
+    ]
+    t = Table(data, colWidths=[3 * cm] * 6)
+    grey = colors.HexColor("#F7F6F2")
+    label_col = colors.HexColor("#686D76")
     t.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, -1), "Helvetica", 9),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F7F6F2")),
-        ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#F7F6F2")),
-        ("BACKGROUND", (4, 0), (4, -1), colors.HexColor("#F7F6F2")),
-        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#686D76")),
-        ("TEXTCOLOR", (2, 0), (2, -1), colors.HexColor("#686D76")),
-        ("TEXTCOLOR", (4, 0), (4, -1), colors.HexColor("#686D76")),
+        ("BACKGROUND", (0, 0), (0, -1), grey),
+        ("BACKGROUND", (2, 0), (2, -1), grey),
+        ("BACKGROUND", (4, 0), (4, -1), grey),
+        ("TEXTCOLOR", (0, 0), (0, -1), label_col),
+        ("TEXTCOLOR", (2, 0), (2, -1), label_col),
+        ("TEXTCOLOR", (4, 0), (4, -1), label_col),
         ("FONT", (1, 0), (1, -1), "Helvetica-Bold", 10),
         ("FONT", (3, 0), (3, -1), "Helvetica-Bold", 10),
         ("FONT", (5, 0), (5, -1), "Helvetica-Bold", 10),
@@ -309,18 +327,22 @@ async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
-    story.append(t)
+    return t
 
-    # Rating distribution
-    story.append(Paragraph("Manager rating distribution", h2))
-    dist_rows = [["Rating", "Count", "Bar"]]
+
+def _distribution_table(distribution: dict):
+    """Manager rating distribution bar table."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle
+    rows = [["Rating", "Count", "Bar"]]
     max_n = max(1, max(distribution.values()))
     for r in [5, 4, 3, 2, 1]:
         n = distribution[str(r)]
         bar = "█" * int((n / max_n) * 40)
-        dist_rows.append([f"{r} star{'s' if r > 1 else ''}", str(n), bar])
-    dt = Table(dist_rows, colWidths=[3 * cm, 2 * cm, 12 * cm])
-    dt.setStyle(TableStyle([
+        rows.append([f"{r} star{'s' if r > 1 else ''}", str(n), bar])
+    t = Table(rows, colWidths=[3 * cm, 2 * cm, 12 * cm])
+    t.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 9),
         ("TEXTCOLOR", (2, 1), (2, -1), colors.HexColor("#26547C")),
@@ -328,10 +350,14 @@ async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
     ]))
-    story.append(dt)
+    return t
 
-    # Per-review table
-    story.append(Paragraph("Reviews", h2))
+
+def _reviews_table(reviews: list):
+    """Per-review row table."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle
     rows = [["Employee", "Department", "Self", "Mgr", "Status", "Note"]]
     for r in reviews:
         note = (r.get("manager_score") or {}).get("comments") or ""
@@ -344,8 +370,8 @@ async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
             r["status"].replace("_", " "),
             note,
         ])
-    rt = Table(rows, colWidths=[4 * cm, 3 * cm, 1.2 * cm, 1.2 * cm, 3 * cm, 4.6 * cm], repeatRows=1)
-    rt.setStyle(TableStyle([
+    t = Table(rows, colWidths=[4 * cm, 3 * cm, 1.2 * cm, 1.2 * cm, 3 * cm, 4.6 * cm], repeatRows=1)
+    t.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F7F6F2")),
@@ -355,7 +381,50 @@ async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
-    story.append(rt)
+    return t
+
+
+@router.get("/cycles/{cid}/summary.pdf")
+async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
+    """Download a PDF summary of an entire review cycle (analytics + table)."""
+    from fastapi.responses import StreamingResponse
+    import io as _io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
+    tf = tenant_filter(user)
+    cycle = await db.review_cycles.find_one({"id": cid, **tf}, {"_id": 0})
+    if not cycle:
+        raise HTTPException(404, "Cycle not found")
+    reviews = await db.performance_reviews_v2.find(
+        {"cycle_id": cid, **tf}, {"_id": 0}
+    ).sort("employee_name", 1).to_list(2000)
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+    metrics = _compute_cycle_metrics(reviews)
+    styles = _pdf_styles()
+
+    buf = _io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=2 * cm, rightMargin=2 * cm,
+        topMargin=2 * cm, bottomMargin=2 * cm,
+    )
+    story = [
+        Paragraph(f"Performance Review Summary · {cycle['name']}", styles["h1"]),
+        Paragraph(
+            f"<b>Organisation:</b> {company.get('name','—')} &nbsp;&nbsp;"
+            f"<b>Period:</b> {cycle['period']} &nbsp;&nbsp;"
+            f"<b>Generated:</b> {iso(now_utc())[:10]}",
+            styles["small"],
+        ),
+        Spacer(1, 0.4 * cm),
+        _kpi_table(metrics),
+        Paragraph("Manager rating distribution", styles["h2"]),
+        _distribution_table(metrics["rating_distribution"]),
+        Paragraph("Reviews", styles["h2"]),
+        _reviews_table(reviews),
+    ]
     doc.build(story)
     buf.seek(0)
 
@@ -376,43 +445,9 @@ async def cycle_analytics(cid: str, user: dict = Depends(require_admin)):
     reviews = await db.performance_reviews_v2.find(
         {"cycle_id": cid, **tf}, {"_id": 0}
     ).to_list(2000)
-    total = len(reviews)
-    completed = [r for r in reviews if r["status"] == "completed"]
-    self_ratings = [r["self_rating"] for r in reviews if r.get("self_rating")]
-    mgr_ratings = [r["manager_rating"] for r in completed if r.get("manager_rating")]
-    avg_self = round(sum(self_ratings) / max(1, len(self_ratings)), 2) if self_ratings else 0
-    avg_manager = round(sum(mgr_ratings) / max(1, len(mgr_ratings)), 2) if mgr_ratings else 0
-    distribution = {str(i): 0 for i in range(1, 6)}
-    for r in completed:
-        if r.get("manager_rating"):
-            key = str(int(r["manager_rating"]))
-            if key in distribution:
-                distribution[key] += 1
-    promo = {"none": 0, "consider": 0, "strong": 0}
-    salary = {"none": 0, "merit": 0, "promotion": 0}
-    for r in completed:
-        promo[r.get("promotion_recommendation") or "none"] = promo.get(r.get("promotion_recommendation") or "none", 0) + 1
-        salary[r.get("salary_action") or "none"] = salary.get(r.get("salary_action") or "none", 0) + 1
-    by_dept: dict = {}
-    for r in completed:
-        d = r.get("department", "—") or "—"
-        by_dept.setdefault(d, []).append(r.get("manager_rating") or 0)
-    dept_summary = [
-        {"department": d, "count": len(v), "avg_rating": round(sum(v) / max(1, len(v)), 2)}
-        for d, v in sorted(by_dept.items())
-    ]
-    acked = sum(1 for r in completed if r.get("acknowledged_at"))
+    metrics = _compute_cycle_metrics(reviews)
+    metrics.pop("completed_count", None)
     return {
         "cycle": {"id": cycle["id"], "name": cycle["name"], "period": cycle["period"]},
-        "total_reviews": total,
-        "completed": len(completed),
-        "completion_rate": round(len(completed) / max(1, total), 3),
-        "acknowledged": acked,
-        "acknowledgement_rate": round(acked / max(1, len(completed)), 3),
-        "avg_self_rating": avg_self,
-        "avg_manager_rating": avg_manager,
-        "rating_distribution": distribution,
-        "promotion_recommendations": promo,
-        "salary_actions": salary,
-        "department_summary": dept_summary,
+        **metrics,
     }
