@@ -93,10 +93,57 @@ def _email_items(snap: dict) -> list[dict]:
     return items
 
 
+def _build_email_body_html(admin_name: str, items: list[dict]) -> str:
+    """Compose the inner HTML body for a digest email."""
+    greeting = f"<p>Good morning {admin_name},</p>"
+    if not items:
+        return greeting + '<p style="color:#2D7A5D;font-weight:600;">All clear — no pending actions today. 🎉</p>'
+    rows = "".join(
+        f'<tr><td style="padding:10px 0;border-bottom:1px solid #E2DFD6;">'
+        f'<div style="font-size:13px;">{it["label"]}</div>'
+        f'<a href="{it["url"]}" style="color:#26547C;font-size:12px;text-decoration:none;">{it["cta"]} →</a>'
+        f'</td></tr>'
+        for it in items
+    )
+    return (
+        greeting
+        + "<p>Here's your SaloneHCM digest for today:</p>"
+        + f'<table style="width:100%;border-collapse:collapse;">{rows}</table>'
+    )
+
+
+async def _push_digest(admin: dict, body: str) -> None:
+    import push_service
+    try:
+        await push_service.fanout_to_user(admin["id"], {
+            "title": "SaloneHCM · Daily digest",
+            "body": body,
+            "url": "/dashboard",
+            "kind": "daily_digest",
+            "tag": "daily-digest",
+        })
+    except Exception:
+        logger.warning("daily digest push failed for %s", admin["email"])
+
+
+async def _email_digest(admin: dict, snap: dict) -> None:
+    from email_service import _wrap_html, _send as _email_send
+    try:
+        body_html = _build_email_body_html(admin.get("name", ""), _email_items(snap))
+        html = _wrap_html(
+            title="Daily digest",
+            body_html=body_html,
+            cta_label="Open dashboard",
+            cta_url=(os.environ.get("FRONTEND_URL", "") + "/dashboard"),
+        )
+        await _email_send(admin["email"], "SaloneHCM · Daily digest", html)
+    except Exception:
+        logger.warning("daily digest email failed for %s", admin["email"])
+
+
 async def _send_daily_digest() -> None:
     """For each admin user, compute their tenant snapshot and fire their preferred channels."""
-    import push_service
-    from email_service import _wrap_html, _send as _email_send, is_configured as _email_ok
+    from email_service import is_configured as _email_ok
     admins = await db.users.find(
         {"role": {"$in": ["admin", "superadmin"]}},
         {"_id": 0, "id": 1, "email": 1, "company_id": 1, "name": 1, "digest_prefs": 1},
@@ -110,49 +157,11 @@ async def _send_daily_digest() -> None:
         if cid not in by_tenant:
             by_tenant[cid] = await _aggregate_for_tenant(cid)
         snap = by_tenant[cid]
-        body = _summarize(snap)
         prefs = a.get("digest_prefs") or {"push": True, "email": False}
         if prefs.get("push"):
-            try:
-                await push_service.fanout_to_user(a["id"], {
-                    "title": "SaloneHCM · Daily digest",
-                    "body": body,
-                    "url": "/dashboard",
-                    "kind": "daily_digest",
-                    "tag": "daily-digest",
-                })
-            except Exception:
-                logger.warning("daily digest push failed for %s", a["email"])
+            await _push_digest(a, _summarize(snap))
         if prefs.get("email") and _email_ok():
-            try:
-                items = _email_items(snap)
-                if items:
-                    rows = "".join([
-                        f'''<tr><td style="padding:10px 0;border-bottom:1px solid #E2DFD6;">
-                              <div style="font-size:13px;">{it["label"]}</div>
-                              <a href="{it["url"]}" style="color:#26547C;font-size:12px;text-decoration:none;">{it["cta"]} →</a>
-                            </td></tr>'''
-                        for it in items
-                    ])
-                    body_html = f"""
-                      <p>Good morning {a.get('name','')},</p>
-                      <p>Here's your SaloneHCM digest for today:</p>
-                      <table style="width:100%;border-collapse:collapse;">{rows}</table>
-                    """
-                else:
-                    body_html = f"""
-                      <p>Good morning {a.get('name','')},</p>
-                      <p style="color:#2D7A5D;font-weight:600;">All clear — no pending actions today. 🎉</p>
-                    """
-                html = _wrap_html(
-                    title="Daily digest",
-                    body_html=body_html,
-                    cta_label="Open dashboard",
-                    cta_url=(os.environ.get("FRONTEND_URL", "") + "/dashboard"),
-                )
-                await _email_send(a["email"], "SaloneHCM · Daily digest", html)
-            except Exception:
-                logger.warning("daily digest email failed for %s", a["email"])
+            await _email_digest(a, snap)
 
     # Persist a log so admins can inspect
     try:

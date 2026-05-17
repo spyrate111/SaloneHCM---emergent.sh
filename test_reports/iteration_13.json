@@ -1,0 +1,44 @@
+{
+  "summary": "Iter19 — Validated 3 high-complexity refactors (TwoFactorCard, SmsPayslipButton, digest._send_daily_digest) end-to-end. Backend: 101/102 pytest PASS (1 skipped: known integration skip in test_iter18_csv_increments) across iter11..iter18. Frontend: ALL critical flows pass — (a) /settings TwoFactorCard renders correctly: Gov admin (no 2FA) sees 'Begin setup' button → click renders SetupPanel with QR image + secret + 6-digit code input; superadmin admin@salonehcm.sl after TOTP login sees EnabledPanel with 'cannot be disabled' message and twofa-disable-open button is absent. (b) /payroll SmsPayslipButton: 35 sms-btn-{rid} buttons render; modal opens with 'BULK SMS · GOV TIER' header (CSS uppercase), Dry-run completes, sms-result populates with 6 rows + KPI tiles + status pills, 'Run again' resets correctly. (c) Daily digest aggregator test_iter14_batch.py::TestDailyDigest passes. (d) /performance loads with 0 React 'unique key' warnings. (e) /employees/{id} EmployeeDetail loads cleanly. (f) /transparency/government-of-sierra-leone public portal renders.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Resend free-tier email delivery (Email-CSV, NRA-PAYE-Return email, Daily digest email to admin@gov.sl)",
+        "issue": "Documented limitation persisting from iteration_12 — Resend free plan only delivers to delivered@resend.dev or the verified Resend account email. Backend pytest sidesteps via delivered@resend.dev so tests stay green. UI email-CSV success toast still cannot fire when sending to=admin@gov.sl in this preview environment. Expected per other_misc_info.",
+        "affected_selectors": ["[data-testid=email-csv]", "[data-testid^=email-nra-paye-]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_batch.py",
+    "/app/test_reports/pytest/iter19_digest.xml",
+    "/app/test_reports/pytest/iter19_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "TwoFactorCard.jsx refactor is clean — main component is 37 lines of declarative state-driven JSX dispatching to 4 well-named sub-components (TwoFactorHeader, SetupPanel, EnabledPanel, DisablePanel). All 8 data-testids preserved. Cyclomatic complexity dropped substantially. No prop-drilling smell.",
+    "SmsPayslipButton.jsx refactor is clean — main exports SmsPayslipButton + 5 internal sub-components (SmsModalHeader, TwilioConfigBanner, SmsActions, SmsResultPanel, SmsResultTable, KPI). STATUS_PILL map cleanly captures the 4 result statuses (sent/would_send/failed/skipped). data-testids sms-modal, sms-dry-run, sms-result, sms-btn-{rid}, sms-live-send all preserved.",
+    "digest.py refactor is excellent — _send_daily_digest now orchestrates only the iteration over admins + persistence. The 3 extracted helpers (_build_email_body_html, _push_digest, _email_digest) each have a single responsibility. The _push_digest and _email_digest helpers correctly swallow exceptions so a failing channel for one admin doesn't break the whole digest. APScheduler trigger and digest_runs persistence shape unchanged.",
+    "Performance.jsx line 216 `key={r.id}` confirmed present on the review-row map inside CyclesAdmin tbody — react key-prop warning has been silenced (0 warnings observed in console during /performance load).",
+    "EmployeeDetail.jsx line 19-31: `load` correctly wrapped in useCallback with [id] dependency and `useEffect(() => { load(); }, [load])` on line 33 — eslint react-hooks/exhaustive-deps warning resolved. (Minor improvement opportunity, NOT blocking: saveCs() at line 64 calls load() inside its body without listing it as a useCallback dep — but since saveCs is not memoized, this is fine.)",
+    "One pre-existing unrelated console error noticed across all pages — Layout.jsx ~line 166 produces a React hydration warning: '<span> cannot be a child of <option>'. This is OUTSIDE the scope of the 3 refactored components and was present before this iteration's changes — flag for cleanup but not blocking.",
+    "Pre-existing Recharts width(-1) cosmetic warning from iteration_12 was NOT in scope for this iteration and remains unfixed."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (101/101 pass, 1 expected skip)",
+    "frontend": "100% (all critical refactor flows pass)"
+  },
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (Gov, no 2FA); admin@salonehcm.sl / Admin@2026 + TOTP from pyotp.TOTP('KRSXG5BANFXSAYTBORQXG43LMR2A').now()",
+  "seed_data_creation": "None — no new test data created. Re-used existing 6 demo Gov employees + existing payroll runs.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 3 refactors (TwoFactorCard, SmsPayslipButton, digest._send_daily_digest) verified behavior-preserving. Backend test suite 101/101 green. Frontend: TwoFactorCard 4-state machine works for both Gov admin (no 2FA, sees Begin setup → SetupPanel with QR + secret + code input) and superadmin (2FA enforced, sees EnabledPanel with 'cannot be disabled', no disable button). SmsPayslipButton modal opens with correct header, dry-run round-trips to /api/payroll/runs/{rid}/send-sms and populates SmsResultPanel with KPI tiles + SmsResultTable rows. EmployeeDetail loads cleanly with no eslint warning. Performance Cycles tab loads with 0 React key warnings. Pre-existing unrelated issues that remain: (1) Layout.jsx ~166 hydration warning '<span> cannot be a child of <option>', (2) Recharts width(-1) cosmetic warning on dashboards. Both flagged in iter12 but are unrelated to this iteration's scope.",
+  "rca of the issue": "N/A — no issues found in this iteration's scope. Two pre-existing items carry over from iter12 (Layout span-in-option hydration warning + Recharts width(-1) cosmetic) but these are outside the refactor scope and not regressions."
+}

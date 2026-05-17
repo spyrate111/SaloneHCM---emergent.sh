@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
@@ -16,7 +16,7 @@ export default function EmployeeDetail() {
   const [cs, setCs] = useState({});
   const [savingCs, setSavingCs] = useState(false);
 
-  const load = () => api.get(`/employees/${id}`).then((r) => {
+  const load = useCallback(() => api.get(`/employees/${id}`).then((r) => {
     setE(r.data);
     setCs({
       grade_code: r.data.grade_code || "",
@@ -28,9 +28,9 @@ export default function EmployeeDetail() {
       responsibility_allowance_enabled: r.data.responsibility_allowance_enabled ?? false,
       hardship_allowance_enabled: r.data.hardship_allowance_enabled ?? false,
     });
-  });
+  }), [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!has || !has("civil_service")) return;
