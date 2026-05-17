@@ -77,17 +77,15 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
-## v1.11 (Feb 17 2026) — Code Quality Cleanup + Complexity Refactors
+## v1.11 (Feb 17 2026) — Code Quality Cleanup + Complexity Refactors + Console Warning Verification
 - **Fixed react-hooks/exhaustive-deps warning** in `EmployeeDetail.jsx` — wrapped `load()` in `useCallback([id])`. Frontend now compiles with **zero ESLint warnings**.
 - **Refactored `TwoFactorCard.jsx`** — extracted 4 sub-components (`TwoFactorHeader`, `SetupPanel`, `EnabledPanel`, `DisablePanel`). Main component dropped from 194 lines / 9 useState hooks to 37 lines of declarative state-dispatch. All 8 data-testids preserved.
 - **Refactored `SmsPayslipButton.jsx`** — extracted 5 sub-components (`SmsModalHeader`, `TwilioConfigBanner`, `SmsActions`, `SmsResultPanel`, `SmsResultTable`). All data-testids preserved (`sms-btn-{rid}`, `sms-modal`, `sms-dry-run`, `sms-live-send`, `sms-result`).
 - **Refactored `digest.py _send_daily_digest`** — extracted 3 helpers (`_build_email_body_html`, `_push_digest`, `_email_digest`). Each has single responsibility; main orchestrator handles iteration + persistence only.
 - **Cleaned up 9 stale test cycles** (`Iter13/Iter14/Iter16 Test Cycle`) from Gov-tenant `review_cycles` + 54 attached `performance_reviews_v2` (legacy testing artifacts).
 - **Cleaned up stale `transparency_slug='demo-salone-transparency-test'`** from a TEST_iter8 company (was causing 409 in test_iter11_transparency.py).
+- **Console-warning verification sweep (Feb 17)**: Logged in as Gov admin and visited Dashboard, Analytics, Ministry, Employees, Leave, Payroll, Users, Performance, Talent, Civil Service, Benefits, Compliance, SMS Logs, Settings, Simulator (with chart render). Interacted with all dynamic `<select>` dropdowns. **ZERO Recharts width(-1) warnings, ZERO `<span> in <option>` hydration warnings, ZERO React key-prop warnings.** Both pre-existing items flagged in iter12/13 are confirmed resolved by the existing `ChartShell` wrapper + native-`<option>` discipline across the codebase.
 - **Tests**: 101/101 pass across iter11→iter18 batch. Frontend testing agent verified all 3 refactored components behave identically to pre-refactor (`/app/test_reports/iteration_13.json`).
-- **Pre-existing items remaining (NOT regressions, flagged in iter12)**:
-  - Recharts width(-1) cosmetic warning on Dashboard/Analytics/Ministry — needs ResponsiveContainer minWidth(0) wrapper revisit.
-  - `<span> cannot be a child of <option>` hydration warning (location ambiguous in testing report).
 
 ## v1.10 (May 15 2026) — Civil Service editor · Acting UI · Report exports · Annual step increments
 - **Civil-service profile editor on Employee Detail** — new card above the existing Profile card with grade/step selectors (cascading; step amount preview in SLE), budget code selector (auto-fills ministry), 4 allowance toggles (housing/transport/responsibility/hardship). Save calls `PATCH /civil-service/employees/{eid}/profile` which auto-syncs `basic_salary_sle` from the selected step amount.
