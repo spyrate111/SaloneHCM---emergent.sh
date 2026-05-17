@@ -1,11 +1,17 @@
 """Shared pytest helpers — auto-injects TOTP code for the seed superadmin so
 the existing test suites keep working under strict 2FA enforcement."""
+import os
 import pyotp
 import requests
 
-# Same deterministic secret as `seeders/users.py` — testing-only.
-SUPERADMIN_TOTP_SECRET = "KRSXG5BANFXSAYTBORQXG43LMR2A"
-SUPERADMIN_EMAIL = "admin@salonehcm.sl"
+# Read the same secret used by the seeder. Falls back to the known dev-only
+# default so contributor laptops Just Work without extra env setup; production
+# CI must inject its own SUPERADMIN_TOTP_SECRET.
+SUPERADMIN_TOTP_SECRET = os.environ.get(
+    "SUPERADMIN_TOTP_SECRET",
+    "KRSXG5BANFXSAYTBORQXG43LMR2A",
+)
+SUPERADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@salonehcm.sl").lower()
 
 
 def totp_now() -> str:

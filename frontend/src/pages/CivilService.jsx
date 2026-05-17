@@ -175,7 +175,7 @@ function GradesTab() {
         <Modal title={`Step schedule · ${editing.grade.code}`} onClose={() => setEditing(null)} wide>
           <div className="space-y-3">
             {editing.steps.map((s, i) => (
-              <div key={i} className="grid grid-cols-3 gap-3 items-center">
+              <div key={s._uid || `step-${i}`} className="grid grid-cols-3 gap-3 items-center">
                 <input type="number" min="1" max="20" value={s.step_number} onChange={(e) => {
                   const next = [...editing.steps]; next[i] = { ...next[i], step_number: e.target.value };
                   setEditing({ ...editing, steps: next });
@@ -186,7 +186,7 @@ function GradesTab() {
                 }} className="col-span-2 bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" placeholder="Monthly SLE" />
               </div>
             ))}
-            <button type="button" onClick={() => setEditing({ ...editing, steps: [...editing.steps, { step_number: editing.steps.length + 1, monthly_amount_sle: 0 }] })} className="text-xs text-[#26547C] hover:underline inline-flex items-center gap-1">
+            <button type="button" onClick={() => setEditing({ ...editing, steps: [...editing.steps, { _uid: `new-${Date.now()}`, step_number: editing.steps.length + 1, monthly_amount_sle: 0 }] })} className="text-xs text-[#26547C] hover:underline inline-flex items-center gap-1">
               <Plus className="w-3.5 h-3.5" /> Add step
             </button>
             <div className="flex justify-end gap-2 pt-2">

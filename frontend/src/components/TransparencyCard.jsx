@@ -18,7 +18,10 @@ export default function TransparencyCard() {
       try {
         const v = await api.get("/public/transparency/admin/views");
         setViews(v.data);
-      } catch { /* ignore */ }
+      } catch (e) {
+        // View counters are optional metadata — log and keep the card functional.
+        if (typeof console !== "undefined") console.warn("transparency view counter fetch failed", e);
+      }
     }
   };
   useEffect(() => { load(); }, []);
@@ -35,9 +38,15 @@ export default function TransparencyCard() {
   };
 
   const copy = async (url) => {
-    try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      // Non-secure-context fallback: tell the admin to select & copy manually.
+      if (typeof console !== "undefined") console.warn("Clipboard write failed", e);
+      toast.error("Could not copy automatically — select the URL and copy manually.");
+    }
   };
 
   if (!status) return null;

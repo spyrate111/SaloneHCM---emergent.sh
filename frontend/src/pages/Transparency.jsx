@@ -82,8 +82,8 @@ export default function Transparency() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="ministry-table">
               <thead className="bg-[#F7F6F2]">
-                <tr>{[t(lang, "th_num"), t(lang, "th_ministry"), t(lang, "th_headcount"), t(lang, "th_gross"), t(lang, "th_paye"), t(lang, "th_nassit")].map((h, i) => (
-                  <th key={i} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+                <tr>{[t(lang, "th_num"), t(lang, "th_ministry"), t(lang, "th_headcount"), t(lang, "th_gross"), t(lang, "th_paye"), t(lang, "th_nassit")].map((h) => (
+                  <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
                 ))}</tr>
               </thead>
               <tbody>

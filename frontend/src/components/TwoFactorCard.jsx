@@ -59,7 +59,14 @@ export default function TwoFactorCard() {
 
   const copySecret = async () => {
     if (!setup?.secret) return;
-    try { await navigator.clipboard.writeText(setup.secret); } catch { /* ignore */ }
+    try {
+      await navigator.clipboard.writeText(setup.secret);
+    } catch (e) {
+      // Browsers may block clipboard access in non-secure contexts — surface the secret manually.
+      if (typeof console !== "undefined") console.warn("Clipboard write failed; secret shown in UI", e);
+      toast.error("Could not copy automatically — select and copy the secret manually.");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
