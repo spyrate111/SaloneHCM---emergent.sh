@@ -1,7 +1,7 @@
 """Daily admin digest — runs once per day, pushes a summary to each tenant admin."""
 import logging
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from apscheduler.triggers.cron import CronTrigger

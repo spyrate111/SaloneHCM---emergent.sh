@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 
-from core import db, require_admin, audit, now_utc, iso, tenant_filter
+from core import db, require_admin, audit, now_utc, iso
 from payroll_engine import calc_payslip
 
 router = APIRouter(prefix="/public", tags=["public"])

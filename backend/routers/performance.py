@@ -233,11 +233,8 @@ async def acknowledge_review(rid: str, body: AcknowledgeIn, user: dict = Depends
     return {"ok": True}
 
 
-def _compute_cycle_metrics(reviews: list) -> dict:
-    """Pure aggregation helper — shared by JSON analytics endpoint and PDF summary."""
-    completed = [r for r in reviews if r["status"] == "completed"]
-    self_ratings = [r["self_rating"] for r in reviews if r.get("self_rating")]
-    mgr_ratings = [r["manager_rating"] for r in completed if r.get("manager_rating")]
+def _rating_distribution(completed: list) -> dict:
+    """Bucket completed reviews by 1..5 manager rating."""
     distribution = {str(i): 0 for i in range(1, 6)}
     for r in completed:
         rating = r.get("manager_rating")
@@ -245,19 +242,40 @@ def _compute_cycle_metrics(reviews: list) -> dict:
             key = str(int(rating))
             if key in distribution:
                 distribution[key] += 1
+    return distribution
+
+
+def _action_counts(completed: list) -> tuple[dict, dict]:
+    """Tally promotion + salary actions across completed reviews."""
     promo = {"none": 0, "consider": 0, "strong": 0}
     salary = {"none": 0, "merit": 0, "promotion": 0}
     for r in completed:
         promo[r.get("promotion_recommendation") or "none"] += 1
         salary[r.get("salary_action") or "none"] += 1
+    return promo, salary
+
+
+def _department_summary(completed: list) -> list:
     by_dept: dict = {}
     for r in completed:
         d = r.get("department") or "—"
         by_dept.setdefault(d, []).append(r.get("manager_rating") or 0)
-    dept_summary = [
+    return [
         {"department": d, "count": len(v), "avg_rating": round(sum(v) / max(1, len(v)), 2)}
         for d, v in sorted(by_dept.items())
     ]
+
+
+def _avg(xs: list) -> float:
+    return round(sum(xs) / max(1, len(xs)), 2) if xs else 0
+
+
+def _compute_cycle_metrics(reviews: list) -> dict:
+    """Pure aggregation helper — shared by JSON analytics endpoint and PDF summary."""
+    completed = [r for r in reviews if r["status"] == "completed"]
+    self_ratings = [r["self_rating"] for r in reviews if r.get("self_rating")]
+    mgr_ratings = [r["manager_rating"] for r in completed if r.get("manager_rating")]
+    promo, salary = _action_counts(completed)
     acked = sum(1 for r in completed if r.get("acknowledged_at"))
     total = len(reviews)
     return {
@@ -267,12 +285,12 @@ def _compute_cycle_metrics(reviews: list) -> dict:
         "completion_rate": round(len(completed) / max(1, total), 3),
         "acknowledged": acked,
         "acknowledgement_rate": round(acked / max(1, len(completed)), 3),
-        "avg_self_rating": round(sum(self_ratings) / max(1, len(self_ratings)), 2) if self_ratings else 0,
-        "avg_manager_rating": round(sum(mgr_ratings) / max(1, len(mgr_ratings)), 2) if mgr_ratings else 0,
-        "rating_distribution": distribution,
+        "avg_self_rating": _avg(self_ratings),
+        "avg_manager_rating": _avg(mgr_ratings),
+        "rating_distribution": _rating_distribution(completed),
         "promotion_recommendations": promo,
         "salary_actions": salary,
-        "department_summary": dept_summary,
+        "department_summary": _department_summary(completed),
     }
 
 

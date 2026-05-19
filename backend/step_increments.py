@@ -7,7 +7,7 @@ Designed to be:
   - Re-targetable: admin can call `POST /civil-service/step-increments/run` to dry-run or apply now.
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Optional
 
 from apscheduler.triggers.cron import CronTrigger

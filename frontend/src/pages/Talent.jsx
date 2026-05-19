@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 import { Briefcase, Star, GraduationCap, Plus, X, RefreshCw, Download } from "lucide-react";
 import {
   DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay,
@@ -284,7 +285,7 @@ function Learning({ isAdmin }) {
       a.href = url; a.download = `certificate-${cid.slice(0, 8)}.pdf`; a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("Certificate download failed", e);
+      toast.error(e?.response?.data?.detail || "Certificate download failed");
     }
   };
 

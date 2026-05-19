@@ -1,0 +1,38 @@
+{
+  "summary": "Iter14 refactor-review — validated 3 backend helper-split refactors (ministry_rollup, _compute_cycle_metrics, completion_certificate) and 1 frontend component extraction (CompanySwitcher) end-to-end. Backend: 101/101 pre-existing iter11..iter18 tests PASS + 4/4 new targeted refactor tests PASS (ministry rollup totals match per-row sums, analytics returns full 11-key shape with rating_distribution {1..5} + dept_summary, summary.pdf returns valid PDF magic bytes, certificate.pdf returns valid PDF with Content-Disposition 'attachment; filename=certificate-*.pdf'). Frontend: ALL 4 flows pass — (a) /settings CompanySwitcher renders for superadmin with `company-switcher-toggle`, dropdown opens showing 6 tenants with `switcher-item-{cid}` testids, Demo Salone marked Active; (b) /dashboard for Gov tenant shows 'Grade F' with 'CRITICAL' badge — confirms GRADE_LABEL.F='Critical'; (c) /performance?status=pending_manager lands admin on the 'My team' tab (visible underline indicator in screenshot) — confirms isAdmin→team branch; (d) /talent and /sms-logs both render cleanly with the expected toast.error replacements in place.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_refactors.py",
+    "/app/test_reports/pytest/iter14_refactors.xml",
+    "/app/test_reports/pytest/iter14_iter11to18.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ministry.py refactor is clean — _blank_ministry/_accumulate_employee/_accumulate_leave/_finalize each have a single responsibility. defaultdict(_blank_ministry) elegantly bootstraps per-department buckets. Final per-bucket rounding done in _finalize. 95 lines total (vs 86 monolithic before) — slight LOC trade-off for substantial cyclomatic complexity drop. Totals cross-check passes (test_rollup_shape_and_totals).",
+    "performance.py _compute_cycle_metrics split into _rating_distribution/_action_counts/_department_summary/_avg helpers is behavior-preserving — the 11-key analytics response shape (total_reviews, completed, completion_rate, acknowledged, acknowledgement_rate, avg_self_rating, avg_manager_rating, rating_distribution, promotion_recommendations, salary_actions, department_summary) is intact and consumed unchanged by both /analytics JSON and /summary.pdf renderer.",
+    "talent.py completion_certificate split into _cert_border/_cert_body/_cert_footer/_cert_qr is clean — each helper takes the canvas object and writes to its own region. Content-Disposition filename header preserved (`attachment; filename=certificate-{8chars}.pdf`). PDF size remains >2KB indicating QR + body + border + footer all still embedded.",
+    "CompanySwitcher.jsx extraction is exemplary — 80-line standalone component with internal CompanyRow sub-component, all 3 data-testids (company-switcher, company-switcher-toggle, company-switcher-menu, switcher-item-{cid}) preserved. Imports cleanly into Layout.jsx via default export.",
+    "ComplianceScoreWidget GRADE_LABEL map (lines 16-22) is a substantial readability win over the prior 4-level nested ternary — direct O(1) lookup with explicit A+/A→Excellent, B→Strong, C→Watch, D→Action needed, F→Critical entries. Verified live: Gov tenant Grade F displays 'CRITICAL' badge.",
+    "Performance.jsx if/else replacing the triple ternary for default tab selection is clearer — isAdmin→'team', employee→'mine' fallback. Verified live: admin@gov.sl on /performance?status=pending_manager lands with 'My team' tab active.",
+    "Talent.jsx:287 + SmsLogs.jsx:67 toast.error replacing console.error is correct UX — user now sees a visible failure indicator instead of a silent dev-console log.",
+    "Pre-existing carry-over items (NOT in scope of this iteration's refactors, flagged previously): test_iter6_batchB.py + test_salonehcm.py contain tests that depend on a 'admin@salonehcm.sl with role=admin' fixture that was promoted to superadmin in iter9 — these 17 failures are stale-fixture issues, not regressions from this iteration's refactor. test_iter8_phase_abc.py twilio tests expect twilio_configured=False but Twilio IS configured in this env — also stale-fixture, not regression."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter14_refactors.py (NEW — 4 targeted regression tests for the 3 backend refactors)"
+  ],
+  "success_rate": {
+    "backend": "100% on scoped refactors (4/4 new + 101/101 iter11-18 pass)",
+    "frontend": "100% (all 4 critical flows verified)"
+  },
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (Gov, no 2FA); admin@salonehcm.sl / Admin@2026 + TOTP from pyotp.TOTP('KRSXG5BANFXSAYTBORQXG43LMR2A').now() (verified working)",
+  "seed_data_creation": "Created 1 fresh Performance cycle 'Iter14 Refactor Cycle' (period 2026-RF14) + 1 Talent program 'Iter14 Cert Refactor' + 1 completion record in Gov tenant via the test fixtures. Safe — uses Gov tenant only.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 3 backend refactors (ministry rollup helper split, performance _compute_cycle_metrics helper split, talent completion_certificate helper split) and the CompanySwitcher component extraction are behavior-preserving. Full iter11-18 backend suite 101/101 green. CompanySwitcher live on /settings shows 6 tenants when logged in as superadmin (data-testids preserved). ComplianceScoreWidget GRADE_LABEL map works (Gov Grade F → 'CRITICAL'). Performance ?status=pending_manager deeplink lands admin on 'My team' tab. Talent + SmsLogs render cleanly. The 17 failing tests in the full pytest run (test_iter6_batchB.py, test_salonehcm.py, parts of test_iter8_phase_abc.py + test_iter9_features.py) are stale-fixture issues that pre-date this iteration's refactor — NOT regressions. They expect admin role='admin' (now 'superadmin') and Twilio not-configured (now configured). The pre-existing Layout.jsx ~line 166 React '<span> cannot be a child of <option>' hydration warning carries over and is still unfixed. Recharts width(-1) cosmetic warning also carries over.",
+  "rca of the issue": "N/A — no regressions introduced by this iteration's refactors. Behavior preservation verified at both unit (JSON shape) and integration (PDF magic bytes, content-disposition headers, frontend testid mapping) levels."
+}

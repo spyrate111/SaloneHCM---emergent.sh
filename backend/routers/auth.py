@@ -71,7 +71,7 @@ class AcceptInviteIn(LoginIn.__bases__[0]):
     pass
 
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 class _AcceptInviteIn(BaseModel):
     token: str = Field(..., min_length=10, max_length=200)
     password: str = Field(..., min_length=8, max_length=128)

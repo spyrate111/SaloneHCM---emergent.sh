@@ -4,13 +4,12 @@ acting allowances, Ministry-of-Finance approval workflow, ghost-worker controls.
 Gov tier-only. Feature flag: `civil_service`.
 """
 import uuid
-from datetime import datetime
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from core import (
-    db, get_current_user, require_admin, require_feature, audit,
+    db, get_current_user, require_admin, audit,
     now_utc, iso, tenant_filter, with_tenant,
 )
 

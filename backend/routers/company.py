@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends
 
 from core import db, get_current_user
-from tiers import TIERS, TIER_FEATURES, features_for, tier_label
+from tiers import TIERS, features_for, tier_label
 
 router = APIRouter(prefix="/company", tags=["company"])
 

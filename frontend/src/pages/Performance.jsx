@@ -17,9 +17,13 @@ export default function Performance() {
   const [params] = useSearchParams();
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
   // Deep-link from digest: ?status=pending_manager → land on team tab
-  const initialTab = params.get("status") === "pending_manager" && !isAdmin ? "mine"
-    : params.get("status") === "pending_manager" ? "team"
-    : isAdmin ? "cycles" : "mine";
+  const statusParam = params.get("status");
+  let initialTab;
+  if (statusParam === "pending_manager") {
+    initialTab = isAdmin ? "team" : "mine";
+  } else {
+    initialTab = isAdmin ? "cycles" : "mine";
+  }
   const [tab, setTab] = useState(initialTab);
 
   return (

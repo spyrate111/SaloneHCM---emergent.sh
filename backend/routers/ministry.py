@@ -1,5 +1,6 @@
 """Ministry-level rollups — Gov-tier dashboard that aggregates by department (= ministry)."""
 from collections import defaultdict
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
 from core import db, require_feature, tenant_filter
 from payroll_engine import calc_payslip
@@ -11,13 +12,8 @@ router = APIRouter(
 )
 
 
-@router.get("/rollup")
-async def ministry_rollup(user: dict = Depends(require_feature("ministry_reports"))):
-    """Aggregate KPIs grouped by department (treated as ministry)."""
-    tf = tenant_filter(user)
-    employees = await db.employees.find(tf, {"_id": 0}).to_list(5000)
-
-    by_ministry: dict[str, dict] = defaultdict(lambda: {
+def _blank_ministry() -> dict:
+    return {
         "name": "",
         "headcount_total": 0,
         "headcount_active": 0,
@@ -29,49 +25,62 @@ async def ministry_rollup(user: dict = Depends(require_feature("ministry_reports
         "avg_basic_salary": 0.0,
         "leave_pending": 0,
         "leave_approved_30d": 0,
-    })
+    }
 
+
+def _accumulate_employee(bucket: dict, e: dict) -> None:
+    bucket["name"] = e["department"]
+    bucket["headcount_total"] += 1
+    if e.get("status") == "active":
+        bucket["headcount_active"] += 1
+        slip = calc_payslip(e)
+        bucket["monthly_payroll_gross"] += slip["gross"]
+        bucket["monthly_payroll_net"] += slip["net"]
+        bucket["monthly_paye"] += slip["paye"]
+        bucket["monthly_nassit"] += slip["nassit_employee"] + slip["nassit_employer"]
+        bucket["avg_basic_salary"] += slip["basic"]
+    if e.get("is_manager"):
+        bucket["headcount_managers"] += 1
+
+
+def _accumulate_leave(bucket: dict, lv: dict, cutoff_iso: str) -> None:
+    if lv["status"] == "pending":
+        bucket["leave_pending"] += 1
+    elif lv["status"] == "approved" and (lv.get("created_at") or "") >= cutoff_iso:
+        bucket["leave_approved_30d"] += lv.get("days", 0)
+
+
+def _finalize(bucket: dict) -> None:
+    if bucket["headcount_active"]:
+        bucket["avg_basic_salary"] = round(bucket["avg_basic_salary"] / bucket["headcount_active"], 2)
+    for k in ("monthly_payroll_gross", "monthly_payroll_net", "monthly_paye", "monthly_nassit"):
+        bucket[k] = round(bucket[k], 2)
+
+
+@router.get("/rollup")
+async def ministry_rollup(user: dict = Depends(require_feature("ministry_reports"))):
+    """Aggregate KPIs grouped by department (treated as ministry)."""
+    tf = tenant_filter(user)
+    employees = await db.employees.find(tf, {"_id": 0}).to_list(5000)
+
+    by_ministry: dict[str, dict] = defaultdict(_blank_ministry)
     for e in employees:
-        m = by_ministry[e["department"]]
-        m["name"] = e["department"]
-        m["headcount_total"] += 1
-        if e.get("status") == "active":
-            m["headcount_active"] += 1
-            slip = calc_payslip(e)
-            m["monthly_payroll_gross"] += slip["gross"]
-            m["monthly_payroll_net"] += slip["net"]
-            m["monthly_paye"] += slip["paye"]
-            m["monthly_nassit"] += slip["nassit_employee"] + slip["nassit_employer"]
-            m["avg_basic_salary"] += slip["basic"]
-        if e.get("is_manager"):
-            m["headcount_managers"] += 1
+        _accumulate_employee(by_ministry[e["department"]], e)
 
-    # Leave aggregations
     leaves = await db.leave_requests.find(tf, {"_id": 0}).to_list(5000)
     emp_dept = {e["id"]: e["department"] for e in employees}
-    from datetime import datetime, timezone, timedelta
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     for lv in leaves:
         dept = emp_dept.get(lv["employee_id"])
-        if not dept:
-            continue
-        if lv["status"] == "pending":
-            by_ministry[dept]["leave_pending"] += 1
-        if lv["status"] == "approved" and (lv.get("created_at") or "") >= cutoff:
-            by_ministry[dept]["leave_approved_30d"] += lv.get("days", 0)
+        if dept:
+            _accumulate_leave(by_ministry[dept], lv, cutoff_iso)
 
     rows = []
     for m in by_ministry.values():
-        if m["headcount_active"]:
-            m["avg_basic_salary"] = round(m["avg_basic_salary"] / m["headcount_active"], 2)
-        m["monthly_payroll_gross"] = round(m["monthly_payroll_gross"], 2)
-        m["monthly_payroll_net"] = round(m["monthly_payroll_net"], 2)
-        m["monthly_paye"] = round(m["monthly_paye"], 2)
-        m["monthly_nassit"] = round(m["monthly_nassit"], 2)
+        _finalize(m)
         rows.append(m)
     rows.sort(key=lambda x: x["monthly_payroll_gross"], reverse=True)
 
-    # Tenant totals
     totals = {
         "ministries": len(rows),
         "headcount_total": sum(r["headcount_total"] for r in rows),

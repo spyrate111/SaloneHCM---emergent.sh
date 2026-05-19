@@ -345,43 +345,22 @@ async def _maybe_trigger_perf_review(employee_id: str, program_id: str, program:
         pass
 
 
-@router.get("/completions/{cid}/certificate.pdf")
-async def completion_certificate(cid: str, user: dict = Depends(get_current_user)):
-    """Generate a PDF certificate of completion."""
-    from fastapi.responses import StreamingResponse
-    import io as _io
-    from reportlab.lib.pagesizes import landscape, A4
+def _cert_border(c, W: float, H: float, cm: float) -> None:
+    """Draw the ornamental double-line border on the certificate."""
     from reportlab.lib import colors
-    from reportlab.lib.units import cm
-    from reportlab.pdfgen import canvas as pdf_canvas
-
-    tf = tenant_filter(user)
-    completion = await db.training_completions.find_one({"id": cid, **tf}, {"_id": 0})
-    if not completion:
-        raise HTTPException(404, "Completion not found")
-    # Employees can only download their own; admins can download any.
-    if user["role"] not in ("admin", "superadmin") and completion["employee_id"] != user.get("employee_id"):
-        raise HTTPException(403, "Not allowed")
-
-    program = await db.training_programs.find_one({"id": completion["program_id"], **tf}, {"_id": 0}) or {}
-    employee = await db.employees.find_one({"id": completion["employee_id"], **tf}, {"_id": 0}) or {}
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
-
-    buf = _io.BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
-    W, H = landscape(A4)
-
-    # Ornamental border
     c.setStrokeColor(colors.HexColor("#133326"))
     c.setLineWidth(4)
     c.rect(1.2 * cm, 1.2 * cm, W - 2.4 * cm, H - 2.4 * cm)
     c.setLineWidth(0.8)
     c.rect(1.6 * cm, 1.6 * cm, W - 3.2 * cm, H - 3.2 * cm)
 
-    # Header
+
+def _cert_body(c, W: float, H: float, cm: float, *, company_name: str, full_name: str, program: dict, completion: dict) -> None:
+    """Render the textual content of the certificate."""
+    from reportlab.lib import colors
     c.setFillColor(colors.HexColor("#133326"))
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · " + (company.get("name") or "SaloneHCM"))
+    c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · " + company_name)
 
     c.setFont("Helvetica-Bold", 36)
     c.drawCentredString(W / 2, H - 5.5 * cm, "CERTIFICATE OF COMPLETION")
@@ -390,7 +369,6 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
     c.setFillColor(colors.HexColor("#525860"))
     c.drawCentredString(W / 2, H - 7.2 * cm, "This is to certify that")
 
-    full_name = f"{employee.get('first_name','')} {employee.get('last_name','')}".strip() or "—"
     c.setFont("Helvetica-Bold", 28)
     c.setFillColor(colors.HexColor("#1A1C1E"))
     c.drawCentredString(W / 2, H - 9.0 * cm, full_name)
@@ -414,16 +392,22 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
         c.setFillColor(colors.HexColor("#2D7A5D"))
         c.drawCentredString(W / 2, H - 14.2 * cm, f"Final score: {completion['score']}%")
 
-    # Footer
+
+def _cert_footer(c, W: float, cm: float, *, cid: str, completed_on: str) -> None:
+    """Render the bottom-left date + bottom-right certificate ID."""
+    from reportlab.lib import colors
     c.setFont("Helvetica", 10)
     c.setFillColor(colors.HexColor("#686D76"))
-    c.drawString(2.4 * cm, 2.2 * cm, f"Completed on: {completion.get('completed_on','—')}")
+    c.drawString(2.4 * cm, 2.2 * cm, f"Completed on: {completed_on}")
     c.drawRightString(W - 2.4 * cm, 2.2 * cm, f"Certificate ID: {cid}")
 
-    # QR code → public verify URL
+
+def _cert_qr(c, W: float, cm: float, cid: str) -> None:
+    """Draw a QR code linking to the public verify URL."""
     try:
         import qrcode as _qr
         from reportlab.lib.utils import ImageReader
+        from reportlab.lib import colors
         import io as _io2
         frontend_url = os.environ.get("FRONTEND_URL", "")
         verify_url = f"{frontend_url}/verify/{cid}" if frontend_url else f"/verify/{cid}"
@@ -434,7 +418,6 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
         b = _io2.BytesIO()
         img.save(b, format="PNG")
         b.seek(0)
-        # bottom-right of inner border
         size = 2.6 * cm
         c.drawImage(ImageReader(b), W - 2.4 * cm - size, 2.6 * cm, width=size, height=size)
         c.setFont("Helvetica", 7)
@@ -442,6 +425,38 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
         c.drawRightString(W - 2.4 * cm - size - 0.2 * cm, 3.6 * cm, "Scan to verify")
     except Exception:
         pass
+
+
+@router.get("/completions/{cid}/certificate.pdf")
+async def completion_certificate(cid: str, user: dict = Depends(get_current_user)):
+    """Generate a PDF certificate of completion."""
+    from fastapi.responses import StreamingResponse
+    import io as _io
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.lib.units import cm
+    from reportlab.pdfgen import canvas as pdf_canvas
+
+    tf = tenant_filter(user)
+    completion = await db.training_completions.find_one({"id": cid, **tf}, {"_id": 0})
+    if not completion:
+        raise HTTPException(404, "Completion not found")
+    if user["role"] not in ("admin", "superadmin") and completion["employee_id"] != user.get("employee_id"):
+        raise HTTPException(403, "Not allowed")
+
+    program = await db.training_programs.find_one({"id": completion["program_id"], **tf}, {"_id": 0}) or {}
+    employee = await db.employees.find_one({"id": completion["employee_id"], **tf}, {"_id": 0}) or {}
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+    full_name = f"{employee.get('first_name','')} {employee.get('last_name','')}".strip() or "—"
+
+    buf = _io.BytesIO()
+    c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
+    W, H = landscape(A4)
+
+    _cert_border(c, W, H, cm)
+    _cert_body(c, W, H, cm, company_name=company.get("name") or "SaloneHCM",
+               full_name=full_name, program=program, completion=completion)
+    _cert_footer(c, W, cm, cid=cid, completed_on=completion.get("completed_on", "—"))
+    _cert_qr(c, W, cm, cid)
 
     c.showPage()
     c.save()

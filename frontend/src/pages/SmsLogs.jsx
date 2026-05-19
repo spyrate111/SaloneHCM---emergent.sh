@@ -64,7 +64,7 @@ export default function SmsLogs() {
       a.href = url; a.download = "salonehcm-sms-audit.csv"; a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("CSV export failed", e);
+      toast.error(e?.response?.data?.detail || "CSV export failed");
     }
   };
 

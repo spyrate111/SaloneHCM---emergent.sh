@@ -13,6 +13,15 @@ const GRADE_COLOR = {
   "F":  { bg: "from-[#B83A3A] to-[#8E2727]", ring: "#B83A3A", chip: "bg-[#FBEAEA] text-[#B83A3A]" },
 };
 
+const GRADE_LABEL = {
+  "A+": "Excellent",
+  "A": "Excellent",
+  "B": "Strong",
+  "C": "Watch",
+  "D": "Action needed",
+  "F": "Critical",
+};
+
 const DIM_LABELS = {
   payroll_timeliness: { label: "NRA filing timeliness", icon: TrendingUp },
   nassit_accuracy: { label: "NASSIT contribution accuracy", icon: Check },
@@ -68,7 +77,7 @@ export default function ComplianceScoreWidget() {
             <h2 className="font-heading text-2xl sm:text-3xl font-bold mt-1 flex items-center gap-3">
               Grade {data.grade}
               <span className={`text-[10px] uppercase tracking-wider font-medium px-2.5 py-1 rounded-full ${colors.chip}`}>
-                {data.grade === "A+" || data.grade === "A" ? "Excellent" : data.grade === "B" ? "Strong" : data.grade === "C" ? "Watch" : data.grade === "D" ? "Action needed" : "Critical"}
+                {GRADE_LABEL[data.grade] || "Critical"}
               </span>
             </h2>
             <p className="text-white/75 text-sm mt-1.5 max-w-md leading-relaxed">
