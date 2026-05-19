@@ -77,6 +77,15 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
+## v1.13 (Feb 19 2026) — Dual-Auth Migration: httpOnly Cookies + CSRF Hardening
+- **Security hardening — eliminated XSS-readable JWT in sessionStorage**: Backend `/api/auth/login` now sets an `access_token` cookie with `httpOnly=true secure=true samesite=None max_age=12h path=/` (XSS-resistant) AND a `salonehcm_csrf` cookie with `httpOnly=false secure=true samesite=None max_age=12h` (JS-readable for double-submit).
+- **`get_current_user` accepts BOTH** cookie auth (new browser path) and `Authorization: Bearer` header (backwards compat for API clients + 105 existing pytests). Bearer takes precedence when both present.
+- **CSRF (double-submit cookie pattern)**: A request-scoped FastAPI dependency `csrf_protect` is mounted on the whole `/api` router. It rejects state-changing requests (POST/PUT/PATCH/DELETE) with 403 "CSRF token missing or invalid" when authenticated via cookie WITHOUT a matching `X-CSRF-Token` header. Uses `secrets.compare_digest` for constant-time comparison. Bootstrap endpoints (`/auth/login`, `/auth/accept-invite`) are CSRF-exempt because no token can exist before login. Bearer-authed requests bypass CSRF entirely.
+- **Frontend axios rewire**: `withCredentials: true` is now global. Request interceptor auto-attaches `X-CSRF-Token` header from `document.cookie` on every state-changing method. `sessionStorage` retained as transitional fallback for blob-download flows.
+- **CORS update**: `allow_credentials=True` + `allow_origin_regex=https://.*\.preview\.emergentagent\.com` (browser rejects wildcard origin when credentials are enabled). Production cutover MUST tighten this to a closed allowlist.
+- **Multi-tenant switcher**: `/api/admin/companies/{cid}/switch` now refreshes BOTH cookies (verified: new cookie value differs, new csrf differs, `/auth/me` with the new cookie returns the new `company_id`).
+- **Tests**: 112/112 pass. New `tests/test_iter15_csrf_cookies.py` (7 tests) + `tests/test_iter15_csrf_extra.py` (5 tests added by testing agent). End-to-end browser verification confirmed correct cookie attributes (httpOnly, secure, sameSite). Full report at `/app/test_reports/iteration_15.json`.
+
 ## v1.12 (Feb 17 2026) — Code Quality Review Round 2: 11 Refactors + Auto-cleanup
 - **Reality-check on Code Quality report**: Verified actual state before applying — real ESLint output shows 0 React hook warnings (claim "74 instances" was stale); real ruff F821 output shows 0 undefined Python vars (claim "4 instances" was stale).
 - **Auto-fixed 11 unused Python imports** via `ruff --select F401,F811,F841 --fix` across digest.py, auth.py, etc.
