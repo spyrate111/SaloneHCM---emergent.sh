@@ -1,7 +1,11 @@
 """Auth endpoints: login, logout, me, 2FA management."""
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
-from core import db, get_current_user, verify_password, hash_password, make_access, limiter, audit, now_utc, iso
+from core import (
+    db, get_current_user, verify_password, hash_password, make_access,
+    limiter, audit, now_utc, iso,
+    new_csrf_token, CSRF_COOKIE,
+)
 from models import LoginIn, TotpVerifyIn, TotpDisableIn
 import twofa
 
@@ -11,11 +15,21 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 TWOFA_REQUIRED_ROLES = {"superadmin"}
 
 
-def _set_cookie(resp: Response, token: str):
+def _set_auth_cookies(resp: Response, token: str) -> str:
+    """Set the httpOnly session cookie + a fresh non-httpOnly CSRF cookie.
+
+    Returns the CSRF token so the JSON body can echo it for SPA bootstrapping.
+    """
     resp.set_cookie(
         key="access_token", value=token, httponly=True, secure=True,
         samesite="none", max_age=43200, path="/",
     )
+    csrf = new_csrf_token()
+    resp.set_cookie(
+        key=CSRF_COOKIE, value=csrf, httponly=False, secure=True,
+        samesite="none", max_age=43200, path="/",
+    )
+    return csrf
 
 
 def _public_company(c: dict | None) -> dict | None:
@@ -47,7 +61,7 @@ async def login(request: Request, body: LoginIn, response: Response):
 
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     token = make_access(user["id"], user["email"], user["role"])
-    _set_cookie(response, token)
+    csrf = _set_auth_cookies(response, token)
     return {
         "id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"],
         "employee_id": user.get("employee_id"),
@@ -55,12 +69,14 @@ async def login(request: Request, body: LoginIn, response: Response):
         "twofa_enabled": bool(user.get("twofa_enabled")),
         "mof_approver": bool(user.get("mof_approver")),
         "token": token,
+        "csrf_token": csrf,
     }
 
 
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token", path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
     return {"ok": True}
 
 
@@ -134,7 +150,7 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     token = make_access(user["id"], user["email"], user["role"])
-    _set_cookie(response, token)
+    csrf = _set_auth_cookies(response, token)
     await audit("invite_accept", f"users/{user_id}", user, {"email": user["email"]})
     return {
         "id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"],
@@ -143,6 +159,7 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
         "twofa_enabled": bool(user.get("twofa_enabled")),
         "mof_approver": bool(user.get("mof_approver")),
         "token": token,
+        "csrf_token": csrf,
     }
 
 

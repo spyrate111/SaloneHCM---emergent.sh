@@ -7,6 +7,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import uuid
+import secrets
 import logging
 import bcrypt
 import jwt
@@ -77,6 +78,46 @@ async def get_current_user(request: Request) -> dict:
     if not user.get("company_id"):
         raise HTTPException(401, "User has no company assigned")
     return user
+
+
+# ---- CSRF (double-submit cookie) ----
+CSRF_COOKIE = "salonehcm_csrf"
+CSRF_HEADER = "X-CSRF-Token"
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+# Bootstrap endpoints that issue / clear the session — CSRF token isn't yet
+# available before login, so we exempt them. Logout still rotates the cookie
+# server-side regardless of whether CSRF was checked.
+_CSRF_EXEMPT_SUFFIXES = (
+    "/auth/login",
+    "/auth/accept-invite",
+)
+
+
+def new_csrf_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+async def csrf_protect(request: Request) -> None:
+    """Enforce CSRF on state-changing requests authenticated via cookie.
+
+    Skipped when:
+      * Method is safe (GET/HEAD/OPTIONS)
+      * Request has an Authorization: Bearer header (API client, not browser)
+      * No access_token cookie present (request will fail auth anyway)
+      * Path is a bootstrap endpoint (login/logout/accept-invite)
+    """
+    if request.method in _SAFE_METHODS:
+        return
+    if request.url.path.endswith(_CSRF_EXEMPT_SUFFIXES):
+        return
+    if request.headers.get("Authorization", "").startswith("Bearer "):
+        return
+    if not request.cookies.get("access_token"):
+        return
+    cookie_token = request.cookies.get(CSRF_COOKIE)
+    header_token = request.headers.get(CSRF_HEADER)
+    if not cookie_token or not header_token or not secrets.compare_digest(cookie_token, header_token):
+        raise HTTPException(403, "CSRF token missing or invalid")
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:

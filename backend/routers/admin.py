@@ -1,10 +1,10 @@
 """Super-admin endpoints — manage companies and switch active tenant."""
 import uuid
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from core import db, require_superadmin, hash_password, audit, now_utc, iso, make_access
+from core import db, require_superadmin, hash_password, audit, now_utc, iso, make_access, new_csrf_token, CSRF_COOKIE
 from tiers import TIERS, features_for, tier_label
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_superadmin)])
@@ -105,7 +105,7 @@ async def update_tier(cid: str, body: TierUpdateIn, user: dict = Depends(require
 
 
 @router.post("/companies/{cid}/switch")
-async def switch_company(cid: str, user: dict = Depends(require_superadmin)):
+async def switch_company(cid: str, response: Response, user: dict = Depends(require_superadmin)):
     """Issue a new JWT scoped to the target company. Super-admin only."""
     company = await db.companies.find_one({"id": cid}, {"_id": 0})
     if not company:
@@ -113,10 +113,21 @@ async def switch_company(cid: str, user: dict = Depends(require_superadmin)):
     # Move the super-admin's user record to the target company (so all tenant_filter queries hit the new tenant)
     await db.users.update_one({"id": user["id"]}, {"$set": {"company_id": cid}})
     token = make_access(user["id"], user["email"], user["role"])
+    # Refresh both cookies so subsequent cookie-authenticated requests use the new JWT.
+    response.set_cookie(
+        key="access_token", value=token, httponly=True, secure=True,
+        samesite="none", max_age=43200, path="/",
+    )
+    csrf = new_csrf_token()
+    response.set_cookie(
+        key=CSRF_COOKIE, value=csrf, httponly=False, secure=True,
+        samesite="none", max_age=43200, path="/",
+    )
     await audit("company_switch", f"companies/{cid}", user,
                 {"to_company": company["name"]})
     return {
         "token": token,
+        "csrf_token": csrf,
         "company": {
             "id": company["id"],
             "name": company["name"],

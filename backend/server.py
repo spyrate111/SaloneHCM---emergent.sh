@@ -1,6 +1,7 @@
 """SaloneHCM API entry point — wires routers and middleware."""
 import logging
-from fastapi import FastAPI, APIRouter
+import os
+from fastapi import FastAPI, APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -8,7 +9,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from core import client, limiter
+from core import client, limiter, csrf_protect
 from seeders import seed
 from storage import init_storage
 import scheduler as payroll_scheduler
@@ -44,7 +45,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-api = APIRouter(prefix="/api")
+api = APIRouter(prefix="/api", dependencies=[Depends(csrf_protect)])
 api.include_router(auth.router)
 api.include_router(employees.router)
 api.include_router(payroll.router)
@@ -78,10 +79,21 @@ async def root():
 
 
 app.include_router(api)
+
+# CORS — when cookies are used, browsers reject Access-Control-Allow-Origin='*'.
+# Allow:
+#   * any *.preview.emergentagent.com host (covers preview environments)
+#   * explicit FRONTEND_URL if set
+#   * localhost dev servers
+_FRONTEND_URL = os.environ.get("FRONTEND_URL", "").rstrip("/")
+_allow_origins = [o for o in [_FRONTEND_URL, "http://localhost:3000", "http://127.0.0.1:3000"] if o]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origin_regex=r"https://[^/]+\.preview\.emergentagent\.com",
+    allow_origins=_allow_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-CSRF-Token"],
 )
