@@ -77,6 +77,18 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
+## v1.12 (Feb 17 2026) — Code Quality Review Round 2: 11 Refactors + Auto-cleanup
+- **Reality-check on Code Quality report**: Verified actual state before applying — real ESLint output shows 0 React hook warnings (claim "74 instances" was stale); real ruff F821 output shows 0 undefined Python vars (claim "4 instances" was stale).
+- **Auto-fixed 11 unused Python imports** via `ruff --select F401,F811,F841 --fix` across digest.py, auth.py, etc.
+- **Refactored `routers/ministry.py ministry_rollup()`** (cyclomatic 20→<10): extracted `_blank_ministry`, `_accumulate_employee`, `_accumulate_leave`, `_finalize` helpers.
+- **Refactored `routers/performance.py _compute_cycle_metrics()`** (cyclomatic 18→<10): extracted `_rating_distribution`, `_action_counts`, `_department_summary`, `_avg` helpers.
+- **Refactored `routers/talent.py completion_certificate()`** (105 lines → 35-line orchestrator + 4 helpers): extracted `_cert_border`, `_cert_body`, `_cert_footer`, `_cert_qr`.
+- **Extracted `CompanySwitcher` from `Layout.jsx`** into dedicated `/app/frontend/src/components/CompanySwitcher.jsx` (80 lines with internal `CompanyRow` sub-component). Layout.jsx drops to focus on shell/header/nav.
+- **Replaced nested ternary in `ComplianceScoreWidget.jsx`** with `GRADE_LABEL` lookup map (A+/A→Excellent, B→Strong, C→Watch, D→Action needed, F→Critical).
+- **Replaced nested ternary in `Performance.jsx:initialTab`** with explicit if/else block — clearer intent for deep-link routing.
+- **Replaced 2 silent `console.error` with `toast.error`** in `Talent.jsx:287` (cert download failure) and `SmsLogs.jsx:67` (CSV export failure) — users now see visible failure indicators instead of silent console logs.
+- **Tests**: 4 new targeted refactor regression tests added by testing agent (`/app/backend/tests/test_iter14_refactors.py`). Total iter11→iter18 pytest suite still 101/101 passing. Frontend testing agent verified all 4 critical flows (CompanySwitcher dropdown, GRADE_LABEL badge, tab routing, toast paths) — `/app/test_reports/iteration_14.json`.
+
 ## v1.11 (Feb 17 2026) — Code Quality Cleanup + Complexity Refactors + Console Warning Verification
 - **Fixed react-hooks/exhaustive-deps warning** in `EmployeeDetail.jsx` — wrapped `load()` in `useCallback([id])`. Frontend now compiles with **zero ESLint warnings**.
 - **Refactored `TwoFactorCard.jsx`** — extracted 4 sub-components (`TwoFactorHeader`, `SetupPanel`, `EnabledPanel`, `DisablePanel`). Main component dropped from 194 lines / 9 useState hooks to 37 lines of declarative state-dispatch. All 8 data-testids preserved.
