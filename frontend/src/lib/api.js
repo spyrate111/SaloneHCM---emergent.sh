@@ -41,6 +41,23 @@ instance.interceptors.request.use((cfg) => {
 
 export default instance;
 
+/**
+ * Trigger a file download by GETting a binary blob from the API and clicking
+ * a synthetic <a download> link. Uses the same axios instance so cookies +
+ * CSRF + Authorization header are all attached automatically — no raw fetch().
+ */
+export const downloadBlob = async (path, filename) => {
+  const res = await instance.get(path, { responseType: "blob" });
+  const url = URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 export const fmtSLE = (n) => {
   if (n === null || n === undefined || isNaN(n)) return "SLE 0.00";
   return (

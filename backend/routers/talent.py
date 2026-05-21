@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 
-from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, require_feature
+from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, require_feature, is_admin
 
 router = APIRouter(prefix="/talent", tags=["talent"], dependencies=[Depends(require_feature("talent"))])
 
@@ -150,7 +150,7 @@ class ReviewIn(BaseModel):
 @router.get("/reviews")
 async def list_reviews(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
+    q = {**tf} if is_admin(user) else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.performance_reviews.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
     employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
     for r in rows:
@@ -239,7 +239,7 @@ async def delete_program(pid: str, user: dict = Depends(require_admin)):
 @router.get("/completions")
 async def list_completions(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
+    q = {**tf} if is_admin(user) else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.training_completions.find(q, {"_id": 0}).sort("completed_on", -1).to_list(1000)
     progs = {p["id"]: p for p in await db.training_programs.find(tf, {"_id": 0}).to_list(500)}
     employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}

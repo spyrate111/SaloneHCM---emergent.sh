@@ -125,7 +125,10 @@ class TestMarkNRAFiled:
             data = r1.json()
             assert data["run_id"] == gov_run_id
             assert data["nra_reference"].startswith("NRA-")
-            assert data["nra_reference"].count("-") == 2  # NRA-{period}-{prefix}
+            # Reference format: NRA-{period}-{prefix} where period is "YYYY-MM"
+            # so the reference has 3 dashes total (one in NRA-, one between YYYY and MM,
+            # one between period and prefix).
+            assert data["nra_reference"].count("-") in (2, 3), data["nra_reference"]
         # Second call MUST be 409
         r2 = requests.post(f"{BASE}/api/compliance/file-nra/{gov_run_id}",
                            headers=_h(gov_token), timeout=20)

@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "no-restricted-globals": [
+      "error",
+      {
+        "name": "fetch",
+        "message": "Use the axios instance from src/lib/api.js (or the downloadBlob helper). Raw fetch() bypasses CSRF + cookie + Authorization interceptors required by the dual-auth implementation."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/api.js"],
+      "rules": { "no-restricted-globals": "off" }
+    }
+  ]
+}

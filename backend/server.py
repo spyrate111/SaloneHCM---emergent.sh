@@ -81,19 +81,35 @@ async def root():
 app.include_router(api)
 
 # CORS — when cookies are used, browsers reject Access-Control-Allow-Origin='*'.
-# Allow:
-#   * any *.preview.emergentagent.com host (covers preview environments)
-#   * explicit FRONTEND_URL if set
-#   * localhost dev servers
-_FRONTEND_URL = os.environ.get("FRONTEND_URL", "").rstrip("/")
-_allow_origins = [o for o in [_FRONTEND_URL, "http://localhost:3000", "http://127.0.0.1:3000"] if o]
+#
+# Production cutover: set `CORS_ALLOWED_ORIGINS` to a comma-separated allowlist
+# of explicit https origins (e.g. https://app.salonehcm.gov.sl,https://hcm.mof.gov.sl)
+# and unset `CORS_ALLOW_PREVIEW` to disable the wildcard preview regex.
+#
+# When `CORS_ALLOWED_ORIGINS` is unset we fall back to the preview-host regex
+# (any *.preview.emergentagent.com) + localhost. This keeps preview/dev working
+# but is NOT safe for prod.
+_explicit = [o.strip().rstrip("/") for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_legacy_frontend_url = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
+if _legacy_frontend_url and _legacy_frontend_url not in _explicit:
+    _explicit.append(_legacy_frontend_url)
+_allow_preview = os.environ.get("CORS_ALLOW_PREVIEW", "1") not in ("0", "false", "False", "")
+_preview_regex = r"https://[^/]+\.preview\.emergentagent\.com" if _allow_preview else None
+
+# When neither an explicit allowlist nor the preview regex is configured, fall
+# back to localhost-only so the server still boots in CI/dev.
+_allow_origins = _explicit or ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://[^/]+\.preview\.emergentagent\.com",
+    allow_origin_regex=_preview_regex,
     allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-CSRF-Token"],
+)
+logging.getLogger("salonehcm").info(
+    "CORS configured: explicit=%s preview_regex=%s",
+    _allow_origins, bool(_preview_regex),
 )

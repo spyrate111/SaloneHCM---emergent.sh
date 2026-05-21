@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api, { fmtSLE, API, getToken } from "../lib/api";
+import api, { fmtSLE, downloadBlob } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Download, FileText, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -21,13 +21,7 @@ export default function SelfService() {
   useEffect(() => { refresh(); }, []);
 
   const downloadPdf = async (rid, eid, name, period) => {
-    const token = getToken();
-    const res = await fetch(`${API}/payroll/runs/${rid}/payslip/${eid}.pdf`, { headers: { Authorization: `Bearer ${token}` } });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `payslip-${name.replace(/\s/g, "_")}-${period}.pdf`; a.click();
-    URL.revokeObjectURL(url);
+    await downloadBlob(`/payroll/runs/${rid}/payslip/${eid}.pdf`, `payslip-${name.replace(/\s/g, "_")}-${period}.pdf`);
   };
 
   const acknowledge = async (rid) => {

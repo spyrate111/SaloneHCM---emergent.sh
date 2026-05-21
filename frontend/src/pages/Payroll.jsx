@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import api, { fmtSLE, API, getToken } from "../lib/api";
+import api, { fmtSLE, downloadBlob } from "../lib/api";
 import { useFeatures } from "../lib/features";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
@@ -31,23 +31,11 @@ export default function Payroll() {
   useEffect(() => { loadRuns(); }, [loadRuns]);
 
   const downloadPdf = async (rid, eid, name) => {
-    const token = getToken();
-    const res = await fetch(`${API}/payroll/runs/${rid}/payslip/${eid}.pdf`, { headers: { Authorization: `Bearer ${token}` } });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `payslip-${name.replace(/\s/g, "_")}.pdf`; a.click();
-    URL.revokeObjectURL(url);
+    await downloadBlob(`/payroll/runs/${rid}/payslip/${eid}.pdf`, `payslip-${name.replace(/\s/g, "_")}.pdf`);
   };
 
   const downloadBank = async (rid, period) => {
-    const token = getToken();
-    const res = await fetch(`${API}/payroll/runs/${rid}/bank-file`, { headers: { Authorization: `Bearer ${token}` } });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `bank-file-${period}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    await downloadBlob(`/payroll/runs/${rid}/bank-file`, `bank-file-${period}.csv`);
   };
 
   const submitMoF = async (rid) => {

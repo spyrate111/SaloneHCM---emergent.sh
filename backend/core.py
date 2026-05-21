@@ -53,6 +53,7 @@ def make_access(uid: str, email: str, role: str) -> str:
         "email": email,
         "role": role,
         "type": "access",
+        "jti": secrets.token_urlsafe(8),
         "exp": now_utc() + timedelta(hours=12),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -130,6 +131,16 @@ async def require_superadmin(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role") != "superadmin":
         raise HTTPException(403, "Super-admin only")
     return user
+
+
+def is_admin(user: dict) -> bool:
+    """True for both tenant admins ('admin') and platform superadmins.
+
+    Many routers historically compared `user['role'] == 'admin'` which silently
+    locked out superadmins from admin-level operations on their tenant. Use this
+    helper everywhere instead.
+    """
+    return user.get("role") in ("admin", "superadmin")
 
 
 def tenant_filter(user: dict) -> dict:

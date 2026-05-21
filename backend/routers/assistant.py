@@ -7,7 +7,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 
-from core import db, get_current_user, require_admin, now_utc, iso, limiter, tenant_filter, require_feature
+from core import db, get_current_user, require_admin, now_utc, iso, limiter, tenant_filter, require_feature, is_admin
 from models import AssistantMessageIn, ActionPlanIn, ActionPlan
 from . import _ai_context, _ai_executor
 
@@ -65,7 +65,7 @@ def _extract_plan(text: str):
 
 async def _build_system_message(user: dict, include_context: bool, action_mode: bool) -> str:
     sys_msg = SYSTEM_BASE
-    if include_context and user.get("role") == "admin":
+    if include_context and is_admin(user):
         ctx = await _ai_context.build(user)
         sys_msg += (
             "\n\n--- BEGIN LIVE COMPANY DATA ---\n"
@@ -74,7 +74,7 @@ async def _build_system_message(user: dict, include_context: bool, action_mode: 
             "When the admin asks about anomalies, top performers, leave usage, or payroll trends, "
             "ground your answer in the data above."
         )
-    if action_mode and user.get("role") == "admin":
+    if action_mode and is_admin(user):
         sys_msg += ACTION_MODE_PROMPT
     return sys_msg
 
@@ -128,7 +128,7 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
         "ts": iso(now_utc()),
     })
 
-    plan = _extract_plan(reply) if body.action_mode and user.get("role") == "admin" else None
+    plan = _extract_plan(reply) if body.action_mode and is_admin(user) else None
     return {"session_id": sid, "reply": reply, "plan": plan}
 
 

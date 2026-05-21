@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
-from core import db, get_current_user, audit, now_utc, iso, tenant_filter, with_tenant
+from core import db, get_current_user, audit, now_utc, iso, tenant_filter, with_tenant, is_admin
 from models import LeaveIn, LeaveDecision
 
 router = APIRouter(prefix="/leave", tags=["leave"])
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/leave", tags=["leave"])
 @router.get("")
 async def list_leaves(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    if user["role"] == "admin":
+    if is_admin(user):
         return await db.leave_requests.find(tf, {"_id": 0}).sort("created_at", -1).to_list(1000)
     # Employee: their own + their direct reports' (if they're a manager)
     my_eid = user.get("employee_id")
@@ -30,7 +30,7 @@ async def list_leaves(user: dict = Depends(get_current_user)):
 
 @router.post("")
 async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
-    eid = body.employee_id if user["role"] == "admin" else user.get("employee_id")
+    eid = body.employee_id if is_admin(user) else user.get("employee_id")
     if not eid:
         raise HTTPException(400, "employee_id required")
     emp = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
@@ -72,6 +72,6 @@ async def decide_leave(lid: str, body: LeaveDecision, user: dict = Depends(get_c
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
-    action = f"leave_{body.status}" if user.get("role") == "admin" else f"manager_leave_{body.status}"
+    action = f"leave_{body.status}" if is_admin(user) else f"manager_leave_{body.status}"
     await audit(action, f"leave_requests/{lid}", user, {"employee": lv.get("employee_name")})
     return {"ok": True, "status": body.status}
