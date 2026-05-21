@@ -4,6 +4,7 @@ import { useFeatures } from "../lib/features";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import SmsPayslipButton from "../components/SmsPayslipButton";
+import IfmisActions from "../components/IfmisActions";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -222,9 +223,10 @@ export default function Payroll() {
                         </button>
                       </>
                     )}
-                    <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded">
+                    <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className={`inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded ${has("ifmis_integration") ? "hidden" : ""}`}>
                       <Download className="w-3.5 h-3.5" /> Bank file
                     </button>
+                    {has("ifmis_integration") && <IfmisActions run={r} />}
                     <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#525860] px-2.5 py-1.5 rounded"><FileText className="w-3.5 h-3.5" /> NRA</a>
                     {has("bulk_sms_payslips") && <SmsPayslipButton run={r} />}
                   </div>

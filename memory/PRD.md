@@ -77,6 +77,16 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
+## v1.15 (Feb 19 2026) — IFMIS Integration Layer (Session 1 of GoSL Vision sequence c→a→b→d→e)
+- **New router** `/app/backend/routers/ifmis.py` exposing 6 endpoints (formats list, per-bank disbursement download, treasury reconciliation JSON+CSV, mark-reconciled with immutability + idempotent 409).
+- **New module** `/app/backend/bank_formats.py` with 6 file-format adapters tested against real SL clearing-bank specs: **SLCB** (tab-delimited HDR/DTL/TRL), **Rokel** (CSV with branch_code), **Ecobank** (pipe-delimited with check digit), **GTBank** (CSV, zero-padded 10-digit accounts), **UBA** (legacy SLL currency code), and **Generic** (legacy fallback).
+- **Treasury reconciliation** groups payroll slips by `budget_code` → MDA vote line with full PAYE/NASSIT/Net columns + control TOTAL row. Verified totals match payroll run totals to <0.05 SLE.
+- **Mark-reconciled** records `ifmis_reference`, `ifmis_reconciled_at`, `ifmis_reconciled_by` on the run document. Returns 409 on re-mark (immutable until super-admin override).
+- **New feature flag** `ifmis_integration` added to `enterprise` + `gov` tiers (lite/professional get 402).
+- **Companies seeder** now sets `ifmis_org_code` on Demo Salone (`ENT-DEMO-001`) and Government of SL (`GoSL-CONS-FUND`).
+- **New frontend component** `/app/frontend/src/components/IfmisActions.jsx` (with internal `ReconciliationModal`) — drop-in on payroll runs row. Shows clearing-bank dropdown + treasury button; locks visually when reconciled.
+- **Tests**: 11 new tests in `tests/test_iter16_ifmis.py` covering format validation, total reconciliation, tier-gating (lite gets 402), and 409 immutability. **307/307 backend tests passing** (+11 IFMIS, 0 regressions).
+
 ## v1.14 (Feb 19 2026) — Production-Ready Hardening Sprint
 - **CORS prod hardening** — Replaced wildcard preview regex with env-driven allowlist. `CORS_ALLOWED_ORIGINS` (comma-separated) is the closed list; `CORS_ALLOW_PREVIEW=0` disables the *.preview.emergentagent.com regex. Sane fallback to localhost-only keeps dev/CI working without config.
 - **ESLint `no-restricted-globals` for fetch** — Created `/app/frontend/.eslintrc.json` + craco baseConfig that errors on raw `fetch()` outside `/app/frontend/src/lib/api.js` and `public/sw.js`. **Verified live** — added a fetch() call breaks the build with the project-specific message. Also refactored existing raw `fetch()` calls in Payroll.jsx + SelfService.jsx to use the new `downloadBlob` helper from api.js (so CSRF + cookie + Authorization interceptors run automatically).
