@@ -90,16 +90,11 @@ async def seed_civil_service(company_id: str) -> None:
 
 
 async def upgrade_gov_employees(company_id: str) -> None:
-    """One-time migration: assign existing Gov employees to grades/steps + budget codes.
-    Idempotent — only runs if employees still lack a grade_code.
-    """
-    untouched = await db.employees.count_documents({
-        "company_id": company_id,
-        "grade_code": {"$exists": False},
-    })
-    if not untouched:
-        return
+    """Assign Gov employees to grades/steps + budget codes + allowance defaults.
 
+    Idempotent — fields are only patched if missing. Always runs on boot so
+    new fields added in future seeder versions reach existing tenants.
+    """
     # Map seed job titles → grade codes
     title_to_grade = {
         "Permanent Secretary": ("GR1", 4),
@@ -121,14 +116,13 @@ async def upgrade_gov_employees(company_id: str) -> None:
     emps = await db.employees.find({"company_id": company_id}, {"_id": 0}).to_list(2000)
     updated = 0
     for e in emps:
-        if e.get("grade_code"):
-            continue
         title = e.get("job_title", "")
         dept = e.get("department", "")
         grade_step = title_to_grade.get(title)
-        budget = dept_to_budget.get(dept)
+        budget = dept_to_budget.get(dept) or dept_to_budget.get(e.get("mda_ministry", ""))
         patch = {}
-        if grade_step:
+        # Set grade only if not already set (don't overwrite manual changes).
+        if grade_step and not e.get("grade_code"):
             grade_code, step = grade_step
             step_doc = await db.civil_service_steps.find_one(
                 {"company_id": company_id, "grade_code": grade_code, "step_number": step},
@@ -138,15 +132,28 @@ async def upgrade_gov_employees(company_id: str) -> None:
             patch["step_number"] = step
             if step_doc:
                 patch["basic_salary_sle"] = float(step_doc["monthly_amount_sle"])
-        if budget:
+        # Always re-assign budget_code if missing (this seeder is idempotent).
+        if budget and not e.get("budget_code"):
             patch["budget_code"] = budget[0]
-            patch["mda_ministry"] = budget[1]
+            patch.setdefault("mda_ministry", budget[1])
         # Sensible allowance defaults
         patch.setdefault("housing_allowance_enabled", True)
         patch.setdefault("transport_allowance_enabled", True)
-        if grade_step and grade_step[0] in ("GR1", "GR2", "GR3", "GR4"):
+        effective_grade = (grade_step[0] if grade_step else None) or e.get("grade_code", "")
+        if effective_grade in ("GR1", "GR2", "GR3", "GR4"):
             patch["responsibility_allowance_enabled"] = True
-        if patch:
+        # Apply the patch if there's any real change. Avoid the no-op write
+        # when grade is already set and budget already set and responsibility
+        # is already correctly enabled.
+        has_real_change = bool(
+            patch.get("grade_code")
+            or patch.get("budget_code")
+            or ("responsibility_allowance_enabled" in patch
+                and patch["responsibility_allowance_enabled"] != e.get("responsibility_allowance_enabled"))
+            or "housing_allowance_enabled" not in e
+            or "transport_allowance_enabled" not in e
+        )
+        if has_real_change:
             await db.employees.update_one({"id": e["id"]}, {"$set": patch})
             updated += 1
     logger.info("Upgraded %d Gov employees with civil-service profile (company %s)", updated, company_id)

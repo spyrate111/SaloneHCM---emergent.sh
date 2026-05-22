@@ -1,6 +1,6 @@
 """SaloneHCM seed orchestrator — runs per-domain seeders in order."""
 from core import db, logger
-from . import companies, users, employees, benefits, talent, gov, civil_service
+from . import companies, users, employees, benefits, talent, gov, civil_service, establishment
 from . import migrate
 
 
@@ -27,4 +27,7 @@ async def seed() -> None:
     # Civil-service config for the Gov tenant
     await civil_service.seed_civil_service(company_id=gov_id)
     await civil_service.upgrade_gov_employees(company_id=gov_id)
+
+    # Establishment positions (Gov + Demo) — Ministry→Directorate→Unit→Position
+    await establishment.seed_establishment(company_id=gov_id)
     logger.info("Seed complete")

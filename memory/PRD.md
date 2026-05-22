@@ -77,7 +77,25 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
-## v1.15 (Feb 19 2026) — IFMIS Integration Layer (Session 1 of GoSL Vision sequence c→a→b→d→e)
+## v1.16 (Feb 19 2026) — Establishment Control (Session 2 of GoSL Vision sequence)
+- **New router** `/app/backend/routers/establishment.py` exposing 9 endpoints:
+  - `GET /api/establishment/tree` — Ministry→Directorate→Unit→Position nested with rolled-up approved/filled/vacancy counts.
+  - `GET /api/establishment/positions` — flat list with `filled_count`, `vacancy_count`, `overrun_count`, `utilisation` per position.
+  - `GET /api/establishment/vacancies` — only active positions with vacancy_count > 0.
+  - `GET /api/establishment/overruns` — payroll-fraud red-flag positions where filled exceeds approved.
+  - `POST /api/establishment/positions` create / `PATCH /{pid}` update / `DELETE /{pid}` delete.
+  - `POST /api/establishment/positions/{pid}/assign` & `/unassign` — link/unlink an employee. Assign now **snapshots** the employee's pre-assignment mda/dept/budget/grade values into `_pre_position_*` fields so unassign can restore them — keeps Civil-Service config clean.
+- **New seeder** `/app/backend/seeders/establishment.py` — 14 sample positions across 3 SL ministries (Finance, Health, Education) + auto round-robin assignment of 6 Gov employees to MoF positions on first boot. Idempotent.
+- **Civil-service seeder fix** — `upgrade_gov_employees` no longer short-circuits on `grade_code already set`. It now patches missing budget_code (via `mda_ministry` fallback) and missing allowance defaults (housing/transport/responsibility) on every boot.
+- **New feature flag** `establishment_control` added to enterprise + gov tiers (lite/professional get 402).
+- **Two new business rules** enforced at API:
+  - PATCH 409 when reducing `approved_count` below current `filled_count` (must unassign first).
+  - DELETE 409 when positions still have assigned employees.
+  - Assign 409 when position is at capacity (prevents accidental overruns).
+- **New frontend page** `/app/frontend/src/pages/Establishment.jsx` — collapsible Ministry→Directorate→Unit tree with overrun banner, KPI strip (Ministries/Approved/Filled/Vacant/Overruns), per-position table with % filled pills + edit/delete actions, and a full create/edit modal. Route `/establishment` protected by `adminOnly`. Sidebar nav entry added.
+- **Tests**: 9 new tests in `tests/test_iter17_establishment.py` covering tree hierarchy, CRUD, assign capacity rules, lower-approved rule, delete-when-filled rule, vacancies + overruns, lite-tier 402. **317/317 backend tests passing (+9 new, 0 regressions).**
+
+## v1.15 (Feb 19 2026) — IFMIS Integration Layer (Session 1)
 - **New router** `/app/backend/routers/ifmis.py` exposing 6 endpoints (formats list, per-bank disbursement download, treasury reconciliation JSON+CSV, mark-reconciled with immutability + idempotent 409).
 - **New module** `/app/backend/bank_formats.py` with 6 file-format adapters tested against real SL clearing-bank specs: **SLCB** (tab-delimited HDR/DTL/TRL), **Rokel** (CSV with branch_code), **Ecobank** (pipe-delimited with check digit), **GTBank** (CSV, zero-padded 10-digit accounts), **UBA** (legacy SLL currency code), and **Generic** (legacy fallback).
 - **Treasury reconciliation** groups payroll slips by `budget_code` → MDA vote line with full PAYE/NASSIT/Net columns + control TOTAL row. Verified totals match payroll run totals to <0.05 SLE.

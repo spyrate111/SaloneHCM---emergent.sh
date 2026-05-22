@@ -137,7 +137,7 @@ def test_lite_tier_cannot_access_ifmis(gov_run):
         assert r.status_code == 402, f"lite tier must be blocked with 402, got {r.status_code}"
     finally:
         # Cleanup the temp tenant
-        new_id = r.json().get("company_id") if r.status_code == 200 else None
+        new_id = (r.json().get("company") or {}).get("id") if r.status_code == 200 else None
         if new_id:
             requests.delete(f"{API}/admin/companies/{new_id}", headers=h_super)
 

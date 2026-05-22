@@ -27,6 +27,7 @@ const NAV = [
   { to: "/analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "superadmin"], feature: "analytics" },
   { to: "/ministry", label: "Ministry rollup", icon: Landmark, roles: ["admin", "superadmin"], feature: "ministry_reports" },
   { to: "/civil-service", label: "Civil Service", icon: Award, roles: ["admin", "superadmin"], feature: "civil_service" },
+  { to: "/establishment", label: "Establishment", icon: Building2, roles: ["admin", "superadmin"], feature: "establishment_control" },
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ["admin", "superadmin", "employee"], feature: "ai_assistant" },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ["employee", "admin", "superadmin"] },
   { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin", "superadmin"], feature: "audit_log" },
