@@ -38,7 +38,8 @@ def calc_paye(taxable: float) -> float:
     return round(tax, 2)
 
 
-def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
+def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
+                 loan_deduction: float = 0.0) -> dict:
     basic = float(emp.get("basic_salary_sle", 0))
     legacy_allow = float(emp.get("allowances_sle", 0))
     breakdown = dict(allowance_breakdown or {})
@@ -50,7 +51,9 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
     nassit_er = round(basic * NASSIT_EMPLOYER, 2)
     taxable = max(0.0, gross - nassit_emp)
     paye = calc_paye(taxable)
-    net = round(gross - nassit_emp - paye, 2)
+    # Loan deductions are post-tax — they reduce take-home pay but don't change tax liability.
+    loan = round(max(0.0, float(loan_deduction or 0.0)), 2)
+    net = round(gross - nassit_emp - paye - loan, 2)
     return {
         "employee_id": emp["id"],
         "employee_name": f'{emp["first_name"]} {emp["last_name"]}',
@@ -61,6 +64,7 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
         "nassit_employee": nassit_emp,
         "nassit_employer": nassit_er,
         "paye": paye,
+        "loan_deduction": loan,
         "net": net,
         "grade_code": emp.get("grade_code"),
         "step_number": emp.get("step_number"),
@@ -77,15 +81,20 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     ).to_list(2000)
     period = f"{year}-{month:02d}"
 
-    # Pull allowance breakdown per employee using the civil-service module
+    # Pull allowance breakdown + active loan deduction per employee.
+    from loans_engine import compute_loan_deduction_for_period, apply_loan_deductions_for_run
     try:
         from routers.civil_service import get_active_allowance_amounts
         slips = []
+        applied_loan_rows: list[dict] = []
         for e in emps:
             breakdown = await get_active_allowance_amounts(e, user["company_id"], period)
-            slips.append(calc_payslip(e, allowance_breakdown=breakdown))
+            loan_due, loan_rows = await compute_loan_deduction_for_period(e["id"], user["company_id"], period)
+            slips.append(calc_payslip(e, allowance_breakdown=breakdown, loan_deduction=loan_due))
+            applied_loan_rows.extend(loan_rows)
     except Exception:
         slips = [calc_payslip(e) for e in emps]
+        applied_loan_rows = []
 
     rid = str(uuid.uuid4())
     doc = {
@@ -101,6 +110,7 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
             "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
             "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
             "paye": round(sum(s["paye"] for s in slips), 2),
+            "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
             "net": round(sum(s["net"] for s in slips), 2),
         },
         "status": "completed",
@@ -108,6 +118,9 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         "created_at": iso(now_utc()),
     }
     await db.payroll_runs.insert_one(doc)
+    # Now persist the loan deductions against each affected loan, idempotent by (loan_id, period).
+    if applied_loan_rows:
+        await apply_loan_deductions_for_run(rid, period, applied_loan_rows)
     doc.pop("_id", None)
     await audit(audit_action, f"payroll_runs/{rid}", user,
                 {"period": period, "net": doc["totals"]["net"]})

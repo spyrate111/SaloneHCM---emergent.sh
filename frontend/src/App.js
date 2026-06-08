@@ -31,6 +31,7 @@ import Performance from "./pages/Performance";
 import Verify from "./pages/Verify";
 import CivilService from "./pages/CivilService";
 import Establishment from "./pages/Establishment";
+import Loans from "./pages/Loans";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/performance" element={<Performance />} />
             <Route path="/civil-service" element={<CivilService />} />
             <Route path="/establishment" element={<ProtectedRoute adminOnly><Establishment /></ProtectedRoute>} />
+            <Route path="/loans" element={<Loans />} />
             <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />

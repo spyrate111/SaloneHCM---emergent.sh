@@ -17,7 +17,7 @@ from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
     documents, company, admin, users, schedules, ministry, public, integrations,
-    push, performance, civil_service, ifmis, establishment,
+    push, performance, civil_service, ifmis, establishment, loans,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -73,6 +73,7 @@ api.include_router(performance.router)
 api.include_router(civil_service.router)
 api.include_router(ifmis.router)
 api.include_router(establishment.router)
+api.include_router(loans.router)
 
 
 @api.get("/")
