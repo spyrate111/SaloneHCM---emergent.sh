@@ -77,7 +77,32 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 - Full Government tier features (ministry-level reporting, bulk SMS)
 - Backend `tests/` regression suite (testing agent created `test_iter7_tenant.py` — extend it)
 
-## v1.16 (Feb 19 2026) — Establishment Control (Session 2 of GoSL Vision sequence)
+## v1.18 (Feb 19 2026) — SaaS Subscription Billing (Paywall)
+- **Adapted for Sierra Leone reality**: Bank transfer primary (via the 5 SL clearing banks already integrated in IFMIS) + Stripe Checkout secondary for international tenants.
+- **New router** `/app/backend/routers/billing.py` (8 endpoints): plans catalog (public), /me subscription state, bank-transfer invoice issuance with unique reference, superadmin-only mark-paid (auto-flips tier + features), Stripe Checkout via emergentintegrations (USD billing from SLE catalog), idempotent post-redirect polling, signature-verified webhook (CSRF-exempt).
+- **Server-side pricing only** — frontend cannot manipulate amounts. SLE catalog hard-coded (lite 200 · pro 800 · ent 2500 · gov 8000) with per-employee surcharge above included counts.
+- **Subscription lifecycle**: 30-day trial → active → past_due (7-day grace) → suspended.
+- **New frontend page** `/app/frontend/src/pages/Billing.jsx` with plan picker, "Bank transfer (recommended in Sierra Leone)" / "Stripe (international)" dual rails, bank-details card with copy-to-clipboard reference code, invoice history. Sidebar nav entry added.
+- **Tests**: 9 new in `tests/test_iter19_billing.py`. All pass. Real Stripe test session creation verified with `sk_test_emergent` key.
+
+## v1.17 (Feb 19 2026) — Loans & Salary Advances (Session 3 of GoSL Vision sequence)
+- **Payroll engine integration** — `calc_payslip()` now accepts `loan_deduction` and adds it as a post-tax deduction. `run_payroll()` fetches active loans per employee, applies the monthly deduction, persists repayments to the loan document, and flips status → `paid` when balance hits 0.
+- **Idempotency by `(loan_id, period)`** — re-running payroll for the same period does **not** double-deduct (verified in tests). Each loan's `repayments[]` array carries the period, amount, run_id, applied_at.
+- **New router** `/app/backend/routers/loans.py` — 6 endpoints:
+  - `GET /api/loans` — admin sees all, employee sees own.
+  - `GET /api/loans/{lid}` — single lookup, scope-checked.
+  - `POST /api/loans` — issue; auto-computes `monthly_deduction = principal / term_months` if not specified; refuses if monthly > 50% of basic salary or if employee has an active loan.
+  - `PATCH /api/loans/{lid}` — update status / monthly / purpose.
+  - `GET /api/loans/{lid}/schedule` — projected repayment row-by-row.
+  - `GET /api/loans/employee/{eid}/active` — active loan helper for ESS payslip view.
+- **New engine helper** `/app/backend/loans_engine.py` — pure functions `compute_loan_deduction_for_period` + `apply_loan_deductions_for_run`. Both idempotent, both used by `payroll_engine.run_payroll`.
+- **New feature flag** `loans_advances` added to **professional + enterprise + gov** (broader than IFMIS/Establishment to match SME relevance from the doc).
+- **New frontend page** `/app/frontend/src/pages/Loans.jsx` — admin view (all loans, issue/cancel) + employee view (own only). Live monthly-deduction preview as user types. Repayment schedule modal. Progress bar per loan. Sidebar nav added with Wallet icon.
+- **Payroll totals** now include a `loan_deductions` field for ministry rollup + IFMIS reconciliation transparency.
+- **Tests**: 8 new tests in `tests/test_iter18_loans.py` (auto-compute monthly, no double-issue, 50%-of-basic guard, schedule, payroll idempotency proof, ESS scope, reissue after cancel, lite-tier 402). **325/325 backend tests passing (+8, 0 regressions).**
+- **Cross-cleanup**: removed 16 stale NRA filings whose `run_id` referenced deleted runs (cleanup of test residue from earlier smoke tests).
+
+## v1.16 (Feb 19 2026) — Establishment Control (Session 2)
 - **New router** `/app/backend/routers/establishment.py` exposing 9 endpoints:
   - `GET /api/establishment/tree` — Ministry→Directorate→Unit→Position nested with rolled-up approved/filled/vacancy counts.
   - `GET /api/establishment/positions` — flat list with `filled_count`, `vacancy_count`, `overrun_count`, `utilisation` per position.

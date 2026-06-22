@@ -17,7 +17,7 @@ from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
     documents, company, admin, users, schedules, ministry, public, integrations,
-    push, performance, civil_service, ifmis, establishment, loans,
+    push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +74,8 @@ api.include_router(civil_service.router)
 api.include_router(ifmis.router)
 api.include_router(establishment.router)
 api.include_router(loans.router)
+api.include_router(billing.router)
+api.include_router(stripe_webhook.router)
 
 
 @api.get("/")

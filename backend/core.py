@@ -91,6 +91,7 @@ _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 _CSRF_EXEMPT_SUFFIXES = (
     "/auth/login",
     "/auth/accept-invite",
+    "/webhook/stripe",
 )
 
 

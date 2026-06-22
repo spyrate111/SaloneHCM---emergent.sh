@@ -210,7 +210,9 @@ function IssueLoanModal({ employees, onClose, onSaved }) {
                   className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
             <option value="">Choose…</option>
             {employees.map((e) => (
-              <option key={e.id} value={e.id}>{e.first_name} {e.last_name} · {fmtSLE(e.basic_salary_sle)}</option>
+              <option key={e.id} value={e.id}>
+                {`${e.first_name} ${e.last_name} · ${fmtSLE(e.basic_salary_sle)}`}
+              </option>
             ))}
           </select>
         </div>
