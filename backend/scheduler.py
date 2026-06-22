@@ -121,6 +121,12 @@ def start():
         attach_step_inc(scheduler)
     except Exception:
         logger.exception("Failed to attach step-increment job")
+    # Attach monthly billing cron — issues invoices day 1 of each month, transitions lapsed subs.
+    try:
+        from billing_cron import register as register_billing
+        register_billing(scheduler)
+    except Exception:
+        logger.exception("Failed to attach billing cron")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

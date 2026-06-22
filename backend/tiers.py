@@ -12,7 +12,7 @@ TIER_FEATURES = {
         "employees", "payroll", "compliance", "leave", "attendance", "self_service",
         "benefits", "talent", "documents", "ai_assistant", "ai_context",
         "team_view", "audit_log", "analytics",
-        "loans_advances",
+        "loans_advances", "sector_presets",
     ],
     "enterprise": [
         "employees", "payroll", "compliance", "leave", "attendance", "self_service",
@@ -20,7 +20,7 @@ TIER_FEATURES = {
         "team_view", "audit_log", "analytics",
         "simulator", "scenarios", "scenario_compare", "decision_brief_pdf",
         "ai_action_mode",
-        "ifmis_integration", "establishment_control", "loans_advances",
+        "ifmis_integration", "establishment_control", "loans_advances", "sector_presets",
     ],
     "gov": [
         "employees", "payroll", "compliance", "leave", "attendance", "self_service",
@@ -30,7 +30,7 @@ TIER_FEATURES = {
         "ai_action_mode",
         "gov_payroll", "ministry_reports", "bulk_sms_payslips", "nra_export",
         "civil_service", "mof_approval", "ghost_worker_detection",
-        "ifmis_integration", "establishment_control", "loans_advances",
+        "ifmis_integration", "establishment_control", "loans_advances", "sector_presets",
     ],
 }
 

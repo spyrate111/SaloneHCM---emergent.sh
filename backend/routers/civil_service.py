@@ -306,6 +306,15 @@ async def get_active_allowance_amounts(emp: dict, company_id: str, period: str) 
     for a in active_actings:
         label = f"Acting: {a['acting_role_title']}"
         out[label] = round(out.get(label, 0) + float(a["monthly_allowance_sle"]), 2)
+
+    # Sector preset allowances (private-sector industry templates).
+    # These are additive to civil-service allowances. Stored directly on the employee.
+    for sa in emp.get("sector_allowances") or []:
+        lbl = sa.get("label")
+        amt = float(sa.get("amount_sle", 0) or 0)
+        if lbl and amt:
+            out[lbl] = round(out.get(lbl, 0) + amt, 2)
+
     return out
 
 
