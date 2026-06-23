@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../lib/features";
@@ -110,6 +110,10 @@ function KPI({ label, value, color = "text-[#1A1C1E]", small }) {
 }
 
 function LoansTable({ loans, isAdmin, onSchedule, onRefresh }) {
+  const headers = useMemo(
+    () => [isAdmin && "Employee", "Principal", "Monthly", "Paid / Remaining", "Progress", "Status", "Purpose", ""].filter(Boolean),
+    [isAdmin],
+  );
   const cancel = async (lid) => {
     if (!window.confirm("Cancel this loan? Any remaining balance will be written off.")) return;
     try {
@@ -122,7 +126,7 @@ function LoansTable({ loans, isAdmin, onSchedule, onRefresh }) {
     <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="loans-table">
       <table className="w-full text-sm">
         <thead className="bg-[#F7F6F2]">
-          <tr>{[isAdmin && "Employee", "Principal", "Monthly", "Paid / Remaining", "Progress", "Status", "Purpose", ""].filter(Boolean).map((h) => (
+          <tr>{headers.map((h) => (
             <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-2.5 px-4 font-medium">{h}</th>
           ))}</tr>
         </thead>

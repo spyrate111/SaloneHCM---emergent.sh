@@ -190,7 +190,7 @@ function EnabledPanel({ required, onDisable }) {
   return (
     <div className="flex items-center justify-between gap-4 flex-wrap">
       <p className="text-sm text-[#525860]">
-        Your account is protected. You'll be asked for a 6-digit code at every sign-in.
+        Your account is protected. You&rsquo;ll be asked for a 6-digit code at every sign-in.
       </p>
       {required ? (
         <span className="text-xs text-[#525860]">2FA is required for your role and cannot be disabled.</span>

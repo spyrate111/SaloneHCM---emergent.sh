@@ -45,7 +45,7 @@ export default function Dashboard() {
           Good day, {user?.name?.split(" ")[0] || "there"}.
         </h1>
         <p className="text-[#525860] mt-2 text-sm max-w-2xl">
-          Here's what's happening across your organization today — payroll, headcount, compliance, and pending approvals.
+          Here&rsquo;s what&rsquo;s happening across your organization today &mdash; payroll, headcount, compliance, and pending approvals.
         </p>
       </div>
 
@@ -109,7 +109,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <a href="/payroll" className="group bg-[#133326] text-white rounded-lg p-6 hover:bg-[#0F281E] transition" data-testid="quick-payroll">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/60">Quick action</div>
-          <div className="font-heading text-xl font-semibold mt-2">Run this month's payroll</div>
+          <div className="font-heading text-xl font-semibold mt-2">Run this month&rsquo;s payroll</div>
           <div className="text-white/70 text-sm mt-1">Auto-calculates PAYE & NASSIT for active employees.</div>
           <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[#D1603D]">
             Open Payroll Engine <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />

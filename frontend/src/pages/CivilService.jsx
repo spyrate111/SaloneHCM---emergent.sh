@@ -710,7 +710,7 @@ function GhostsTab() {
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center">
               <CheckCircle2 className="w-12 h-12 mx-auto text-[#2D7A5D]" strokeWidth={1.3} />
               <div className="font-heading text-lg font-semibold mt-3">No ghost workers detected</div>
-              <p className="text-sm text-[#525860] mt-1">All employees acknowledged this period's payslips.</p>
+              <p className="text-sm text-[#525860] mt-1">All employees acknowledged this period&rsquo;s payslips.</p>
             </div>
           )}
         </div>

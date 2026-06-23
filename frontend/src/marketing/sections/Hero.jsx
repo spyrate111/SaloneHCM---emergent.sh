@@ -31,7 +31,10 @@ export default function Hero() {
     // Stash in sessionStorage; pricing page can use this to pre-fill
     try {
       sessionStorage.setItem("salonehcm_lead", JSON.stringify({ employees: Number(emp), interest }));
-    } catch (_e) { /* sessionStorage unavailable */ }
+    } catch (err) {
+      // sessionStorage may be disabled (Safari private mode etc.) — log and continue.
+      console.debug("[Hero] sessionStorage write skipped:", err?.message || err);
+    }
     nav("/pricing");
   };
 

@@ -102,7 +102,7 @@ function Header({ totalApproved, totalFilled, totalVacancy, ministries, overruns
           <div className="text-[10px] uppercase tracking-[0.18em] text-[#525860]">Workforce planning</div>
           <h1 className="font-heading text-3xl font-bold mt-1">Establishment Control</h1>
           <p className="text-sm text-[#525860] mt-1 max-w-2xl">
-            Tracks approved positions vs. who's actually on payroll. Vacancies highlight recruitment needs;
+            Tracks approved positions vs. who&rsquo;s actually on payroll. Vacancies highlight recruitment needs;
             overruns are an audit red flag for ghost-worker exposure.
           </p>
         </div>

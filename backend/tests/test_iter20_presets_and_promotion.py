@@ -6,9 +6,11 @@ import pytest
 from pymongo import MongoClient
 
 API = (os.environ.get("REACT_APP_BACKEND_URL") or "https://salonepaycms.preview.emergentagent.com") + "/api"
-GOV_EMAIL = "admin@gov.sl"; GOV_PASS = "GovAdmin@2026"
-SUPER_EMAIL = "admin@salonehcm.sl"; SUPER_PASS = "Admin@2026"
-SUPER_SECRET = "KRSXG5BANFXSAYTBORQXG43LMR2A"
+GOV_EMAIL = "admin@gov.sl"
+GOV_PASS = "GovAdmin@2026"
+SUPER_EMAIL = "admin@salonehcm.sl"
+SUPER_PASS = "Admin@2026"
+SUPER_SECRET = os.environ.get("SUPERADMIN_TOTP_SECRET", "KRSXG5BANFXSAYTBORQXG43LMR2A")
 
 
 @pytest.fixture

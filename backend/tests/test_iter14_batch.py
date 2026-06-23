@@ -183,13 +183,12 @@ class TestRecurringTraining:
         progs = requests.get(f"{API}/talent/programs", headers=_h(gov_token), timeout=15).json()
         prog = next((p for p in progs if p.get("is_recurring")), None)
         assert prog, "needs at least one recurring program"
-        prev_due = prog.get("next_due_at")
         # Add a completion
         emp = requests.get(f"{API}/employees", headers=_h(gov_token), timeout=15).json()[0]
-        completion = requests.post(f"{API}/talent/completions", headers=_h(gov_token), json={
+        requests.post(f"{API}/talent/completions", headers=_h(gov_token), json={
             "program_id": prog["id"], "employee_id": emp["id"],
             "completed_on": "2026-05-13", "score": 88,
-        }, timeout=15).json()
+        }, timeout=15)
         # Re-fetch program
         progs2 = requests.get(f"{API}/talent/programs", headers=_h(gov_token), timeout=15).json()
         updated = next(p for p in progs2 if p["id"] == prog["id"])

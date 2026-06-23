@@ -54,7 +54,7 @@ export default function Testimonials() {
                 <blockquote className="text-[15px] text-[#0F2C24] leading-relaxed flex-1">{t.quote}</blockquote>
                 <div className="mt-5 flex items-center gap-1">
                   {Array.from({ length: t.rating }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-[#E07B4A] fill-[#E07B4A]" />
+                    <Star key={`${t.name}-star-${i}`} className="w-4 h-4 text-[#E07B4A] fill-[#E07B4A]" />
                   ))}
                 </div>
                 <figcaption className="mt-3 leading-tight">

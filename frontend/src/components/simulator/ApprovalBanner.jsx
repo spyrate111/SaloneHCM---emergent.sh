@@ -21,7 +21,7 @@ export default function ApprovalBanner({ scenario, onDecide, onApply, onClose })
             {scenario.approver_email && <><span>·</span><span>Approver: {scenario.approver_email}</span></>}
             {scenario.approved_by && <><span>·</span><span>{scenario.approval_status} by {scenario.approved_by}</span></>}
           </div>
-          {scenario.approval_notes && <p className="text-sm italic text-[#525860] mt-2">"{scenario.approval_notes}"</p>}
+          {scenario.approval_notes && <p className="text-sm italic text-[#525860] mt-2">&ldquo;{scenario.approval_notes}&rdquo;</p>}
         </div>
         <div className="flex gap-2 flex-wrap">
           {scenario.approval_status === "pending" && (

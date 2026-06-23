@@ -374,7 +374,6 @@ async def stripe_status(session_id: str, http_request: Request, user: dict = Dep
 async def _apply_paid_subscription(company_id: str, plan_id: str, amount_sle: float, method: str) -> None:
     """Activate or extend a paid subscription. Idempotent — guard by checking
     last_payment_at to avoid double application if both webhook and polling fire."""
-    sub = await db.subscriptions.find_one({"company_id": company_id}, {"_id": 0})
     start, end = _next_period_dates()
     await db.subscriptions.update_one(
         {"company_id": company_id},

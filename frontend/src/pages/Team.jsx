@@ -40,7 +40,7 @@ export default function Team() {
       {/* Admin team picker */}
       {user?.role === "admin" && allManagers.length > 0 && (
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-4">
-          <div className="text-[10px] uppercase tracking-wider text-[#525860] mb-2">Switch to another manager's team</div>
+          <div className="text-[10px] uppercase tracking-wider text-[#525860] mb-2">Switch to another manager&rsquo;s team</div>
           <div className="flex flex-wrap gap-2">
             {allManagers.map((m) => (
               <button

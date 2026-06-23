@@ -113,7 +113,7 @@ export default function TransparencyCard() {
         {!enabled && (
           <div className="text-xs bg-[#FBF1DE] border border-[#E8D5A2] text-[#8B6A14] rounded-md px-3 py-2 inline-flex items-center gap-1.5">
             <AlertCircle className="w-4 h-4" />
-            Publishing makes payroll summaries publicly accessible — citizens won't need an account to view.
+            Publishing makes payroll summaries publicly accessible &mdash; citizens won&rsquo;t need an account to view.
           </div>
         )}
 

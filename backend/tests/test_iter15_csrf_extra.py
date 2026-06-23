@@ -68,7 +68,7 @@ def test_login_and_accept_invite_are_csrf_exempt():
 def test_admin_switch_company_refreshes_cookies():
     """Superadmin /api/admin/companies/{cid}/switch refreshes BOTH cookies + returns csrf_token in body."""
     s = requests.Session()
-    code = pyotp.TOTP("KRSXG5BANFXSAYTBORQXG43LMR2A").now()
+    code = pyotp.TOTP(os.environ.get("SUPERADMIN_TOTP_SECRET", "KRSXG5BANFXSAYTBORQXG43LMR2A")).now()
     lr = s.post(f"{API}/auth/login", json={"email": "admin@salonehcm.sl", "password": "Admin@2026", "totp_code": code})
     assert lr.status_code == 200, lr.text
     s.headers.pop("Authorization", None)

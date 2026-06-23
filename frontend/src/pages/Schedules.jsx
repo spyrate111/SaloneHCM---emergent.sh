@@ -71,7 +71,7 @@ export default function Schedules() {
             Recurring schedules <Repeat className="w-6 h-6 text-[#D1603D]" />
           </h1>
           <p className="text-[#525860] text-sm mt-1.5 max-w-2xl">
-            Auto-run payroll on a cadence. Each schedule fires at <span className="font-data">06:00 UTC</span> on its due date and creates a normal payroll run — the same one you'd get from the manual wizard.
+            Auto-run payroll on a cadence. Each schedule fires at <span className="font-data">06:00 UTC</span> on its due date and creates a normal payroll run &mdash; the same one you&rsquo;d get from the manual wizard.
           </p>
         </div>
         <button
@@ -154,7 +154,7 @@ export default function Schedules() {
             </Field>
             <Field label="Day of month (used for Monthly only)">
               <input data-testid="new-schedule-day" name="day_of_month" type="number" min={1} max={31} defaultValue={28} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
-              <div className="text-[11px] text-[#686D76] mt-1">If the chosen day doesn't exist (e.g. Feb 30), it falls back to the last day of the month.</div>
+              <div className="text-[11px] text-[#686D76] mt-1">If the chosen day doesn&rsquo;t exist (e.g. Feb 30), it falls back to the last day of the month.</div>
             </Field>
             <Field label="Description (optional)">
               <input name="description" placeholder="Notes for your team" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
