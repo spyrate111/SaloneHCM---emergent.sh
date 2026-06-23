@@ -35,6 +35,8 @@ import Loans from "./pages/Loans";
 import Billing from "./pages/Billing";
 import SectorPresets from "./pages/SectorPresets";
 import Promotion from "./pages/Promotion";
+import LandingPage from "./marketing/LandingPage";
+import PricingPage from "./marketing/PricingPage";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -47,6 +49,8 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/transparency/:slug" element={<Transparency />} />
           <Route path="/verify/:cid" element={<Verify />} />
@@ -82,8 +86,7 @@ export default function App() {
             <Route path="/companies" element={<ProtectedRoute superAdminOnly><Companies /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
           </Route>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />
       </BrowserRouter>
