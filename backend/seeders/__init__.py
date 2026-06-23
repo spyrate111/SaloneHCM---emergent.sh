@@ -1,7 +1,26 @@
 """SaloneHCM seed orchestrator — runs per-domain seeders in order."""
 from core import db, logger
+from tiers import features_for
 from . import companies, users, employees, benefits, talent, gov, civil_service, establishment
 from . import migrate
+
+
+async def _resync_all_company_features() -> None:
+    """Ensure every company's `features` array matches its current `tier`.
+
+    Some admin paths (direct tier overrides, test fixtures) historically
+    mutated `tier` without re-deriving `features`, causing `require_feature()`
+    402s for routes that should be enabled. Re-deriving on every boot is
+    cheap (~ms) and prevents drift.
+    """
+    n = 0
+    async for c in db.companies.find({}, {"_id": 0, "id": 1, "tier": 1, "features": 1, "name": 1}):
+        expected = features_for(c.get("tier", "lite"))
+        if set(c.get("features") or []) != set(expected):
+            await db.companies.update_one({"id": c["id"]}, {"$set": {"features": expected}})
+            n += 1
+    if n:
+        logger.info("Re-synced features for %d company tier mismatch(es)", n)
 
 
 async def seed() -> None:
@@ -30,4 +49,8 @@ async def seed() -> None:
 
     # Establishment positions (Gov + Demo) — Ministry→Directorate→Unit→Position
     await establishment.seed_establishment(company_id=gov_id)
+
+    # Final safety net: any company whose `features` array drifted from its
+    # `tier` gets re-derived from tiers.py. Catches direct admin tier mutations.
+    await _resync_all_company_features()
     logger.info("Seed complete")

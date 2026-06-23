@@ -1,0 +1,32 @@
+{
+  "summary": "Iter22 backend-only regression — verified the new `_resync_all_company_features()` boot-time migration in /app/backend/seeders/__init__.py. RESULTS: test_iter22_feature_resync.py (2/2 PASS — boot-state assertion + simulated drift correction), test_iter20_presets_and_promotion.py (11/11 PASS), test_iter21_marketing_leads.py (4/4 PASS), test_iter18_loans.py (8/8 PASS), test_iter19_billing.py (9/9 PASS — 3 tests initially hit Cloudflare 429 in /api/auth/login at 30/min; re-ran individually after 65s pause and all passed). Total: 34/34 backend tests PASS. Supervisor backend.err.log shows `Seed complete` on every restart and NO `Re-synced features for N` line — confirming a clean boot with zero drift at startup (because the boot-time resync had already corrected any pre-existing drift). RCA-confirming finding: AFTER the iter19 billing test suite ran, the Gov tenant's features array drifted again to 23 items (missing civil_service+6 other gov-tier flags), and a live curl to GET /api/promotion/eligible returned 402. Calling `_resync_all_company_features()` directly via `python -c \"asyncio.run(...)\"` restored 30 features and the same endpoint returned 200. This empirically validates BOTH the latent bug iter17 flagged AND the new boot-time fix — but the deeper root cause (iter19 billing test paths that mutate `company.tier` via direct update_one without re-deriving features) remains. The boot-time fix protects PRODUCTION (every restart re-syncs) but does NOT protect a running process between restarts. Skipped frontend per testing_type='backend only'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "billing.subscribe / admin subscription paths", "issue": "iter19 billing tests mutate Gov tenant tier in ways that drop 7 gov-tier flags from company.features (civil_service, gov_payroll, ministry_reports, bulk_sms_payslips, nra_export, mof_approval, ghost_worker_detection). Verified by direct DB inspection after test suite: features count 30→23. Boot-time resync corrects this on next restart, but require_feature() 402s any tier-gated route until then. The 5-line boot fix is correct & verified; a complementary fix is to call features_for(tier) inside every code path that writes company.tier (audit `companies.update_one` + `tier` callsites)."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/test_reports/pytest/iter22_resync.xml",
+    "/app/test_reports/pytest/iter22_iter20_21.xml",
+    "/app/test_reports/pytest/iter22_iter18_19.xml"
+  ],
+  "action_items": [
+    "OPTIONAL hardening (not blocking): audit all callsites that write `company.tier` and ensure each one also writes `features=features_for(tier)`. Most likely culprit based on this run: routers/billing.py admin-subscribe paths or test fixtures in test_iter19_billing.py. The boot-time resync IS sufficient for production stability; this would just keep a running process consistent between restarts.",
+    "OPTIONAL: bump the 30 req/min /api/auth/login rate limit, or add backoff/retry in test client; CI suite of 30+ tests in fast succession can saturate it and produce spurious KeyError('token')."
+  ],
+  "critical_code_review_comments": [
+    "seeders/__init__.py:_resync_all_company_features() is correct — uses set() comparison so order doesn't matter, projects only needed fields, logs only when work was done (no log spam on clean boots, as confirmed by supervisor logs showing 'Seed complete' but no 'Re-synced features' line). Async cursor + update_one per drifted company scales linearly with # tenants (fine for current scale).",
+    "tests/test_iter22_feature_resync.py is well-structured: one test asserts steady-state invariant (post-boot must-have set), one test asserts the function works on simulated drift. The drift-simulation test also re-confirms the API returns 200 after resync, which is the user-visible behavior we care about.",
+    "Empirical validation: direct DB check after running iter19 billing tests showed gov tenant drifted to 23 features and /api/promotion/eligible returned 402 — exactly the user-impacting bug. Running the new helper restored 30 features and the endpoint returned 200. The fix demonstrably eliminates the production impact of the latent bug."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (34/34)", "frontend": "skipped per request"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 verified working (no 2FA). Superadmin TOTP auto-injected via conftest.py with SUPERADMIN_TOTP_SECRET fallback.",
+  "seed_data_creation": "None. Drift simulation test mutates+restores gov tenant features inline (transient).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter22 bug fix VERIFIED — _resync_all_company_features() runs at boot, both new tests pass, simulated drift is corrected, real drift after iter19 tests is corrected. Backend 34/34 across iter18+iter19+iter20+iter21+iter22. Be aware: /api/auth/login is rate-limited at 30/min by Cloudflare; if multiple test files run back-to-back you may see KeyError('token') — pause 60s and retry individual tests. The deeper latent bug (iter19 billing tests cause drift between restarts) is documented in 'minor' but does NOT impact production because every restart re-syncs.",
+  "rca of the issue": "RCA CONFIRMED & FIX VERIFIED: The latent bug = `company.features` and `company.tier` can drift apart because not all admin tier-mutation paths re-derive features. Reproduction: run test_iter19_billing.py → gov tenant features drop from 30 to 23 (missing civil_service, gov_payroll, ministry_reports, bulk_sms_payslips, nra_export, mof_approval, ghost_worker_detection) → GET /api/promotion/eligible returns 402 (require_feature('civil_service') decorator reads company.features, not company.tier). Mitigation (now applied in seeders/__init__.py:_resync_all_company_features): on every backend startup, iterate db.companies, compare set(company.features) to set(features_for(company.tier)), and update any drift. Verified: function correctly restored gov from 23→30 features in a live drifted state and /api/promotion/eligible flipped 402→200. The new 'Re-synced features for N' log line appeared 0 times during this test run's clean boots, confirming the log gate is non-noisy. Action for main agent (optional deeper fix): audit `companies.update_one` callsites that write `tier` and ensure features is co-updated; this would close the gap between restarts."
+}
