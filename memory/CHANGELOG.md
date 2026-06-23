@@ -1,5 +1,26 @@
 ## CHANGELOG
 
+### v1.13 (Feb 2026) — Code Quality Pass + Latent Drift Bug Fix
+
+**Code quality (per external review)**
+- Replaced 6 hardcoded `SUPER_SECRET = "KRSXG5..."` literals in test files with `os.environ.get("SUPERADMIN_TOTP_SECRET", "<dev-default>")` — matches conftest.py pattern; CI can inject a real secret without code changes.
+- Removed 3 unused local variables: `sub` in `routers/billing.py::_apply_paid_subscription`, `prev_due` + `completion` in `tests/test_iter14_batch.py`.
+- Fixed multi-statements-per-line in `tests/test_iter13_batch.py` and `tests/test_iter20_presets_and_promotion.py`.
+- Frontend: added stable React key in `marketing/sections/Testimonials.jsx` (`${t.name}-star-${i}`), replaced empty catch in `marketing/sections/Hero.jsx` with `console.debug`, added `useMemo` for header array in `pages/Loans.jsx::LoansTable`, fixed 10 unescaped-entity lint errors across Dashboard / CivilService / Schedules / Establishment / Team / TwoFactorCard / TransparencyCard / ApprovalBanner / ShareLinkModal / marketing-Hero / marketing-Testimonials / marketing-Personas / marketing-Contact.
+
+**Bug fix: company-features drift causing 402 errors**
+- Root cause: some admin paths write `company.tier` without re-deriving `company.features`; the discrepancy then breaks tier-gated routes (`require_feature("civil_service")` returns 402 even though `tier == "gov"`). This had silently bit us twice — once in the prior session (Session 4/5 testing), once in iter17 when iter19 billing tests caused live drift.
+- Fix: `seeders/__init__.py::_resync_all_company_features()` — boot-time async helper that scans every company, compares `set(company.features)` to `set(features_for(company.tier))`, and updates any drift. Logs `"Re-synced features for N company tier mismatch(es)"` only when work was done (no log spam on clean boots).
+- Verified: testing agent iter18 ran the iter19 billing suite (which DOES cause drift), then called the resync function — features array went 23 → 30 and `GET /api/promotion/eligible` flipped 402 → 200. Empirical demonstration that the fix eliminates the user-visible bug.
+- New tests: `tests/test_iter22_feature_resync.py` — boot-state invariant + simulated drift correction.
+
+**Testing**
+- Backend: 34/34 across iter18/iter19/iter20/iter21/iter22 (100%).
+- Frontend: 9/9 regression items pass (per iter17 testing agent).
+
+---
+
+
 
 ### v1.12 (Feb 2026) — Public Marketing Site (ADP-inspired)
 
