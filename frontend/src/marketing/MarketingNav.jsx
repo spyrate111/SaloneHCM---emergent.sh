@@ -57,7 +57,7 @@ export default function MarketingNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const goCta = () => nav(user ? "/dashboard" : "/login");
+  const goCta = () => nav(user ? "/billing" : "/pricing");
 
   return (
     <header

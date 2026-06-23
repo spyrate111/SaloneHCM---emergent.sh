@@ -1,5 +1,27 @@
 ## CHANGELOG
 
+
+### v1.12 (Feb 2026) — Public Marketing Site (ADP-inspired)
+
+**New public landing experience at `/`**
+- `/` now renders a public marketing `LandingPage` (no auth required). Wildcard `*` route changed to redirect to `/` (was `/dashboard`).
+- 12 distinct sections matching ADP's layout pattern, localized for Sierra Leone: promo-banner (live countdown), sticky marketing-nav (4 dropdowns + Pricing + Sign-in + Get-pricing CTAs), hero with "Solution Wizard" lead form, personas (Small/Midsize/Enterprise/Government), 9-product feature grid, 6 industry tiles, dark-green stats panel, 3-card resources, 3-quote testimonials, 4-tile awards, contact form, 4-column footer.
+- New `/pricing` public route with 4-tier comparison (Lite / Professional / Enterprise / Gov), featured plan with "Most popular" badge, SLE pricing, Stripe + bank-transfer note.
+
+**New backend endpoint**
+- `POST /api/marketing/leads` — public (no auth, no CSRF) — captures `{name, email, company, employees, message}` into `marketing_leads` collection. EmailStr validation, employees ≥1 required.
+
+**Architecture**
+- New folder `/app/frontend/src/marketing/` housing `LandingPage.jsx`, `PricingPage.jsx`, `MarketingLayout.jsx`, `MarketingNav.jsx`, `MarketingFooter.jsx`, `PromoBanner.jsx` + `sections/` with `Hero`, `Personas`, `ProductsGrid`, `Industries`, `StatsRow`, `Resources`, `Testimonials`, `Contact`.
+- `MarketingLayout` handles `#anchor` smooth-scroll on hash-link navigation.
+- All interactive elements carry kebab-case `data-testid` attributes for QA.
+
+**Tests added**
+- `tests/test_iter21_marketing_leads.py` — 4 backend tests for the public lead capture endpoint (all passing).
+- Frontend testing agent iteration_16: 16/16 checks pass (100%) — landing + pricing + mobile drawer + auth regression all green.
+
+---
+
 ### v1.6 (May 2026) — NRA Filing Automation + PWA polish
 
 **NRA filing export automation** (Gov-tier exclusive)

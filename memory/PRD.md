@@ -243,3 +243,11 @@ See `/app/memory/test_credentials.md`.
 - Token is in `sessionStorage` (key `salonehcm_token`); axios interceptor adds Bearer header.
 - Documents soft-delete only (`is_deleted=true`).
 - Storage paths are tenant-scoped: `salonehcm/{company_id}/uploads/...`
+
+
+## v1.12 — Public Marketing Site (Feb 2026)
+- New public root route `/` renders `LandingPage` (ADP-inspired structure, SaloneHCM-branded). Wildcard now redirects to `/` (was `/dashboard`).
+- New public `/pricing` page (4-tier comparison).
+- `POST /api/marketing/leads` — public lead capture; persists to `marketing_leads` collection.
+- Folder `/app/frontend/src/marketing/` contains all marketing components, isolated from the app shell.
+- 16/16 frontend tests pass; 4/4 backend lead-capture tests pass; full auth regression green.
