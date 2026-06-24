@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { setToken } from "../lib/api";
 import { TIER_COLORS, TIER_DESCRIPTIONS } from "../lib/features";
 import { toast } from "sonner";
-import { Building2, Plus, X, ArrowRightLeft, Crown, Sparkles } from "lucide-react";
+import { Building2, Plus, X, ArrowRightLeft, Crown, Sparkles, ShieldAlert, ShieldCheck, RefreshCw } from "lucide-react";
 
 const TIER_OPTIONS = [
   { value: "lite", label: "Salone HCM Lite" },
@@ -17,13 +17,39 @@ export default function Companies() {
   const { user, refetch } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [open, setOpen] = useState(false);
+  const [drift, setDrift] = useState(null);
+  const [driftDetail, setDriftDetail] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
 
   const load = useCallback(async () => {
     const r = await api.get("/admin/companies");
     setCompanies(r.data);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadDrift = useCallback(async () => {
+    try {
+      const r = await api.get("/admin/companies/drift-check");
+      setDrift(r.data);
+    } catch (e) {
+      console.warn("[Companies] drift check failed:", e?.message || e);
+    }
+  }, []);
+
+  useEffect(() => { load(); loadDrift(); }, [load, loadDrift]);
+
+  const onResync = async () => {
+    setResyncing(true);
+    try {
+      const r = await api.post("/admin/companies/drift-resync");
+      toast.success(`Resynced ${r.data.fixed_count} tenant${r.data.fixed_count === 1 ? "" : "s"}`);
+      await Promise.all([load(), loadDrift()]);
+      setDriftDetail(false);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Resync failed");
+    } finally {
+      setResyncing(false);
+    }
+  };
 
   const onCreate = async (ev) => {
     ev.preventDefault();
@@ -44,6 +70,7 @@ export default function Companies() {
       await api.patch(`/admin/companies/${c.id}/tier`, { tier });
       toast.success(`${c.name} → ${tier}`);
       load();
+      loadDrift();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Tier update failed");
     }
@@ -80,6 +107,90 @@ export default function Companies() {
           <Plus className="w-4 h-4" strokeWidth={1.5} /> Create tenant
         </button>
       </div>
+
+      {/* Tier drift monitor */}
+      {drift && (
+        <div
+          data-testid="drift-monitor"
+          className={`border rounded-lg p-4 ${
+            drift.ok
+              ? "border-[#C9E2D2] bg-[#EFF6F2]"
+              : "border-[#F1C3A1] bg-[#FBEBDF]"
+          }`}
+        >
+          <div className="flex items-start gap-3 flex-wrap">
+            {drift.ok ? (
+              <ShieldCheck className="w-5 h-5 text-[#2D7A5D] mt-0.5" strokeWidth={1.5} />
+            ) : (
+              <ShieldAlert className="w-5 h-5 text-[#B84F2F] mt-0.5" strokeWidth={1.5} />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-heading text-base font-semibold">
+                  Tier-features drift monitor
+                </h3>
+                <span
+                  data-testid="drift-badge"
+                  className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
+                    drift.ok
+                      ? "bg-[#2D7A5D] text-white"
+                      : "bg-[#B84F2F] text-white"
+                  }`}
+                >
+                  {drift.ok ? "All in sync" : `${drift.drifted_count} drifted`}
+                </span>
+              </div>
+              <p className="text-xs text-[#525860] mt-1 leading-relaxed">
+                Verifies every tenant&rsquo;s <code className="bg-white px-1 py-0.5 rounded text-[#1A1C1E]">features</code> array matches its <code className="bg-white px-1 py-0.5 rounded text-[#1A1C1E]">tier</code>. Drift causes 402 errors on tier-gated routes. The boot-time seeder auto-heals on every restart; this lets you fix it in-process.
+              </p>
+              {!drift.ok && (
+                <button
+                  type="button"
+                  onClick={() => setDriftDetail((v) => !v)}
+                  className="mt-2 text-xs font-semibold text-[#B84F2F] hover:underline"
+                  data-testid="drift-toggle-detail"
+                >
+                  {driftDetail ? "Hide" : "Show"} affected tenants ({drift.drifted_count})
+                </button>
+              )}
+              {driftDetail && !drift.ok && (
+                <div className="mt-3 space-y-2" data-testid="drift-detail">
+                  {drift.drifted.map((d) => (
+                    <div key={d.id} className="bg-white border border-[#F1C3A1] rounded-md px-3 py-2 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-[#1A1C1E]">{d.name}</span>
+                        <span className="text-[10px] uppercase tracking-wider bg-[#F1EEE6] px-1.5 py-0.5 rounded">{d.tier}</span>
+                      </div>
+                      {d.missing.length > 0 && (
+                        <div className="mt-1 text-[#B84F2F]">
+                          <span className="font-semibold">Missing:</span> {d.missing.join(", ")}
+                        </div>
+                      )}
+                      {d.extra.length > 0 && (
+                        <div className="mt-0.5 text-[#8C7000]">
+                          <span className="font-semibold">Extra:</span> {d.extra.join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {!drift.ok && (
+              <button
+                type="button"
+                onClick={onResync}
+                disabled={resyncing}
+                className="inline-flex items-center gap-1.5 bg-[#B84F2F] hover:bg-[#9c4127] disabled:opacity-60 text-white text-xs px-3 py-2 rounded-md"
+                data-testid="drift-resync-button"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${resyncing ? "animate-spin" : ""}`} strokeWidth={1.7} />
+                {resyncing ? "Resyncing…" : "Resync now"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {companies.map((c) => {

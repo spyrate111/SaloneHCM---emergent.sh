@@ -144,3 +144,49 @@ async def list_tiers(_: dict = Depends(require_superadmin)):
         {"id": t, "label": tier_label(t), "features": features_for(t), "rank": i}
         for i, t in enumerate(TIERS)
     ]
+
+
+# ---------- Tier-features drift monitor ----------
+
+@router.get("/companies/drift-check")
+async def drift_check(_: dict = Depends(require_superadmin)):
+    """Scan every company and report any whose `features` array doesn't match its tier."""
+    drifted = []
+    total = 0
+    async for c in db.companies.find({}, {"_id": 0, "id": 1, "name": 1, "tier": 1, "features": 1}):
+        total += 1
+        expected = set(features_for(c.get("tier", "lite")))
+        have = set(c.get("features") or [])
+        if have != expected:
+            drifted.append({
+                "id": c["id"],
+                "name": c.get("name", ""),
+                "tier": c.get("tier", "lite"),
+                "missing": sorted(expected - have),
+                "extra": sorted(have - expected),
+            })
+    return {
+        "ok": len(drifted) == 0,
+        "total_companies": total,
+        "drifted_count": len(drifted),
+        "drifted": drifted,
+    }
+
+
+@router.post("/companies/drift-resync")
+async def drift_resync(user: dict = Depends(require_superadmin)):
+    """One-click resync — re-derive `features` from `tier` for every drifted company.
+    Logs an audit entry per fixed company."""
+    fixed = []
+    async for c in db.companies.find({}, {"_id": 0, "id": 1, "name": 1, "tier": 1, "features": 1}):
+        expected = features_for(c.get("tier", "lite"))
+        if set(c.get("features") or []) != set(expected):
+            await db.companies.update_one(
+                {"id": c["id"]},
+                {"$set": {"features": expected, "label": tier_label(c.get("tier", "lite"))}},
+            )
+            await audit("company_features_resync", f"companies/{c['id']}", user, {
+                "tier": c.get("tier"), "feature_count": len(expected),
+            })
+            fixed.append({"id": c["id"], "name": c.get("name", ""), "tier": c.get("tier")})
+    return {"ok": True, "fixed_count": len(fixed), "fixed": fixed}
