@@ -67,6 +67,19 @@ def _restore_superadmin_tenant() -> None:
         if demo:
             update["$set"]["company_id"] = demo["id"]
         c.users.update_one({"email": SUPERADMIN_EMAIL}, update)
+        # Belt-and-braces: also resync every company's features to its tier.
+        # Some test suites (iter19 billing) historically mutated `tier` without
+        # re-deriving `features`, breaking tier-gated routes for later modules.
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from tiers import features_for, tier_label
+        for comp in c.companies.find({}, {"_id": 0, "id": 1, "tier": 1, "features": 1}):
+            expected = features_for(comp.get("tier", "lite"))
+            if set(comp.get("features") or []) != set(expected):
+                c.companies.update_one(
+                    {"id": comp["id"]},
+                    {"$set": {"features": expected, "label": tier_label(comp.get("tier", "lite"))}},
+                )
     except Exception:
         # Don't block tests if Mongo isn't reachable from the test host —
         # only the multi-tenant scoped tests will fail explicitly in that case.

@@ -35,14 +35,23 @@ def super_h():
 
 @pytest.fixture(autouse=True)
 def _isolate_billing():
+    # Use the canonical tier→features map so tier mutations stay consistent.
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from tiers import features_for, tier_label
+    gov_reset = {"$set": {
+        "tier": "gov",
+        "label": tier_label("gov"),
+        "features": features_for("gov"),
+    }}
     db = MongoClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))[os.environ.get("DB_NAME", "salonehcm_db")]
-    # Restore Gov tier in case prior test left it changed
-    db.companies.update_one({"name": "Government of Sierra Leone"}, {"$set": {"tier": "gov"}})
+    # Restore Gov tier (+ features + label) in case a prior test left them changed
+    db.companies.update_one({"name": "Government of Sierra Leone"}, gov_reset)
     db.subscription_invoices.delete_many({})
     db.subscriptions.delete_many({})
     db.payment_transactions.delete_many({})
     yield
-    db.companies.update_one({"name": "Government of Sierra Leone"}, {"$set": {"tier": "gov"}})
+    db.companies.update_one({"name": "Government of Sierra Leone"}, gov_reset)
     db.subscription_invoices.delete_many({})
     db.subscriptions.delete_many({})
     db.payment_transactions.delete_many({})
