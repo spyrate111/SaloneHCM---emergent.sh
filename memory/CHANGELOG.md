@@ -1,5 +1,20 @@
 ## CHANGELOG
 
+### v1.14 (Feb 2026) — Tier/Features Drift Hardening
+
+**Closed the gap between restarts** (follow-up to iter18's boot-time fix)
+- Audited all 5 `companies.update_one` callsites that write `tier`. All 3 production paths (`billing.py:263`, `billing.py:391`, `admin.py:94`) were already correct — they bundle `tier`, `label`, and `features=features_for(tier)` in a single atomic `$set`.
+- The leak was a test fixture: `tests/test_iter19_billing.py::_isolate_billing` reset only `tier`, leaving features stale and contaminating later test modules. Now uses `gov_reset = {$set: {tier, label, features}}` atomically.
+- Belt-and-braces guard: `tests/conftest.py::_restore_superadmin_tenant()` now iterates `db.companies` on every module load and resyncs `features` for any tenant whose array doesn't match its tier — silently no-ops on clean state.
+
+**Empirically verified**
+- Ran `test_iter19_billing.py` (the historical drift source) → 9/9 PASS → direct DB check: gov tenant retains all 30 features → ran `test_iter20_presets_and_promotion.py` immediately after → 11/11 PASS with zero 402s.
+- Full regression: iter18+iter19+iter20+iter21+iter22 = 34/34 (100%).
+- Boot logs show `Seed complete` with no `Re-synced features for N` line on clean restarts — confirming zero production drift.
+
+---
+
+
 ### v1.13 (Feb 2026) — Code Quality Pass + Latent Drift Bug Fix
 
 **Code quality (per external review)**
