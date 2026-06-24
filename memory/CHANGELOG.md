@@ -1,5 +1,25 @@
 ## CHANGELOG
 
+### v1.15 (Feb 2026) — Tier Drift Monitor
+
+**New super-admin widget on `/companies`**
+- Visible drift indicator (green ShieldCheck / red ShieldAlert) at the top of the Tenants page, with a badge showing "All in sync" or "N drifted".
+- Expandable per-tenant detail showing the exact missing / extra feature flags.
+- One-click "Resync now" button that re-derives features from tier for every drifted tenant, with per-tenant audit-log entry.
+- Auto-refreshes after any tier change.
+
+**Backend**
+- `GET /api/admin/companies/drift-check` — read-only scan; returns `{ok, total_companies, drifted_count, drifted: [{id, name, tier, missing, extra}]}`. Set comparison so feature order doesn't trigger false positives.
+- `POST /api/admin/companies/drift-resync` — idempotent in-process fix; audit-logged. Returns `{ok, fixed_count, fixed: [...]}`.
+- Both endpoints require super-admin (router-level dep). Gov-tenant admin gets 403.
+
+**Testing (verified by testing_agent iter20)**
+- Backend: **38/38 PASS (100%)** — 4 new drift-monitor tests + full regression iter18→iter23.
+- Frontend e2e: super-admin login → drift injection → red-badge render → expand detail → click Resync → toast → green-badge restoration. All 5 data-testids verified.
+
+---
+
+
 ### v1.14 (Feb 2026) — Tier/Features Drift Hardening
 
 **Closed the gap between restarts** (follow-up to iter18's boot-time fix)
