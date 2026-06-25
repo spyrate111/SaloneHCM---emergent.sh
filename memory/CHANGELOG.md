@@ -1,5 +1,28 @@
 ## CHANGELOG
 
+### v1.16 (Feb 2026) — Twilio Live Integration Verified
+
+**Twilio wired with real credentials**
+- Updated `/app/backend/.env` with the user's production Twilio Account SID, Auth Token, and sender number `+18555259887`.
+- Added `POST /api/integrations/sms/test` endpoint (mirrors `/email/test`): admin-only, validates E.164, defaults sensible test body, 502 on Twilio errors, audits to `audit_logs`.
+- End-to-end verified with live sends:
+  - Single test → SID `SM214d081dd14aa7a47004f3cb3b6018dc` → **delivered** to +18777804236.
+  - Bulk payslip send → 1/6 delivered (the test-virtual-number employee). The other 5 +232 numbers returned Twilio's expected trial-account "unverified destination" error — code is correct, account just needs upgrade + Geo Permissions.
+
+**Testing (verified by testing_agent iter21)**
+- Backend: **17/17 PASS** — 8 new SMS-test endpoint tests + 9 iter12 Twilio regression tests + dry-run payroll bulk-SMS smoke.
+
+**Outstanding for production +232 sends**
+- Upgrade Twilio account from Trial to paid.
+- Enable Geo Permissions for Sierra Leone in Twilio console.
+- Resend domain verification still pending DNS update.
+
+**SECURITY REMINDER**
+- The Auth Token shared in chat is now in conversation logs. **Rotate it in Twilio Console → Account → API Keys & Tokens → Rotate Auth Token** as soon as practical, then update `/app/backend/.env`.
+
+---
+
+
 ### v1.15 (Feb 2026) — Tier Drift Monitor
 
 **New super-admin widget on `/companies`**
