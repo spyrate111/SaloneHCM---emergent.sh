@@ -35,7 +35,7 @@ export default function Hero() {
       // sessionStorage may be disabled (Safari private mode etc.) — log and continue.
       console.debug("[Hero] sessionStorage write skipped:", err?.message || err);
     }
-    nav("/pricing");
+    nav("/demo");
   };
 
   return (

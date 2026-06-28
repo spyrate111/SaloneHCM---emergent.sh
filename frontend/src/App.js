@@ -37,6 +37,7 @@ import SectorPresets from "./pages/SectorPresets";
 import Promotion from "./pages/Promotion";
 import LandingPage from "./marketing/LandingPage";
 import PricingPage from "./marketing/PricingPage";
+import DemoPage from "./marketing/DemoPage";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/demo" element={<DemoPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/transparency/:slug" element={<Transparency />} />
           <Route path="/verify/:cid" element={<Verify />} />

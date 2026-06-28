@@ -1,0 +1,33 @@
+{
+  "summary": "Iter25/26 — Full e2e regression of new public /demo wizard (frontend + backend). Backend: 23/23 pytest pass (7 new iter25 demo-request tests + iter21 leads + iter23 drift + iter24 SMS regression). Frontend: end-to-end Playwright run validated /demo public route, 3-step wizard (You → Team → Goals → Success), all data-testids, Continue button enable/disable matrix on all 3 steps, back/next/step-indicator behavior, real POST /api/marketing/demo-requests submission landing on demo-step-success with first-name greeting, all 3 next-step cards, right rail (Why card, phone/email, trust badges 3/4 matched testid, 2 testimonials), landing-hero hydration handoff (87 employees + interest=payroll → size 50-249 pre-selected, payroll topic pre-selected, submit enabled with zero manual clicks on step 3), hero CTA navigates to /demo (was /pricing), desktop + mobile drawer 'Get a demo' nav link both present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DemoPage right-rail Trust badge", "issue": "ISO badge testid does not match spec. Spec asked for 'trust-iso------aligned' (6 dashes). Actual code at /app/frontend/src/marketing/DemoPage.jsx:269 generates testid via `b.label.toLowerCase().replace(/[^a-z]/g, '-')` — for label 'ISO-27001 aligned' that produces 'iso-------aligned' (7 dashes, because the 7 non-letter chars are: '-','2','7','0','0','1',' '). The badge visually renders fine; only the testid string differs from the spec by one extra dash. Other 3 badges (nra-certified, data-hosted-in-wca, nassit-registered) match exactly.", "selector": "[data-testid='trust-iso-------aligned']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter25_demo_requests.py",
+    "/app/test_reports/pytest/iter26_regression.xml"
+  ],
+  "action_items": [
+    "(Low) Either pin the ISO trust badge testid to exactly 'trust-iso------aligned' (e.g. by mapping it explicitly) or update the spec in the review request — current code yields 'trust-iso-------aligned' (7 dashes). Suggested fix: replace the dynamic testid for trust badges with a stable static slug per badge (e.g. add a `slug` field on each TRUST_BADGES entry)."
+  ],
+  "critical_code_review_comments": [
+    "routers/marketing.py — DemoRequestIn validates industry/size/topics against ALLOWED_* sets and persists cleanly. EmailStr does the email validation. min_length=1 on topics list correctly returns 422 for empty arrays. Note: ALLOWED_TOPICS includes 'self_service' on the backend but the frontend only exposes 8 topics (payroll/hr/compliance/ai/civil_service/ifmis/loans/talent). Harmless — backend is more permissive than UI, which matches the landing-hero handoff (hero's interest dropdown DOES include 'self_service' and 'ats' which would NOT exist as toggle cards on step 3). If a user picks 'ats' on the hero, hydration would try to pre-select a topic ID 'ats' that has no card — the topic stays selected internally but invisible (the wizard would still submit successfully because backend rejects only on truly unknown values). Consider filtering hydrated topics to the visible TOPICS set or adding the missing cards.",
+    "DemoPage.jsx (350+ lines) is approaching the file-size soft limit but is cleanly structured into helpers (StepYou/StepTeam/StepGoals/StepSuccess/ProgressBar/NextStepCard/Field) and is justified as a single-page wizard. No refactor required.",
+    "DemoPage submit() uses api.post (shared axios instance) — good. Errors gracefully surfaced via demo-error testid. Form is NOT persisted on page-away (documented in review request). Acceptable.",
+    "Trust badge testid generation is fragile (data-driven slug). Recommend a static `slug` field on TRUST_BADGES entries to make testids predictable.",
+    "Hero hydration is one-shot useEffect on mount — correct. No infinite loop risk."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (23/23)", "frontend": "100% functional / 1 minor cosmetic testid mismatch"},
+  "test_credentials": "Not required — /demo and /api/marketing/demo-requests are fully public (no auth, no CSRF).",
+  "seed_data_creation": "9 throw-away demo_request docs were created in db.marketing_demo_requests during the run (7 from pytest auto-cleanup + 2 from Playwright e2e submissions: test.reviewer@example.com and hydra@example.com). The 2 Playwright docs were NOT cleaned up. Main agent may optionally purge: db.marketing_demo_requests.delete_many({email: {$in: ['test.reviewer@example.com','hydra@example.com']}}).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The /demo wizard is fully working. Critical flows validated: 3-step wizard, validation gating, back/next, real submission, success screen, hero→demo hydration handoff with sessionStorage 'salonehcm_lead' key, mobile drawer nav-demo link. Only outstanding nit: ISO trust badge testid has 7 dashes not 6 ('trust-iso-------aligned'). If next agent re-runs backend tests, use /app/backend/tests/test_iter25_demo_requests.py. Hero interest dropdown includes 'self_service' and 'ats' which are NOT topic-card values on step 3 — minor UX gap if a user picks one of those on landing (the hydrated topic id won't render as a visible card).",
+  "rca of the issue": "ISO badge testid mismatch — root cause is dynamic slug generation `label.toLowerCase().replace(/[^a-z]/g, '-')`. For 'ISO-27001 aligned', every non-letter (including digits and the dash and space) becomes a single dash, producing 7 dashes. Spec expected 6. Fix: add an explicit `slug` per TRUST_BADGES entry."
+}
