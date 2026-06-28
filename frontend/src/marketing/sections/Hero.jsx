@@ -96,8 +96,12 @@ export default function Hero() {
 
           {/* Secondary CTAs */}
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-[#525860]">
+            <a href="/tour" className="font-semibold text-[#0F2C24] hover:text-[#C02719] inline-flex items-center gap-1" data-testid="hero-secondary-tour">
+              Or take the interactive tour <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+            <span className="text-[#EAE7DF]">|</span>
             <a href="#personas" className="font-semibold text-[#0F2C24] hover:text-[#C02719] inline-flex items-center gap-1" data-testid="hero-secondary-personas">
-              Or pick by business size <ArrowRight className="w-3.5 h-3.5" />
+              Pick by business size <ArrowRight className="w-3.5 h-3.5" />
             </a>
             <span className="text-[#EAE7DF]">|</span>
             <a href="tel:+23230000000" className="hover:text-[#C02719]" data-testid="hero-secondary-call">
