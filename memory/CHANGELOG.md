@@ -1,5 +1,24 @@
 ## CHANGELOG
 
+### v1.17 (Feb 2026) — Public Demo Wizard (ADP page-2 equivalent)
+
+**New public `/demo` route**
+- 3-step multi-step wizard (You → Your team → Your goals) with progress bar, validation gating on Continue/Submit, Back/Next navigation, and success state with 3 next-step CTAs.
+- Right rail with "Why SaloneHCM" card (phone + email), Trust & Security badges (4 static slugs: nra, wca, nassit, iso27001), and 2 testimonials.
+- Hydrates from sessionStorage `salonehcm_lead` written by the landing hero — employees → size bucket, interest → topic (filtered to known topic IDs to avoid invisible pre-selections).
+- Landing hero CTA now routes to `/demo` instead of `/pricing`; "Get a demo" link added to desktop nav + mobile drawer; "Get pricing" button still routes to `/pricing` for users who want price directly.
+
+**Backend**
+- `POST /api/marketing/demo-requests` — public, no auth, no CSRF. Validates `industry`, `size`, `topics` against allowed sets; `topics` must be non-empty. Persists to `marketing_demo_requests` collection with `source='demo_wizard'`.
+
+**Testing (verified by testing_agent iter22)**
+- Backend: **23/23 PASS (100%)** — 7 new iter25 demo-request tests + iter21/22/23/24 regression.
+- Frontend e2e: full wizard flow validated end-to-end (3 steps + success state, validation gating matrix, real submission, hero handoff hydration, mobile drawer nav). 100% functional.
+- Two minor follow-ups from review applied: static slugs on trust-badge testids + hydration filter for unknown topic IDs.
+
+---
+
+
 ### v1.16 (Feb 2026) — Twilio Live Integration Verified
 
 **Twilio wired with real credentials**

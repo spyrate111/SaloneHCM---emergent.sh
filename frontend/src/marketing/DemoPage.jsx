@@ -38,10 +38,10 @@ const TOPICS = [
 ];
 
 const TRUST_BADGES = [
-  { icon: ShieldCheck, label: "NRA-certified",      tone: "text-[#1f6f55]" },
-  { icon: Lock,        label: "Data hosted in WCA", tone: "text-[#0F2C24]" },
-  { icon: Award,       label: "NASSIT-registered",  tone: "text-[#E07B4A]" },
-  { icon: ShieldAlert, label: "ISO-27001 aligned",  tone: "text-[#5a4FCF]" },
+  { slug: "nra",      icon: ShieldCheck, label: "NRA-certified",      tone: "text-[#1f6f55]" },
+  { slug: "wca",      icon: Lock,        label: "Data hosted in WCA", tone: "text-[#0F2C24]" },
+  { slug: "nassit",   icon: Award,       label: "NASSIT-registered",  tone: "text-[#E07B4A]" },
+  { slug: "iso27001", icon: ShieldAlert, label: "ISO-27001 aligned",  tone: "text-[#5a4FCF]" },
 ];
 
 const TESTIMONIALS = [
@@ -77,10 +77,12 @@ export default function DemoPage() {
       const raw = sessionStorage.getItem("salonehcm_lead");
       if (raw) {
         const parsed = JSON.parse(raw);
+        const known = new Set(TOPICS.map((t) => t.value));
+        const hydratedTopic = known.has(parsed.interest) ? [parsed.interest] : [];
         setForm((f) => ({
           ...f,
           size: bucketFromEmployees(parsed.employees) || f.size,
-          topics: parsed.interest ? [parsed.interest] : f.topics,
+          topics: hydratedTopic.length ? hydratedTopic : f.topics,
         }));
       }
     } catch (err) {
@@ -266,7 +268,7 @@ export default function DemoPage() {
                   {TRUST_BADGES.map((b) => {
                     const Icon = b.icon;
                     return (
-                      <div key={b.label} className="bg-[#FAF8F2] rounded-lg p-3 flex items-center gap-2.5" data-testid={`trust-${b.label.toLowerCase().replace(/[^a-z]/g, "-")}`}>
+                      <div key={b.label} className="bg-[#FAF8F2] rounded-lg p-3 flex items-center gap-2.5" data-testid={`trust-${b.slug}`}>
                         <Icon className={`w-5 h-5 ${b.tone}`} />
                         <span className="text-[12px] font-semibold text-[#0F2C24] leading-tight">{b.label}</span>
                       </div>
