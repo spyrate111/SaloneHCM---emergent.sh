@@ -1,5 +1,25 @@
 ## CHANGELOG
 
+### v1.18 (Feb 2026) — Training Video Library
+
+**Public marketing videos**
+- New universal `VideoPlayer` (auto-detects YouTube / Vimeo / MP4) with poster, big play button, hover controls (play, mute, fullscreen, progress bar), and clickable chapter markers.
+- New `VideoLibrary` section on the landing page between Products and Industries — featured player + side playlist of 9-12 videos.
+- New `/videos` route: full library with category chips (All / Getting started / By industry / Deep dive), client-side search, and persona labels.
+- "Videos" link added to desktop nav + mobile drawer.
+
+**Backend**
+- `GET /api/marketing/videos` (public, filterable by `category` and `persona`) and `GET /api/marketing/videos/{id}`.
+- `POST/PATCH/DELETE /api/marketing/admin/videos` (super-admin only) for CRUD; `GET /api/marketing/admin/videos` lists all including unpublished drafts.
+- Seeder ships 9 placeholder videos across 3 categories × 3+ personas. Idempotent by title; also refreshes `poster` URLs in-place when the seed source changes. Source MP4s = Google's public test bucket (placeholder); replace via the admin endpoint when real screen recordings are ready.
+
+**Testing (verified by testing_agent iter23)**
+- **Backend: 35/35 PASS (100%)** — 10 new iter26 video tests + 25 regression.
+- **Frontend e2e: 100% functional** — landing section, /videos page, all player testids, category filter, search, mobile drawer, navigation. Switched poster CDN from Unsplash (403'd in env) to picsum.photos seeded URLs after iter23 review.
+
+---
+
+
 ### v1.17 (Feb 2026) — Public Demo Wizard (ADP page-2 equivalent)
 
 **New public `/demo` route**
