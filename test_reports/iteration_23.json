@@ -1,0 +1,34 @@
+{
+  "summary": "Iter27 — Full e2e regression of new training video library (frontend + backend). Backend: 35/35 pytest pass (10 iter26 videos + 7 iter25 demo + 4 iter21 leads + 2 iter22 resync + 4 iter23 drift + 8 iter24 sms — cumulative regression). Frontend: end-to-end Playwright run validated landing video-library-section (9 playlist items, all 5 player testids present: video-play-overlay, video-play-toggle, video-mute-toggle, video-fullscreen, video-chapters), clicking a playlist item swaps featured player, desktop nav-videos link navigates to /videos. /videos page: videos-page testid present, videos-list with 9 items, search input + all 4 category chips (all, getting_started, by_persona, deep_dive) present. Category filter getting_started narrows to 3, by_persona narrows to 3, all returns to 9. Search 'NRA' narrows to 2 results (matches summaries containing NRA). Player: overlay click + mute toggle + play toggle + fullscreen all work. Mobile (390x844): hamburger drawer exposes nav-videos link, /videos route renders stacked layout with 9 items.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "VideoPlayer poster images", "issues": ["Unsplash hotlinked poster URLs (images.unsplash.com/photo-{id}?...) return HTTP 403 in some preview environments — console logs show repeated 403s. Player still renders correctly with the loading spinner and controls, but posters do not display. Recommend either (a) self-hosting placeholder images in /app/frontend/public, or (b) switching to a CDN that allows hotlinking (e.g. Cloudinary/Imgix), or (c) Pexels direct CDN URLs. Not a regression of the spec — the spec said placeholder videos may load slowly or be blocked — but worth flagging for production."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter26_videos.py",
+    "/app/test_reports/pytest/iter27_videos_regression.xml"
+  ],
+  "action_items": [
+    "(Low) Replace Unsplash hotlink posters with self-hosted assets or a CDN that permits hotlinking — current 403s mean no poster image renders in the video card or featured area (video itself still plays / shows controls)."
+  ],
+  "critical_code_review_comments": [
+    "marketing.py VideoIn model — clean Pydantic validation with Literal[...] for category/persona, returns 422 on invalid values as designed. ObjectId stripped via projection. published filter applied at DB-query level for /videos and /videos/{id} (good — admin endpoint /admin/videos returns all incl drafts).",
+    "seeders/marketing_videos.py — idempotent by title, sets published=True + ISO timestamps. Logger fires only when new inserts happen. Clean.",
+    "VideoPlayer.jsx — universal MP4/YouTube/Vimeo detector via URL pattern is fine. Custom controls hover-reveal on hover, big center play overlay, chapter markers on lg viewports — all match spec. data-testid coverage complete.",
+    "VideosPage.jsx — category chip filtering and search input both operate client-side on the full GET /api/marketing/videos result (no extra round-trips). 'NRA' search correctly filters by both title and summary. Good.",
+    "VideoLibrary.jsx (landing section) — renders between products-section and industries-section as specified; playlist items have stable data-testid='video-playlist-item-{id}' for testability.",
+    "Browser console shows repeated 403s for Unsplash poster URLs — does not break the player but worth swapping CDN. No other console errors."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (35/35)", "frontend": "100% functional / posters 403 in this env"},
+  "test_credentials": "Super-admin admin@salonehcm.sl / Admin@2026 + TOTP from KRSXG5BANFXSAYTBORQXG43LMR2A (used by pytest conftest). Gov-admin admin@gov.sl / GovAdmin@2026 (no TOTP). /videos and GET /api/marketing/videos are fully public — no auth required for read paths.",
+  "seed_data_creation": "Zero net new docs — pytest test_video_crud_lifecycle and test_unpublished_video_hidden_from_public both create then delete their own docs via the API and a safety-net Mongo delete in the finally block. db.marketing_videos contains only the 9 seeded videos after the run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter26 video library is fully working end-to-end. Backend: 10 new iter26 tests cover public list+filter+single-get, 422 validation, superadmin/govadmin/anonymous authorization, full CRUD lifecycle, and unpublished-hidden-from-public. Cumulative regression at 35/35. Frontend: /videos route, landing VideoLibrary section, MarketingNav 'Videos' link (desktop + mobile), VideoPlayer chapter+controls all confirmed via Playwright with all required data-testids present. Only cosmetic gap: Unsplash poster images return 403 in this preview environment (not a code bug — external CDN policy). Use /app/backend/tests/test_iter26_videos.py for any future re-runs.",
+  "rca of the issue": "N/A — no functional defects found. Poster 403 is an external CDN policy issue with Unsplash hotlinking; mitigation is to self-host the 9 placeholder posters in /app/frontend/public/videos/posters/ or switch CDNs."
+}

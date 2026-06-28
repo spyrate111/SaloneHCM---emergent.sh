@@ -6,6 +6,7 @@ import Industries from "./sections/Industries";
 import StatsRow from "./sections/StatsRow";
 import Resources from "./sections/Resources";
 import Testimonials from "./sections/Testimonials";
+import VideoLibrary from "./sections/VideoLibrary";
 import Contact from "./sections/Contact";
 
 export default function LandingPage() {
@@ -14,6 +15,7 @@ export default function LandingPage() {
       <Hero />
       <Personas />
       <ProductsGrid />
+      <VideoLibrary />
       <Industries />
       <StatsRow />
       <Resources />

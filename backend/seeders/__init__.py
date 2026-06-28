@@ -3,6 +3,7 @@ from core import db, logger
 from tiers import features_for
 from . import companies, users, employees, benefits, talent, gov, civil_service, establishment
 from . import migrate
+from . import marketing_videos
 
 
 async def _resync_all_company_features() -> None:
@@ -49,6 +50,9 @@ async def seed() -> None:
 
     # Establishment positions (Gov + Demo) — Ministry→Directorate→Unit→Position
     await establishment.seed_establishment(company_id=gov_id)
+
+    # Marketing video library (public training/walkthrough videos)
+    await marketing_videos.seed_videos()
 
     # Final safety net: any company whose `features` array drifted from its
     # `tier` gets re-derived from tiers.py. Catches direct admin tier mutations.
