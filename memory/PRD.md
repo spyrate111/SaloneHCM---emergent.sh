@@ -251,3 +251,15 @@ See `/app/memory/test_credentials.md`.
 - `POST /api/marketing/leads` — public lead capture; persists to `marketing_leads` collection.
 - Folder `/app/frontend/src/marketing/` contains all marketing components, isolated from the app shell.
 - 16/16 frontend tests pass; 4/4 backend lead-capture tests pass; full auth regression green.
+
+## v1.13 — Marketing Videos sidebar fix + High-Complexity Refactors (Feb 20 2026)
+- **P0 bug fix (verified)** — Super-admin sidebar now shows "Marketing Videos" link (data-testid `nav-marketing-videos`) → routes to `/admin/videos` CRUD UI. Gated to `roles=["superadmin"]` in `lib/nav.js`.
+- **Backend refactors (55/55 tests pass, 0 regressions)**:
+  - `routers/public.py` — `public_transparency` split into `_log_transparency_view`, `_aggregate_ministries`, `_last_payroll_and_compliance` helpers.
+  - `routers/civil_service.py` — `ghost_workers_pdf` split into `_ghost_pdf_story` (header) and `_ghost_pdf_suspects_table` helpers.
+  - `routers/billing.py` — `create_stripe_checkout` split into `_compute_stripe_usd_amount` and `_persist_pending_stripe_txn` helpers.
+- **Frontend refactors (frontend testing agent 10/10 flows green)**:
+  - `components/Layout.jsx` — 178 → 53 lines. Extracted `AppSidebar.jsx` (77 lines) + `AppHeader.jsx` (40 lines). NAV array + `filterNavForUser()` moved to `lib/nav.js` as single source-of-truth.
+  - `components/TransparencyCard.jsx` — Extracted `PortalBadge`, `SlugEditor`, `LivePortalBlock` sub-components. All 7 data-testids preserved.
+- All post-refactor data-testids verified identical (sidebar, nav-*, header-*, transparency-*, admin-videos-*).
+
