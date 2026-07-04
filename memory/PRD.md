@@ -282,3 +282,17 @@ See `/app/memory/test_credentials.md`.
 - **Frontend badge** on `Talent.jsx` posting cards — blue "From Establishment" pill (data-testid `posting-source-establishment`) + footer metadata row (ministry, grade, budget code, "N vacancies / M approved"). Auto-postings distinguishable by `data-testid="posting-establishment-{uuid}"` vs manual `posting-manual-{uuid}`.
 - **Manual postings unaffected** — sync only touches rows where `source="establishment"`.
 - **Testing**: 8/8 new lifecycle tests (`test_iter27_establishment_ats_sync.py`) + 9/9 pre-existing establishment tests + 56/56 talent-related tests still green. Frontend testing agent 8/8 flows verified (`iteration_27.json`), including cross-tenant isolation (demo tenant has ZERO establishment cards; manual postings intact) and employee read-only gating.
+
+## v1.16 — Public Careers job board (Feb 20 2026)
+- **No-auth public page** at `/careers/{transparency_slug}` — citizens browse all open job postings for any tenant that has opted-in via `transparency_public=true`. Reuses the existing transparency slug system.
+- **Backend** — 3 new endpoints in `routers/public.py`:
+  - `GET /public/careers/{slug}` — list open postings with ministry facets + search/filter query params.
+  - `GET /public/careers/{slug}/postings/{pid}` — single posting detail.
+  - `POST /public/careers/{slug}/postings/{pid}/apply` — anonymous application, rate-limited 5/min per IP.
+- **Duplicate prevention** — same email + same posting → 409. Applications persist with `source="public_careers"` and a short human-friendly `application_ref` (`APP-XXXXXXXX`).
+- **Frontend** `pages/PublicCareers.jsx` (381 lines) — full listing/detail/apply/success flow decomposed into 7 sub-components. Header/FilterBar with ministry facets + search, PostingCard for browse, ApplyPanel with PostingHeader + ApplyForm + SuccessPanel for the detail/apply flow.
+- **Cross-linking** — orange "Browse open positions" CTA added to `/transparency/{slug}` header (data-testid `transparency-careers-link`).
+- **Admin visibility** — public-applied applicants show a "Public" pill on the Kanban card + reference number, so admins can distinguish citizen submissions from internal referrals at a glance.
+- **Testing** — 11/11 backend tests (`test_iter28_public_careers.py`) + 11/11 frontend flows (`iteration_28.json`) green. Zero regressions on existing transparency tests (13/13 still pass).
+- **New data-testids**: `careers-page`, `careers-org-name`, `careers-filters`, `careers-search`, `careers-ministry-filter`, `careers-posting-{id}`, `careers-empty`, `careers-404`, `careers-apply-page`, `careers-apply-back`, `careers-posting-detail`, `careers-apply-form`, `careers-apply-name/email/phone/resume`, `careers-apply-submit`, `careers-apply-success`, `careers-application-ref`, `transparency-careers-link`, `applicant-source-public`.
+

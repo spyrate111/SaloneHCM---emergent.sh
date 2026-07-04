@@ -524,9 +524,23 @@ function KanbanCard({ a }) {
 function KanbanCardView({ a, dragging }) {
   return (
     <div className={dragging ? "bg-white border border-[#26547C] rounded-md p-2.5 shadow-lg" : ""}>
-      <div className="text-[13px] font-medium text-[#1A1C1E] truncate">{a.name}</div>
+      <div className="flex items-start justify-between gap-1.5">
+        <div className="text-[13px] font-medium text-[#1A1C1E] truncate flex-1">{a.name}</div>
+        {a.source === "public_careers" && (
+          <span
+            data-testid="applicant-source-public"
+            title="Applied via public /careers page"
+            className="shrink-0 text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-[#FFF2E5] text-[#B84F2F] border border-[#F1C3A1]"
+          >
+            Public
+          </span>
+        )}
+      </div>
       <div className="text-[11px] text-[#525860] truncate mt-0.5">{a.posting_title}</div>
       <div className="text-[11px] text-[#686D76] truncate mt-0.5 font-data">{a.email}</div>
+      {a.application_ref && (
+        <div className="text-[10px] text-[#9aa0a6] truncate mt-0.5 font-data">{a.application_ref}</div>
+      )}
     </div>
   );
 }
