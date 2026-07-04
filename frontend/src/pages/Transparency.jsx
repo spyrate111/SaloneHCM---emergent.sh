@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../lib/api";
-import { Landmark, ShieldCheck, Users, Wallet, Receipt, ArrowDownToLine, FileCheck, Globe } from "lucide-react";
+import { Landmark, ShieldCheck, Users, Wallet, Receipt, ArrowDownToLine, FileCheck, Globe, Briefcase } from "lucide-react";
 import { LANGUAGES, t } from "../lib/i18nTransparency";
 
 const fmtSLE = (v) => new Intl.NumberFormat("en", { style: "currency", currency: "SLE", maximumFractionDigits: 0 }).format(v);
@@ -60,6 +60,13 @@ export default function Transparency() {
               </>
             )}
           </div>
+          <a
+            href={`/careers/${slug}`}
+            data-testid="transparency-careers-link"
+            className="inline-flex items-center gap-2 mt-5 bg-[#D1603D] hover:bg-[#B84F2F] text-white text-sm font-semibold px-4 py-2 rounded-md transition"
+          >
+            <Briefcase className="w-4 h-4" /> Browse open positions
+          </a>
         </div>
       </header>
 

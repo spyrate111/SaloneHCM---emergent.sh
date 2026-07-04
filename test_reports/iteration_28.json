@@ -1,0 +1,28 @@
+{
+  "summary": "Iter28 public /careers/:slug frontend UX — all 9 requested flows tested end-to-end on preview URL and PASSED: (1) anonymous browse renders careers-page with dark header 'Join Government of Sierra Leone', '10 open positions' subheading, filters, and 10 posting cards each carrying careers-posting-<uuid> testid; (2) search 'Health' correctly narrows to 3 Health-related postings (Epidemiologist / Community Health Officer / Senior Midwifery Coordinator), clearing restores all 10; (3) ministry dropdown filters correctly (e.g. Ministry of Basic and Senior Secondary Education → 3 cards, all matching); (4) posting card click updates URL to ?apply=<pid> and shows careers-apply-page + careers-posting-detail with title, ministry, department, location, grade, description; (5) careers-apply-back returns to listing; (6) form submission produces careers-apply-success panel with ref APP-D7EB5C49 matching APP-XXXXXXXX regex and 'Application submitted' text; (7) duplicate reapply with same email → 409, toast 'You have already applied to this posting.' shown, no new success panel; (8) 5-char resume_summary blocked by HTML5 minLength validation ('Please lengthen this text to 20 characters or more'); (9) transparency-careers-link exists on /transparency/government-of-sierra-leone header, href=/careers/government-of-sierra-leone, navigates correctly; (10) /careers/does-not-exist renders careers-404 with helpful copy; (11) admin@gov.sl login → /talent → applicant-kanban → kanban-col-applied contains the newly-submitted card with name 'UI Test Applicant', title 'TVET Coordinator', and the correct email. Preserved DB budget: only 1 successful application was created (well under the 2-max limit).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Talent → Applicant Kanban card", "issues": ["The applicant kanban card does not visually surface the source='public_careers' badge. Card only shows name/title/email. Not required by acceptance criteria but would improve triage UX so admin can quickly distinguish citizen-submitted vs. internal applications. Minor / cosmetic."]}
+    ]
+  },
+  "test_report_links": ["/app/frontend/src/pages/PublicCareers.jsx"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PublicCareers.jsx correctly uses process.env.REACT_APP_BACKEND_URL with a dedicated axios instance (withCredentials:false) — good for anonymous flow; no auth token accidentally leaks.",
+    "Duplicate detection returns 409 with a string detail that is surfaced cleanly via `toast.error` — the current err?.response?.data?.detail extraction correctly handles both string and non-string detail shapes.",
+    "HTML5 validation minLength=20 on resume_summary works client-side; backend also enforces it (422) per iter28 backend tests — defense-in-depth is good.",
+    "File is 381 lines — well under the 700-line threshold and cleanly decomposed into Header/FilterBar/PostingCard/ApplyPanel/PostingHeader/ApplyForm/SuccessPanel sub-components. Good separation of concerns.",
+    "All interactive elements carry data-testid — testability is excellent."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (per request)", "frontend": "100% (11/11 flows pass)"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (no 2FA) — used for admin visibility test only. Test applicant email created: ui_test_b6aa335a@example.com applied to posting 7a320177-5659-408d-832b-c17ca2899225 (TVET Coordinator) with ref APP-D7EB5C49.",
+  "seed_data_creation": "One live applicant record created in gov tenant: name='UI Test Applicant', email=ui_test_b6aa335a@example.com, posting=TVET Coordinator, ref=APP-D7EB5C49, stage=applied, source=public_careers. Main agent may want to clean this up post-verification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter28 public careers frontend fully validated. If retesting: use a fresh incognito to avoid stale state, generate a fresh uuid-suffixed email for each new application to avoid tripping the duplicate-prevention 409, and remember only 2 successful applications total are budgeted for this tenant. Rate limit is 5/min per IP — testing pace is fine.",
+  "rca of the issue": "No bugs to RCA — all flows work as designed."
+}

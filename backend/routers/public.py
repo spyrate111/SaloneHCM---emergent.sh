@@ -1,12 +1,13 @@
 """Public read-only transparency endpoints — Gov-tier customers can opt-in to publish anonymised ministry rollups for the citizenry."""
+import uuid
 from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
-from core import db, require_admin, audit, now_utc, iso
+from core import db, require_admin, audit, now_utc, iso, limiter
 from payroll_engine import calc_payslip
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -208,3 +209,139 @@ async def view_count(user: dict = Depends(require_admin)):
         "ts": {"$gte": cutoff},
     })
     return {"total_views": total, "last_7d": last7}
+
+
+
+# ===== Public Careers (no auth) =====
+# Any tenant that has opted into `transparency_public=true` also publishes an
+# open careers page at /careers/{slug}. Citizens can browse all open job_postings
+# (whether auto-synced from establishment_positions or manually created) and
+# submit anonymous applications that land in the tenant's Kanban pipeline.
+
+
+async def _resolve_public_tenant(slug: str) -> dict:
+    company = await db.companies.find_one(
+        {"transparency_slug": slug.lower().strip(), "transparency_public": True},
+        {"_id": 0},
+    )
+    if not company:
+        raise HTTPException(404, "No public careers page for this slug")
+    return company
+
+
+def _public_posting_view(p: dict) -> dict:
+    """Strip internal fields; keep only what a citizen should see."""
+    meta = p.get("establishment_meta") or {}
+    return {
+        "id": p["id"],
+        "title": p["title"],
+        "department": p.get("department", ""),
+        "location": p.get("location", "Freetown"),
+        "employment_type": p.get("employment_type", "Full-time"),
+        "salary_min_sle": p.get("salary_min_sle", 0),
+        "salary_max_sle": p.get("salary_max_sle", 0),
+        "description": p.get("description", ""),
+        "posted_at": p.get("created_at"),
+        "source": p.get("source", "manual"),
+        "ministry": meta.get("ministry"),
+        "unit": meta.get("unit"),
+        "grade_code": meta.get("grade_code"),
+        "vacancy_count": meta.get("vacancy_count"),
+    }
+
+
+@router.get("/careers/{slug}")
+async def public_careers_list(slug: str, ministry: Optional[str] = None, q: Optional[str] = None):
+    """List open job postings for one publicly-listed tenant. No auth required."""
+    company = await _resolve_public_tenant(slug)
+    query = {"company_id": company["id"], "status": "open"}
+    postings = await db.job_postings.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+    rows = [_public_posting_view(p) for p in postings]
+    if ministry:
+        rows = [r for r in rows if (r.get("ministry") or "").lower() == ministry.lower()]
+    if q:
+        needle = q.lower().strip()
+        rows = [r for r in rows if needle in (r["title"] + " " + r["department"] + " " + (r.get("ministry") or "")).lower()]
+
+    # Ministry facets for the filter chips
+    ministries = sorted({r["ministry"] for r in rows if r.get("ministry")})
+    return {
+        "organization": {
+            "name": company["name"],
+            "slug": slug,
+            "country": company.get("country", "Sierra Leone"),
+        },
+        "total_open": len(rows),
+        "ministries": ministries,
+        "postings": rows,
+    }
+
+
+@router.get("/careers/{slug}/postings/{pid}")
+async def public_careers_detail(slug: str, pid: str):
+    """Fetch a single posting for the detail/apply page."""
+    company = await _resolve_public_tenant(slug)
+    p = await db.job_postings.find_one({"id": pid, "company_id": company["id"], "status": "open"}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "Posting not found or no longer accepting applications")
+    return {
+        "organization": {"name": company["name"], "slug": slug},
+        "posting": _public_posting_view(p),
+    }
+
+
+class PublicApplyIn(BaseModel):
+    name: str = Field(..., min_length=2, max_length=160)
+    email: EmailStr
+    phone: str = Field(..., min_length=5, max_length=32)
+    resume_summary: str = Field(..., min_length=20, max_length=4000)
+
+
+@router.post("/careers/{slug}/postings/{pid}/apply")
+@limiter.limit("5/minute")
+async def public_careers_apply(slug: str, pid: str, body: PublicApplyIn, request: Request):
+    """Anonymous public application. Lands in the tenant's Kanban pipeline at stage='applied'."""
+    company = await _resolve_public_tenant(slug)
+    posting = await db.job_postings.find_one(
+        {"id": pid, "company_id": company["id"], "status": "open"},
+        {"_id": 0, "id": 1, "title": 1},
+    )
+    if not posting:
+        raise HTTPException(404, "Posting not found or no longer accepting applications")
+
+    # Reject obvious duplicate (same email + same posting within the last 24h).
+    existing = await db.applicants.find_one({
+        "company_id": company["id"],
+        "posting_id": pid,
+        "email": body.email.lower(),
+    }, {"_id": 0, "id": 1})
+    if existing:
+        raise HTTPException(409, "You have already applied to this posting.")
+
+    aid = str(uuid.uuid4())
+    application_ref = f"APP-{aid[:8].upper()}"
+    doc = {
+        "id": aid,
+        "company_id": company["id"],
+        "posting_id": pid,
+        "name": body.name.strip(),
+        "email": body.email.lower(),
+        "phone": body.phone.strip(),
+        "resume_summary": body.resume_summary.strip(),
+        "stage": "applied",
+        "source": "public_careers",
+        "application_ref": application_ref,
+        "ip_prefix": (request.client.host if request.client else "?").rsplit(".", 1)[0] + ".x",
+        "created_at": iso(now_utc()),
+        "stage_history": [{
+            "from": None, "to": "applied", "by": "public_careers", "ts": iso(now_utc()),
+        }],
+    }
+    await db.applicants.insert_one(doc)
+    return {
+        "ok": True,
+        "application_ref": application_ref,
+        "posting_title": posting["title"],
+        "message": "Thank you for applying. Our team will review your application and reach out.",
+    }

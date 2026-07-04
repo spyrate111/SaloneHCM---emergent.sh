@@ -27,6 +27,7 @@ import SmsLogs from "./pages/SmsLogs";
 import Schedules from "./pages/Schedules";
 import Ministry from "./pages/Ministry";
 import Transparency from "./pages/Transparency";
+import PublicCareers from "./pages/PublicCareers";
 import Performance from "./pages/Performance";
 import Verify from "./pages/Verify";
 import CivilService from "./pages/CivilService";
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/videos" element={<VideosPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/transparency/:slug" element={<Transparency />} />
+          <Route path="/careers/:slug" element={<PublicCareers />} />
           <Route path="/verify/:cid" element={<Verify />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
