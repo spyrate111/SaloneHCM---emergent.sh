@@ -8,7 +8,7 @@ import {
   Sparkles, Settings, UserCircle, LogOut, ChevronRight, ScrollText,
   Heart, GraduationCap, BarChart3, FlaskConical, FolderArchive,
   Building2, UserCog, MessageSquare,
-  Repeat, Landmark, Award, Menu, X, Wallet, CreditCard, Layers, TrendingUp,
+  Repeat, Landmark, Award, Menu, X, Wallet, CreditCard, Layers, TrendingUp, Video,
 } from "lucide-react";
 
 const NAV = [
@@ -40,6 +40,7 @@ const NAV = [
   { to: "/users", label: "Users & Access", icon: UserCog, roles: ["admin", "superadmin"] },
   { to: "/settings", label: "Settings", icon: Settings, roles: ["admin", "superadmin"] },
   { to: "/companies", label: "Tenants", icon: Building2, roles: ["superadmin"] },
+  { to: "/admin/videos", label: "Marketing Videos", icon: Video, roles: ["superadmin"] },
 ];
 
 export default function Layout() {

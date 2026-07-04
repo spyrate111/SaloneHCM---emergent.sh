@@ -40,6 +40,7 @@ import PricingPage from "./marketing/PricingPage";
 import DemoPage from "./marketing/DemoPage";
 import TourPage from "./marketing/TourPage";
 import VideosPage from "./marketing/VideosPage";
+import AdminVideos from "./pages/admin/Videos";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="/sms-logs" element={<ProtectedRoute adminOnly><SmsLogs /></ProtectedRoute>} />
             <Route path="/ministry" element={<ProtectedRoute adminOnly><Ministry /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute superAdminOnly><Companies /></ProtectedRoute>} />
+            <Route path="/admin/videos" element={<ProtectedRoute superAdminOnly><AdminVideos /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
