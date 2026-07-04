@@ -263,3 +263,11 @@ See `/app/memory/test_credentials.md`.
   - `components/TransparencyCard.jsx` — Extracted `PortalBadge`, `SlugEditor`, `LivePortalBlock` sub-components. All 7 data-testids preserved.
 - All post-refactor data-testids verified identical (sidebar, nav-*, header-*, transparency-*, admin-videos-*).
 
+
+## v1.14 — Super-admin Twilio SMS test quick-action (Feb 20 2026)
+- **New component** `components/TwilioTestButton.jsx` — modal-based diagnostic tool mounted on `/companies` page header next to "Create tenant".
+- **Live-send validation** against Twilio Virtual Phone (`+18777804236`) verified end-to-end. SID matches `/^SM[0-9a-f]{32}$/`, status returns `queued`.
+- **Wraps existing endpoints** — `GET /api/integrations/status` (shows configured badge) + `POST /api/integrations/sms/test` (executes the send). No new backend code.
+- **Testing** — frontend testing agent 8/8 flows green (report: `iteration_26.json`). Zero defects, zero regressions on the existing `/companies` UI. Cap of 1 live Twilio send per test run to preserve trial balance.
+- **New data-testids**: `sms-test-open`, `sms-test-modal`, `sms-test-status`, `sms-test-phone`, `sms-test-body`, `sms-test-submit`, `sms-test-cancel`, `sms-test-result`.
+
