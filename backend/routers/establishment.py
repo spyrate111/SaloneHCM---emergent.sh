@@ -15,6 +15,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core import db, tenant_filter, with_tenant, require_admin, require_feature, audit, now_utc, iso
+from establishment_ats_sync import (
+    sync_position_to_posting,
+    close_position_posting,
+    sync_all_positions_for_tenant,
+)
 
 router = APIRouter(
     prefix="/establishment",
@@ -104,7 +109,9 @@ async def create_position(body: PositionIn, user: dict = Depends(require_admin))
     await db.establishment_positions.insert_one(doc)
     await audit("establishment_position_create", f"establishment_positions/{pid}", user,
                 {"title": body.position_title, "approved": body.approved_count})
-    return _annotate({k: v for k, v in doc.items() if k != "_id"}, 0)
+    clean = {k: v for k, v in doc.items() if k != "_id"}
+    await sync_position_to_posting(clean, 0, user)
+    return _annotate(clean, 0)
 
 
 @router.patch("/positions/{pid}")
@@ -125,6 +132,7 @@ async def patch_position(pid: str, body: PositionPatch, user: dict = Depends(req
     await audit("establishment_position_patch", f"establishment_positions/{pid}", user, updates)
     fresh = await db.establishment_positions.find_one({"id": pid, **tf}, {"_id": 0})
     filled = (await _filled_counts(user["company_id"])).get(pid, 0)
+    await sync_position_to_posting(fresh, filled, user)
     return _annotate(fresh, filled)
 
 
@@ -138,6 +146,7 @@ async def delete_position(pid: str, user: dict = Depends(require_admin)):
     if filled:
         raise HTTPException(409, f"Cannot delete — {filled} employee(s) still assigned. Unassign first.")
     await db.establishment_positions.delete_one({"id": pid, **tf})
+    await close_position_posting(pid, user)
     await audit("establishment_position_delete", f"establishment_positions/{pid}", user,
                 {"title": pos["position_title"]})
     return {"ok": True}
@@ -257,6 +266,8 @@ async def assign_employee(pid: str, body: AssignIn, user: dict = Depends(require
     await audit("establishment_assign", f"establishment_positions/{pid}", user,
                 {"employee_id": body.employee_id,
                  "name": f"{emp.get('first_name','')} {emp.get('last_name','')}".strip()})
+    new_filled = (await _filled_counts(user["company_id"])).get(pid, 0)
+    await sync_position_to_posting(pos, new_filled, user)
     return {"ok": True, "position_id": pid, "employee_id": body.employee_id}
 
 
@@ -291,4 +302,21 @@ async def unassign_employee(pid: str, body: AssignIn, user: dict = Depends(requi
     )
     await audit("establishment_unassign", f"establishment_positions/{pid}", user,
                 {"employee_id": body.employee_id})
+    fresh_pos = await db.establishment_positions.find_one({"id": pid, **tf}, {"_id": 0})
+    if fresh_pos:
+        new_filled = (await _filled_counts(user["company_id"])).get(pid, 0)
+        await sync_position_to_posting(fresh_pos, new_filled, user)
     return {"ok": True}
+
+
+
+# ---------- Talent ATS sync (batch backfill) ----------
+
+@router.post("/sync-vacancies")
+async def sync_vacancies_to_ats(user: dict = Depends(require_admin)):
+    """Idempotent batch: reconcile every establishment_position → job_posting for this tenant.
+    Useful after bulk imports or as a super-admin audit tool. Returns counts of
+    postings created / updated / closed."""
+    result = await sync_all_positions_for_tenant(user["company_id"], actor_email=user["email"])
+    await audit("establishment_sync_vacancies", "establishment/sync-vacancies", user, result)
+    return result

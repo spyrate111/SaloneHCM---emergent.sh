@@ -51,6 +51,15 @@ async def seed() -> None:
     # Establishment positions (Gov + Demo) — Ministry→Directorate→Unit→Position
     await establishment.seed_establishment(company_id=gov_id)
 
+    # Auto-publish every vacant establishment_position to Talent ATS.
+    # Idempotent — safe on every boot. Closes filled/frozen positions too.
+    try:
+        from establishment_ats_sync import sync_all_positions_for_tenant
+        async for _c in db.companies.find({}, {"_id": 0, "id": 1}):
+            await sync_all_positions_for_tenant(_c["id"])
+    except Exception as e:
+        logger.warning("establishment→ats sync failed on boot: %s", e)
+
     # Marketing video library (public training/walkthrough videos)
     await marketing_videos.seed_videos()
 

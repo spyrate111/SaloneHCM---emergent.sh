@@ -271,3 +271,14 @@ See `/app/memory/test_credentials.md`.
 - **Testing** — frontend testing agent 8/8 flows green (report: `iteration_26.json`). Zero defects, zero regressions on the existing `/companies` UI. Cap of 1 live Twilio send per test run to preserve trial balance.
 - **New data-testids**: `sms-test-open`, `sms-test-modal`, `sms-test-status`, `sms-test-phone`, `sms-test-body`, `sms-test-submit`, `sms-test-cancel`, `sms-test-result`.
 
+
+
+## v1.15 — Establishment → Talent ATS auto-sync (Feb 20 2026)
+- **Bridges Gov-tier workflow**: every vacant `establishment_position` is auto-published to the Talent ATS as an open `job_posting` (`source="establishment"`). Closes automatically when position is filled/frozen/deleted. Reopens on unassign.
+- **New module** `backend/establishment_ats_sync.py` — `sync_position_to_posting()`, `close_position_posting()`, `sync_all_positions_for_tenant()` (idempotent, safe on boot).
+- **Hooks wired** in `routers/establishment.py` after create/patch/delete/assign/unassign.
+- **New endpoint** `POST /api/establishment/sync-vacancies` — batch backfill for a tenant.
+- **Boot backfill** in `seeders/__init__.py` — reconciles every tenant on startup (verified: `positions=14 created=10 updated=0 closed=0` on gov).
+- **Frontend badge** on `Talent.jsx` posting cards — blue "From Establishment" pill (data-testid `posting-source-establishment`) + footer metadata row (ministry, grade, budget code, "N vacancies / M approved"). Auto-postings distinguishable by `data-testid="posting-establishment-{uuid}"` vs manual `posting-manual-{uuid}`.
+- **Manual postings unaffected** — sync only touches rows where `source="establishment"`.
+- **Testing**: 8/8 new lifecycle tests (`test_iter27_establishment_ats_sync.py`) + 9/9 pre-existing establishment tests + 56/56 talent-related tests still green. Frontend testing agent 8/8 flows verified (`iteration_27.json`), including cross-tenant isolation (demo tenant has ZERO establishment cards; manual postings intact) and employee read-only gating.

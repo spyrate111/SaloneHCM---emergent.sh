@@ -89,16 +89,41 @@ function Recruitment({ isAdmin }) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {postings.map((p) => (
-          <div key={p.id} className="bg-white border border-[#E2DFD6] rounded-lg p-5">
-            <div className="flex items-start justify-between">
-              <div>
+          <div
+            key={p.id}
+            data-testid={p.source === "establishment" ? `posting-establishment-${p.id}` : `posting-manual-${p.id}`}
+            className={`bg-white border rounded-lg p-5 ${p.source === "establishment" ? "border-[#C9D7E2]" : "border-[#E2DFD6]"}`}
+          >
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-wider text-[#525860]">{p.department} · {p.location}</div>
-                <h3 className="font-heading text-lg font-semibold mt-0.5">{p.title}</h3>
+                <h3 className="font-heading text-lg font-semibold mt-0.5 truncate">{p.title}</h3>
               </div>
-              <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${p.status === "open" ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{p.status}</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {p.source === "establishment" && (
+                  <span
+                    data-testid="posting-source-establishment"
+                    title={`Auto-published from Establishment Control (${p.establishment_meta?.ministry || ""})`}
+                    className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6EEF6] text-[#26547C] border border-[#C9D7E2]"
+                  >
+                    From Establishment
+                  </span>
+                )}
+                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${p.status === "open" ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{p.status}</span>
+              </div>
             </div>
-            <div className="mt-3 text-sm text-[#525860]">{p.employment_type} · {fmtSLE(p.salary_min_sle)} – {fmtSLE(p.salary_max_sle)}</div>
+            <div className="mt-3 text-sm text-[#525860]">
+              {p.employment_type} · {fmtSLE(p.salary_min_sle)} – {fmtSLE(p.salary_max_sle)}
+            </div>
             {p.description && <p className="text-xs text-[#686D76] mt-2">{p.description}</p>}
+            {p.source === "establishment" && p.establishment_meta && (
+              <div className="mt-3 pt-3 border-t border-[#F1EEE6] flex items-center gap-3 flex-wrap text-[11px] text-[#525860]">
+                <span>{p.establishment_meta.ministry}</span>
+                {p.establishment_meta.grade_code && <span className="font-data">Grade {p.establishment_meta.grade_code}</span>}
+                {p.establishment_meta.budget_code && <span className="font-data">{p.establishment_meta.budget_code}</span>}
+                <span className="ml-auto font-data">{p.establishment_meta.vacancy_count} vacancy(s) / {p.establishment_meta.approved_count} approved</span>
+              </div>
+            )}
           </div>
         ))}
         {!postings.length && <div className="col-span-2 text-center py-12 text-sm text-[#686D76]">No open positions.</div>}
