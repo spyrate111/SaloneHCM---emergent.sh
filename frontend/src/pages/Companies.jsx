@@ -5,6 +5,7 @@ import { setToken } from "../lib/api";
 import { TIER_COLORS, TIER_DESCRIPTIONS } from "../lib/features";
 import { toast } from "sonner";
 import { Building2, Plus, X, ArrowRightLeft, Crown, Sparkles, ShieldAlert, ShieldCheck, RefreshCw } from "lucide-react";
+import TwilioTestButton from "../components/TwilioTestButton";
 
 const TIER_OPTIONS = [
   { value: "lite", label: "Salone HCM Lite" },
@@ -99,13 +100,16 @@ export default function Companies() {
             Provision new SaloneHCM customer tenants, change their tier, or switch into any tenant to operate as their admin.
           </p>
         </div>
-        <button
-          data-testid="company-create-open"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
-        >
-          <Plus className="w-4 h-4" strokeWidth={1.5} /> Create tenant
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <TwilioTestButton />
+          <button
+            data-testid="company-create-open"
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+          >
+            <Plus className="w-4 h-4" strokeWidth={1.5} /> Create tenant
+          </button>
+        </div>
       </div>
 
       {/* Tier drift monitor */}
