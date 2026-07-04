@@ -1,5 +1,24 @@
 ## CHANGELOG
 
+### v1.19 (Feb 2026) — Super-Admin Videos CRUD UI
+
+**New `/admin/videos` page (super-admin only)**
+- Full library management from the browser: table view of every video (published + drafts), inline **paste-a-URL** form with **live preview** using the same public `VideoPlayer`.
+- **HTML5 drag-to-reorder** — grab any row's grip handle, drop it into position; `sort` auto-renumbers to `(i+1)*10` across affected rows to leave room for later inserts. Bulk PATCH persists the new order.
+- **Publish / draft toggle** via eye icon (no navigation needed).
+- **Delete with confirmation modal** that shows the video title before hard-delete.
+- **Chapters editor** inline in the form (add/remove/edit seconds + label).
+- **Search** field filters the table client-side across title/summary/category/persona.
+- **Marketing Videos** nav item added to the super-admin sidebar (`Layout.jsx`, `roles: ["superadmin"]`) — gov-admin correctly does NOT see it.
+
+**Testing (verified by testing_agent iter24)**
+- Backend: iter26 videos suite still 10/10 (unchanged API contract).
+- Frontend: **100% (12/12 flows verified)** — auth guard, page structure, table render, create+live-preview, edit, publish toggle, delete confirm, drag-reorder, chapters, search, mobile 390x844, public-site regression.
+- Zero defects. Testing agent's review flagged only minor observations (all favorable).
+
+---
+
+
 ### v1.18 (Feb 2026) — Training Video Library
 
 **Public marketing videos**
