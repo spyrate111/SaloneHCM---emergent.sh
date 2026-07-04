@@ -36,21 +36,8 @@ async def public_certificate_verify(cid: str):
     }
 
 
-@router.get("/transparency/{slug}")
-async def public_transparency(slug: str, request: Request):
-    """Anonymised ministry payroll rollup — no auth required.
-
-    Returns ZERO personally identifiable information. Aggregated counts and gross totals only.
-    Companies must explicitly opt-in via /transparency/settings before they appear here.
-    """
-    company = await db.companies.find_one(
-        {"transparency_slug": slug.lower().strip(), "transparency_public": True},
-        {"_id": 0},
-    )
-    if not company:
-        raise HTTPException(404, "No public transparency portal for this slug")
-
-    # Audit view count (best-effort, no PII)
+async def _log_transparency_view(company: dict, slug: str, request: Request) -> None:
+    """Best-effort audit trail — never blocks the response."""
     try:
         await db.transparency_views.insert_one({
             "company_id": company["id"],
@@ -61,11 +48,9 @@ async def public_transparency(slug: str, request: Request):
     except Exception:
         pass
 
-    employees = await db.employees.find(
-        {"company_id": company["id"], "status": "active"},
-        {"_id": 0},
-    ).to_list(5000)
 
+def _aggregate_ministries(employees: list[dict]) -> list[dict]:
+    """Group active employees by department → anonymised ministry rollup."""
     by_ministry: dict[str, dict] = defaultdict(lambda: {
         "name": "",
         "headcount": 0,
@@ -81,21 +66,50 @@ async def public_transparency(slug: str, request: Request):
         m["monthly_gross_sle"] += slip["gross"]
         m["monthly_paye_sle"] += slip["paye"]
         m["monthly_nassit_sle"] += slip["nassit_employee"] + slip["nassit_employer"]
-
     rows = sorted(by_ministry.values(), key=lambda r: -r["monthly_gross_sle"])
     for r in rows:
         r["monthly_gross_sle"] = round(r["monthly_gross_sle"], 2)
         r["monthly_paye_sle"] = round(r["monthly_paye_sle"], 2)
         r["monthly_nassit_sle"] = round(r["monthly_nassit_sle"], 2)
+    return rows
 
+
+async def _last_payroll_and_compliance(company_id: str) -> tuple[Optional[dict], int, Optional[str]]:
+    """Return (last_run_summary_or_None, filings_count, most_recent_filing_period_or_None)."""
     runs = await db.payroll_runs.find(
-        {"company_id": company["id"]}, {"_id": 0}
+        {"company_id": company_id}, {"_id": 0}
     ).sort("created_at", -1).to_list(12)
     last = runs[0] if runs else None
+    last_summary = {"period": last["period"], "ran_at": last["created_at"]} if last else None
 
     filings = await db.nra_filings.find(
-        {"company_id": company["id"]}, {"_id": 0}
+        {"company_id": company_id}, {"_id": 0}
     ).sort("filed_at", -1).to_list(12)
+    return last_summary, len(filings), (filings[0]["period"] if filings else None)
+
+
+@router.get("/transparency/{slug}")
+async def public_transparency(slug: str, request: Request):
+    """Anonymised ministry payroll rollup — no auth required.
+
+    Returns ZERO personally identifiable information. Aggregated counts and gross totals only.
+    Companies must explicitly opt-in via /transparency/settings before they appear here.
+    """
+    company = await db.companies.find_one(
+        {"transparency_slug": slug.lower().strip(), "transparency_public": True},
+        {"_id": 0},
+    )
+    if not company:
+        raise HTTPException(404, "No public transparency portal for this slug")
+
+    await _log_transparency_view(company, slug, request)
+
+    employees = await db.employees.find(
+        {"company_id": company["id"], "status": "active"},
+        {"_id": 0},
+    ).to_list(5000)
+    rows = _aggregate_ministries(employees)
+    last_payroll, filings_count, most_recent_filing = await _last_payroll_and_compliance(company["id"])
 
     return {
         "organization": {
@@ -113,12 +127,10 @@ async def public_transparency(slug: str, request: Request):
             "monthly_nassit_sle": round(sum(r["monthly_nassit_sle"] for r in rows), 2),
         },
         "ministries": rows,
-        "last_payroll": (
-            {"period": last["period"], "ran_at": last["created_at"]} if last else None
-        ),
+        "last_payroll": last_payroll,
         "compliance": {
-            "returns_filed_12m": len(filings),
-            "most_recent_filing": filings[0]["period"] if filings else None,
+            "returns_filed_12m": filings_count,
+            "most_recent_filing": most_recent_filing,
         },
     }
 

@@ -503,26 +503,11 @@ async def ghost_workers_csv(run_id: str, user: dict = Depends(require_admin)):
     )
 
 
-@router.get("/ghost-workers/{run_id}.pdf")
-async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
-    import io
-    from fastapi.responses import StreamingResponse
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib import colors
+def _ghost_pdf_story(data: dict, company: dict, styles, small, h1) -> list:
+    """Build the ghost-worker PDF story header (excluding the table)."""
+    from reportlab.platypus import Paragraph, Spacer
     from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-
-    data = await _ghost_data(run_id, tenant_filter(user))
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
-
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
-    styles = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#B83A3A"), alignment=0, spaceAfter=6)
-    small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
-
-    story = [
+    return [
         Paragraph(f"Ghost-Worker Audit · {data['period']}", h1),
         Paragraph(
             f"<b>{company.get('name','—')}</b> &nbsp;|&nbsp; "
@@ -534,32 +519,62 @@ async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
         ),
         Spacer(1, 0.4 * cm),
     ]
+
+
+def _ghost_pdf_suspects_table(suspects: list):
+    """Build the Table+TableStyle for ghost-worker suspects. Returns a Table."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle
+    rows = [["Employee", "Department", "Ministry", "Grade", "Budget code", "Net SLE", "Hire date"]]
+    total = 0.0
+    for s in suspects:
+        rows.append([
+            s["employee_name"], s["department"] or "—", s["ministry"] or "—",
+            s["grade_code"] or "—", s["budget_code"] or "—",
+            f"{s['net_unacknowledged_sle']:,.2f}", s["hire_date"] or "—",
+        ])
+        total += s["net_unacknowledged_sle"]
+    rows.append(["TOTAL", "", "", "", "", f"{total:,.2f}", ""])
+    t = Table(rows, colWidths=[5 * cm, 3.4 * cm, 4 * cm, 1.6 * cm, 3 * cm, 3 * cm, 2.4 * cm])
+    t.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
+        ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FBEAEA")),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#B83A3A")),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
+        ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
+        ("ALIGN", (5, 1), (5, -1), "RIGHT"),
+        ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#B83A3A")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    return t
+
+
+@router.get("/ghost-workers/{run_id}.pdf")
+async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
+    import io
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    data = await _ghost_data(run_id, tenant_filter(user))
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
+    styles = getSampleStyleSheet()
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#B83A3A"), alignment=0, spaceAfter=6)
+    small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
+
+    story = _ghost_pdf_story(data, company, styles, small, h1)
     if data["suspects"]:
-        rows = [["Employee", "Department", "Ministry", "Grade", "Budget code", "Net SLE", "Hire date"]]
-        total = 0.0
-        for s in data["suspects"]:
-            rows.append([
-                s["employee_name"], s["department"] or "—", s["ministry"] or "—",
-                s["grade_code"] or "—", s["budget_code"] or "—",
-                f"{s['net_unacknowledged_sle']:,.2f}", s["hire_date"] or "—",
-            ])
-            total += s["net_unacknowledged_sle"]
-        rows.append(["TOTAL", "", "", "", "", f"{total:,.2f}", ""])
-        t = Table(rows, colWidths=[5 * cm, 3.4 * cm, 4 * cm, 1.6 * cm, 3 * cm, 3 * cm, 2.4 * cm])
-        t.setStyle(TableStyle([
-            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
-            ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FBEAEA")),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#B83A3A")),
-            ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
-            ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
-            ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
-            ("ALIGN", (5, 1), (5, -1), "RIGHT"),
-            ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#B83A3A")),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ]))
-        story.append(t)
+        story.append(_ghost_pdf_suspects_table(data["suspects"]))
     else:
         story.append(Paragraph(
             "<font color='#2D7A5D'><b>No ghost workers detected — all payslips acknowledged.</b></font>",

@@ -277,6 +277,38 @@ async def mark_invoice_paid(iid: str, body: MarkPaidIn, user: dict = Depends(req
 
 # ---------- Stripe Checkout flow (international fallback) ----------
 
+def _compute_stripe_usd_amount(plan_id: str, employees: int) -> float:
+    """Server-side USD price for Stripe (SLE not natively supported). Frontend cannot manipulate."""
+    plan = PLAN_CATALOG[plan_id]
+    base_usd = plan["monthly_usd"]
+    extra_usd = max(0, employees - plan["included_employees"]) * (plan["extra_employee_sle"] / 22)
+    return round(base_usd + extra_usd, 2)
+
+
+async def _persist_pending_stripe_txn(session, company_id: str, plan_id: str,
+                                       amount_usd: float, amount_sle: float,
+                                       metadata: dict, user: dict) -> str:
+    """Persist a pending payment_transaction (mandated by playbook) + audit log."""
+    txn_id = str(uuid.uuid4())
+    await db.payment_transactions.insert_one({
+        "id": txn_id,
+        "session_id": session.session_id,
+        "company_id": company_id,
+        "plan_id": plan_id,
+        "amount_usd": amount_usd,
+        "amount_sle": amount_sle,
+        "currency": "USD",
+        "payment_status": "initiated",
+        "status": "open",
+        "metadata": metadata,
+        "created_at": iso(now_utc()),
+    })
+    await audit("billing_stripe_session", f"payment_transactions/{txn_id}", user, {
+        "plan": plan_id, "amount_usd": amount_usd,
+    })
+    return txn_id
+
+
 @router.post("/stripe/checkout")
 async def create_stripe_checkout(body: CreateCheckoutIn, http_request: Request, user: dict = Depends(require_admin)):
     """Create a Stripe Checkout session in USD (Stripe doesn't support SLE).
@@ -289,11 +321,7 @@ async def create_stripe_checkout(body: CreateCheckoutIn, http_request: Request, 
 
     employees = await db.employees.count_documents({"company_id": user["company_id"], "status": {"$ne": "terminated"}})
     amount_sle, _ = _compute_amount_for_company(body.plan_id, employees)
-    plan = PLAN_CATALOG[body.plan_id]
-    # Stripe doesn't natively support SLE; charge in USD using catalog conversion.
-    base_usd = plan["monthly_usd"]
-    extra_usd = max(0, employees - plan["included_employees"]) * (plan["extra_employee_sle"] / 22)
-    amount_usd = round(base_usd + extra_usd, 2)
+    amount_usd = _compute_stripe_usd_amount(body.plan_id, employees)
 
     from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
     host_url = str(http_request.base_url).rstrip("/")
@@ -315,24 +343,9 @@ async def create_stripe_checkout(body: CreateCheckoutIn, http_request: Request, 
     )
     session = await sc.create_checkout_session(req)
 
-    # Persist a pending payment_transaction (mandated by playbook).
-    txn_id = str(uuid.uuid4())
-    await db.payment_transactions.insert_one({
-        "id": txn_id,
-        "session_id": session.session_id,
-        "company_id": user["company_id"],
-        "plan_id": body.plan_id,
-        "amount_usd": amount_usd,
-        "amount_sle": amount_sle,
-        "currency": "USD",
-        "payment_status": "initiated",
-        "status": "open",
-        "metadata": metadata,
-        "created_at": iso(now_utc()),
-    })
-    await audit("billing_stripe_session", f"payment_transactions/{txn_id}", user, {
-        "plan": body.plan_id, "amount_usd": amount_usd,
-    })
+    await _persist_pending_stripe_txn(
+        session, user["company_id"], body.plan_id, amount_usd, amount_sle, metadata, user,
+    )
     return {"checkout_url": session.url, "session_id": session.session_id, "amount_usd": amount_usd}
 
 

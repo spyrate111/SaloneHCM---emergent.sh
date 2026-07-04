@@ -1,0 +1,29 @@
+{
+  "summary": "Iter25 frontend regression — verified (a) the P0 bugfix: 'Marketing Videos' link now visible in the super-admin sidebar with data-testid=nav-marketing-videos (from lib/nav.js line 39), gated to roles=['superadmin']; and (b) the 5 code-quality refactors (Layout.jsx → AppSidebar + AppHeader + lib/nav.js; TransparencyCard.jsx → PortalBadge/SlugEditor/LivePortalBlock; and 3 backend helpers) did NOT regress the frontend behaviour. Playwright end-to-end coverage: super-admin login with TOTP → dashboard renders → header shows company name 'Demo Salone Ltd.', tier badge 'Salone HCM Enterprise', country label 'Republic of Sierra Leone' — all 3 testids present after Layout.jsx split. Marketing Videos sidebar link clicks through to /admin/videos, page renders admin-videos-page + admin-videos-search + admin-videos-add. Full CRUD verified end-to-end: create RegressionTestVideo1 (youtu.be/dQw4w9WgXcQ), row appears; toggle publish flips Published→Draft pill and back; delete opens admin-videos-delete-modal and removes the row. Mobile viewport (375x800) — sidebar-open shows the drawer (translate-x-0), sidebar-close hides it (-translate-x-full). Gov-admin login → /settings renders transparency-card with SlugEditor (transparency-slug), Publish/Unpublish button, LivePortalBlock (transparency-live-block + transparency-open) — all sub-components mount cleanly. /civil-service loads without redirect, sidebar 'Civil Service' entry still present. Billing page: plan cards render; selecting 'Professional' plan reveals PaymentMethodCard with 'Card / Stripe' rail marked INTERNATIONAL (method-stripe testid + stripe-btn testid). No console errors from any refactored component. Test data cleaned up (RegressionTestVideo1 deleted).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "lib/nav.js — single source-of-truth NAV array + filterNavForUser(user, has) is a clean refactor. Line 39 correctly gates Marketing Videos with roles=['superadmin'] so it never leaks to tenant admins. Verified gov-admin does NOT see this link in previous iter24 tests.",
+    "AppSidebar.jsx (77 lines) — NavLink loop derives data-testid via label.toLowerCase().replace(/[^a-z]/g,'-') → 'Marketing Videos' → nav-marketing-videos ✓. Note: any future NAV label containing digits will be stripped by the regex (harmless today; something to remember when adding new nav items).",
+    "AppHeader.jsx (40 lines) — preserves header-company-name, header-tier-badge, and header-company-country data-testids exactly as before the refactor. sidebar-open button correctly hidden on lg+ via lg:hidden.",
+    "Layout.jsx (53 lines, down from ~178) — clean shell orchestrator. Route-change → setMobileOpen(false) effect preserved. Sidebar props are all plain data (items, user, mobileOpen, onClose, onLogout) — no logic leakage into presentational component. Good separation of concerns.",
+    "TransparencyCard.jsx — extraction of PortalBadge/SlugEditor/LivePortalBlock sub-components is clean; data-testids preserved (transparency-card, transparency-slug, transparency-publish, transparency-unpublish, transparency-live-block, transparency-open, transparency-update-slug). Nice: the clipboard fallback in copy() logs + toasts instead of silently failing.",
+    "pages/admin/Videos.jsx — FormPanel opens/closes cleanly; PATCH-with-full-body on publish toggle is a slight over-fetch but backend accepts it (per iter24 report) — acceptable trade-off for simplicity.",
+    "Billing.jsx — PaymentMethodCard only renders after selectedPlan is set. This is intentional UX (nothing to pay for until a plan is chosen), but worth noting because a naive 'load billing page → expect Stripe rail' test will fail on first paint. Suggest adding a hint in the empty-selection state that 'Select a plan to see payment options'.",
+    "Minor: dashboard console shows a 401 on the first navigation (before the auth cookie/CSRF token round-trips) and two 403s on gov-admin dashboard for polling endpoints that gate on higher tier — these are pre-existing and did not affect any tested flow."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only run per request)", "frontend": "100% — all 10 review items verified"},
+  "test_credentials": "Super-admin admin@salonehcm.sl / Admin@2026 + TOTP (KRSXG5BANFXSAYTBORQXG43LMR2A). Gov-admin admin@gov.sl / GovAdmin@2026.",
+  "seed_data_creation": "Created & deleted one TEST video (RegressionTestVideo1) end-to-end through the UI. Database left in baseline state — no stray records.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 10 flows in the review request are green. The P0 sidebar bug is fixed via /app/frontend/src/lib/nav.js line 39 (Marketing Videos entry with roles=['superadmin']). Layout.jsx + TransparencyCard.jsx refactors are behaviourally identical to pre-refactor. Two initial test 'failures' (Billing Stripe rail + nav-civil-service count) were confirmed to be test-timing artifacts — Billing rail requires selecting a plan first (PaymentMethodCard is conditional on selectedPlan), and the nav-civil-service link IS rendered (visible in the final screenshot at /civil-service). No action items for the main agent.",
+  "rca of the issue": "N/A — no defects found. Original P0 (Marketing Videos link missing from sidebar) was already fixed by main agent in lib/nav.js. All refactored components preserve their data-testid contracts."
+}
