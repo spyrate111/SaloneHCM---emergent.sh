@@ -17,7 +17,7 @@ import pytest
 import requests
 import uuid
 
-BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 ADMIN = {"email": "admin@salonehcm.sl", "password": "Admin@2026"}
 EMP = {"email": "aminata.kamara@salonehcm.sl", "password": "Employee@2026"}
 
@@ -33,23 +33,36 @@ GOV_ONLY = {"gov_payroll", "ministry_reports", "bulk_sms_payslips", "nra_export"
 
 
 # ---------- fixtures ----------
+def _login_with_retry(payload):
+    """Login with graceful 429 backoff — required when the previous test file's
+    rate-limit test warmed up slowapi's login bucket (30/min per IP)."""
+    import time
+    for delay in (0, 5, 15, 30):
+        if delay:
+            time.sleep(delay)
+        r = requests.post(f"{BASE_URL}/api/auth/login", json=payload, timeout=30)
+        if r.status_code != 429:
+            return r
+    return r
+
+
 @pytest.fixture(scope="module")
 def admin_token():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json=ADMIN, timeout=30)
+    r = _login_with_retry(ADMIN)
     assert r.status_code == 200, r.text
     return r.json()["token"]
 
 
 @pytest.fixture(scope="module")
 def admin_login_json():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json=ADMIN, timeout=30)
+    r = _login_with_retry(ADMIN)
     assert r.status_code == 200
     return r.json()
 
 
 @pytest.fixture(scope="module")
 def emp_token():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json=EMP, timeout=30)
+    r = _login_with_retry(EMP)
     assert r.status_code == 200, r.text
     return r.json()["token"]
 

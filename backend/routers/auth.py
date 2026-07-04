@@ -42,7 +42,7 @@ def _public_company(c: dict | None) -> dict | None:
 
 
 @router.post("/login")
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 async def login(request: Request, body: LoginIn, response: Response):
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})

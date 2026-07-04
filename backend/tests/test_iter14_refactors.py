@@ -11,7 +11,7 @@ import pyotp
 import pytest
 import requests
 
-BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 SUPER_EMAIL = "admin@salonehcm.sl"
 SUPER_PASS = "Admin@2026"
 TOTP_SECRET = os.environ.get("SUPERADMIN_TOTP_SECRET", "KRSXG5BANFXSAYTBORQXG43LMR2A")

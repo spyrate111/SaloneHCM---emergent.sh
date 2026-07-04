@@ -6,7 +6,6 @@ tier-gated routes. We now resync on every boot. This test simulates the
 drift and verifies the next API call works.
 """
 import os
-import asyncio
 import pytest
 import requests
 from pymongo import MongoClient
@@ -43,8 +42,13 @@ def test_gov_features_array_matches_tier_after_boot(gov_h):
 
 
 def test_resync_function_corrects_drift():
-    """Programmatic test: simulate drift, run resync, verify correction."""
-    from seeders import _resync_all_company_features
+    """Programmatic test: simulate drift, run resync, verify correction.
+
+    The resync runs in a subprocess so we get a clean Motor client bound to a
+    fresh event loop — required because prior async tests in the suite can
+    close the module-level loop that `core.client` is bound to.
+    """
+    import subprocess
 
     db_sync = _db()
     gov = db_sync.companies.find_one({"name": "Government of Sierra Leone"})
@@ -58,8 +62,14 @@ def test_resync_function_corrects_drift():
     drifted = db_sync.companies.find_one({"id": gov["id"]})
     assert "civil_service" not in drifted["features"]
 
-    # Run resync (async helper, called from sync test via asyncio.run)
-    asyncio.run(_resync_all_company_features())
+    # Run resync in a subprocess with a clean interpreter/event-loop.
+    result = subprocess.run(
+        ["python", "-c",
+         "import asyncio; from seeders import _resync_all_company_features; "
+         "asyncio.run(_resync_all_company_features())"],
+        cwd="/app/backend", capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, f"resync subprocess failed: {result.stderr}"
 
     # Verify drift is corrected
     fixed = db_sync.companies.find_one({"id": gov["id"]})
