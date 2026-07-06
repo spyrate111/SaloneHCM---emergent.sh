@@ -4,6 +4,7 @@ from tiers import features_for
 from . import companies, users, employees, benefits, talent, gov, civil_service, establishment
 from . import migrate
 from . import marketing_videos
+from . import budget_balances
 
 
 async def _resync_all_company_features() -> None:
@@ -47,6 +48,9 @@ async def seed() -> None:
     # Civil-service config for the Gov tenant
     await civil_service.seed_civil_service(company_id=gov_id)
     await civil_service.upgrade_gov_employees(company_id=gov_id)
+
+    # Baseline IFMIS budget balances for pre-payroll budget check
+    await budget_balances.seed_current_period_balances(company_id=gov_id)
 
     # Establishment positions (Gov + Demo) — Ministry→Directorate→Unit→Position
     await establishment.seed_establishment(company_id=gov_id)

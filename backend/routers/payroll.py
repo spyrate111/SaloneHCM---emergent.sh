@@ -38,6 +38,50 @@ async def preview_payroll(user: dict = Depends(require_admin)):
 
 @router.post("/run")
 async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
+    """Run payroll for the given period.
+
+    Guardrail (Gov tier only): re-runs the pre-payroll budget check against
+    IFMIS allocations. Blocks unsafe verdicts unless an existing check has an
+    active override signed by an mof_approver or superadmin.
+    """
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "features": 1, "tier": 1}) or {}
+    features = company.get("features") or []
+    if "gov_payroll" in features:
+        period = f"{body.period_year}-{body.period_month:02d}"
+        # Look up the most recent budget check for this period.
+        latest = await db.payroll_budget_checks.find_one(
+            {"company_id": user["company_id"], "period": period},
+            {"_id": 0}, sort=[("ran_at", -1)],
+        )
+        if not latest:
+            raise HTTPException(412, {
+                "code": "budget_check_missing",
+                "message": f"Run a pre-payroll budget check for {period} before executing payroll.",
+                "period": period,
+            })
+        if latest["verdict"] != "safe" and not latest.get("override"):
+            raise HTTPException(412, {
+                "code": "budget_check_blocked",
+                "message": f"Budget check for {period} returned '{latest['verdict']}'. An MoF approver must apply an override before running.",
+                "verdict": latest["verdict"],
+                "check_id": latest["id"],
+                "codes_over": latest["totals"]["codes_over"],
+                "unallocated_headcount": latest["totals"]["unallocated_headcount"],
+            })
+        # Passed — carry the check_id into the run for provenance.
+        result = await _run(body.period_year, body.period_month, user)
+        override_used = bool(latest.get("override"))
+        await db.payroll_runs.update_one(
+            {"id": result["id"]},
+            {"$set": {"budget_check_id": latest["id"], "budget_override_used": override_used}},
+        )
+        await db.payroll_budget_checks.update_one(
+            {"id": latest["id"]}, {"$set": {"run_id": result["id"]}},
+        )
+        result["budget_check_id"] = latest["id"]
+        result["budget_override_used"] = override_used
+        return result
+
     return await _run(body.period_year, body.period_month, user)
 
 

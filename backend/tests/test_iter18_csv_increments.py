@@ -100,6 +100,14 @@ class TestActings:
     def test_acting_appears_in_payroll(self, gov_token):
         emps = requests.get(f"{API}/employees", headers=_h(gov_token), timeout=15).json()
         emp_id = emps[0]["id"]
+        # Idempotency: delete any stale actings with the same test-owned title
+        # (residue from earlier runs that never cleaned up).
+        for a in requests.get(f"{API}/civil-service/actings",
+                              headers=_h(gov_token), params={"active_only": False},
+                              timeout=15).json():
+            if "iter18 PayrollCheck" in (a.get("acting_role_title") or ""):
+                requests.delete(f"{API}/civil-service/actings/{a['id']}",
+                                headers=_h(gov_token), timeout=15)
         # Create active acting
         r = requests.post(f"{API}/civil-service/actings", headers=_h(gov_token), json={
             "employee_id": emp_id,
@@ -115,8 +123,10 @@ class TestActings:
         }, timeout=30).json()
         slip = next(s for s in run["slips"] if s["employee_id"] == emp_id)
         breakdown = slip.get("allowance_breakdown") or {}
-        assert any("iter18 PayrollCheck" in k for k in breakdown.keys()), f"acting missing from breakdown: {breakdown}"
-        assert any(abs(v - 999) < 0.01 for v in breakdown.values())
+        matching = [(k, v) for k, v in breakdown.items() if "iter18 PayrollCheck" in k]
+        assert matching, f"acting missing from breakdown: {breakdown}"
+        assert any(abs(v - 999) < 0.01 for _, v in matching), \
+            f"expected 999 SLE, got: {matching}"
         # Cleanup
         requests.delete(f"{API}/civil-service/actings/{aid}", headers=_h(gov_token), timeout=15)
 

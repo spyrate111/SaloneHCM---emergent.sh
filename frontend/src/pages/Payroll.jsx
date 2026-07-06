@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import SmsPayslipButton from "../components/SmsPayslipButton";
 import IfmisActions from "../components/IfmisActions";
+import { BudgetCheckModal, BudgetBalancesPanel } from "../components/BudgetCheck";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -77,12 +78,34 @@ export default function Payroll() {
     setPreview(data); setStep(2);
   };
 
+  const isGov = has("gov_payroll");
+  const period = `${year}-${String(month).padStart(2, "0")}`;
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showBalances, setShowBalances] = useState(false);
+
   const doRun = async () => {
+    if (isGov) {
+      setShowBudgetModal(true);
+      return;
+    }
+    await executeRun();
+  };
+
+  const executeRun = async () => {
     setRunning(true);
     try {
       await api.post("/payroll/run", { period_year: Number(year), period_month: Number(month) });
       setStep(3); loadRuns();
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      const msg = typeof detail === "object" ? detail?.message : (detail || "Payroll run failed");
+      toast.error(msg);
     } finally { setRunning(false); }
+  };
+
+  const onBudgetConfirmed = async () => {
+    setShowBudgetModal(false);
+    await executeRun();
   };
 
   return (
@@ -177,6 +200,30 @@ export default function Payroll() {
           </div>
         )}
       </div>
+
+      {/* Gov-only: IFMIS budget balances panel (collapsible) */}
+      {isGov && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowBalances((s) => !s)}
+            data-testid="toggle-budget-balances"
+            className="inline-flex items-center gap-2 text-sm text-[#26547C] hover:underline"
+          >
+            <ShieldCheck className="w-4 h-4" strokeWidth={1.5} />
+            {showBalances ? "Hide" : "Show"} IFMIS budget balances for {period}
+          </button>
+          {showBalances && <BudgetBalancesPanel period={period} />}
+        </div>
+      )}
+
+      {showBudgetModal && (
+        <BudgetCheckModal
+          period={period}
+          isMofApprover={!!user?.mof_approver || user?.role === "superadmin"}
+          onConfirm={onBudgetConfirmed}
+          onClose={() => setShowBudgetModal(false)}
+        />
+      )}
 
       {/* Runs history */}
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">

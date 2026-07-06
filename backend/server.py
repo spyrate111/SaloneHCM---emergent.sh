@@ -18,7 +18,7 @@ from routers import (
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
-    sector_presets, promotion, marketing,
+    sector_presets, promotion, marketing, payroll_budget,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +80,7 @@ api.include_router(stripe_webhook.router)
 api.include_router(sector_presets.router)
 api.include_router(promotion.router)
 api.include_router(marketing.router)
+api.include_router(payroll_budget.router)
 
 
 @api.get("/")
