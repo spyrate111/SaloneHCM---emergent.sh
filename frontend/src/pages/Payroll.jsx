@@ -220,6 +220,7 @@ export default function Payroll() {
         <BudgetCheckModal
           period={period}
           isMofApprover={!!user?.mof_approver || user?.role === "superadmin"}
+          currentUserEmail={user?.email}
           onConfirm={onBudgetConfirmed}
           onClose={() => setShowBudgetModal(false)}
         />

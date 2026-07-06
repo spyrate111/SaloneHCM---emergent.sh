@@ -9,7 +9,7 @@ import {
 /** Anti-fraud pre-payroll budget check.
  *  Blocks Gov payroll runs that exceed IFMIS allocations unless an MoF approver
  *  overrides with a reason. Every override is audit-logged and SMS-notified. */
-export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose }) {
+export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose, currentUserEmail }) {
   const [check, setCheck] = useState(null);
   const [busy, setBusy] = useState(true);
   const [reason, setReason] = useState("");
@@ -37,7 +37,7 @@ export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose }) 
         check_id: check.id, reason: reason.trim(),
       });
       toast.success("Override applied — MoF approvers notified via SMS");
-      setCheck({ ...check, override: { by: "you", at: new Date().toISOString(), reason } });
+      setCheck({ ...check, override: { by: currentUserEmail || "you", at: new Date().toISOString(), reason } });
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Override failed");
     } finally { setApplying(false); }
