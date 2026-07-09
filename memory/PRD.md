@@ -349,3 +349,45 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 ### New data-testids
 `toggle-budget-balances`, `budget-balances-panel`, `budget-balance-row-*`, `budget-balance-edit-*`, `budget-balance-edit-modal`, `budget-balance-alloc-input`, `budget-balance-note-input`, `budget-balance-save`, `budget-balance-cancel`, `budget-check-modal`, `budget-check-close`, `budget-check-cancel`, `budget-check-proceed`, `budget-check-verdict-{safe|warn|over|unallocated_employees}`, `budget-check-table`, `budget-row-{code}`, `budget-check-unallocated-list`, `budget-check-need-approver`, `budget-check-override-form`, `budget-check-override-reason`, `budget-check-override-confirm`, `budget-check-override-apply`, `budget-check-override-notice`.
 
+
+## v1.19 — Gov Payroll Options B/C/D/E + Demo Videos Fix (Feb 20 2026)
+
+**Ships all four remaining Gov Payroll fraud/abuse guardrails in one push, plus fixes the P0 demo-video playback defect.**
+
+### Demo videos fix (P0 user-reported)
+- Google's `gtv-videos-bucket` was returning **403 Forbidden** on every URL. Swapped all 9 seeded video URLs to `media.w3.org/2010/05/*` (W3C's permanent sample MP4 CDN, verified HTTP 200 + `video/mp4`, hotlink-safe, CORS-open).
+- Seeder now also **refreshes `src`/`poster`/`duration_s`/`chapters` on existing rows** so restarts auto-heal from broken CDNs.
+- Backend verified 200 + `content-type: video/mp4`; testing agent confirmed URLs in DOM. Headless Chromium can't play H.264 in-CI but real browsers do.
+
+### Option B — Payroll variance analysis
+- **Backend** `routers/payroll_variance.py`: `GET /api/payroll/runs/{rid}/variance` returns headline totals (current/prior/Δ/Δ%), by-ministry ranked-by-|Δ%|, and an anomaly list.
+- **7 anomaly heuristics** tuned for typical civil-service payroll: raise ≥10%/25% (warn/high), headcount ≥±5%, gross ≥10%, ministry ≥15%, new starter with hire >30 days ago, terminated employees still paid.
+- **Frontend** `components/Variance.jsx` (188 lines, 4 sub-components): modal with 4 metric cells, colored trend arrows, anomaly list with severity pills, ministry table.
+- **UI wiring**: new "Variance" button (`variance-open-{runId}`) on every runs history row.
+
+### Option C — Retro-pay engine
+- `routers/payroll_rails.py::retro_router` at `/civil-service/retro-pay/*`
+- Tracks backdated grade/step/acting/manual adjustments with owed amount = monthly_delta × months_between(from, to).
+- **Fraud guardrail**: adjustments where `total ≥ 10% of basic` auto-flip to `status="pending_approval"` and require MoF approver sign-off before settlement.
+- On successful payroll run, `settle_pending_retros_for_run()` auto-marks eligible retros as settled and stamps `settled_run_id` on the retro row + `retro_settled_count/total_sle` on the run doc.
+- Settled adjustments cannot be deleted (409) — historical audit record.
+
+### Option D — Multi-signature MoF approval chain
+- `routers/payroll_rails.py::signatures_router` at `/civil-service/mof/*`
+- Per-tenant `companies.mof_signatures_required` (default 1, max 5). Superadmin-only to change.
+- `POST /mof/runs/{rid}/sign` records one signature; `mof_status` flows: `submitted → partially_signed(n/k) → approved`. Any `reject` short-circuits to `rejected`. Same signer can't sign twice.
+- Payroll runs stamped with `mof_signatures: []`, `mof_approved_by/at`, `mof_rejected_by/at`.
+
+### Option E — Payroll cutoff-day lock
+- `routers/payroll_rails.py::cutoff_router` at `/payroll/cutoff/*`
+- Per-tenant `companies.payroll_cutoff_day` (1-28) + `payroll_cutoff_enabled` bool. Off by default (backwards-compat).
+- **Enforcement**: `assert_not_cutoff_locked(user, action)` wired into `POST /employees` (hire), `PUT /employees/{eid}` (salary/status change only), `DELETE /employees/{eid}` (terminate). Returns **HTTP 423 Locked** with structured `{code, message, cutoff_day, period}` when past cutoff-day AND no completed run yet for the current period. Superadmin bypasses.
+- **Frontend** `components/CutoffBanner.jsx` — red top banner on every authenticated page when locked.
+
+### Verification
+- **427 passing / 5 skipped / 0 failures** — full backend suite in 3m18s (up from 411, added 17 new tests across iter30 + iter31).
+- **11/11 UI flows green** (`iteration_30.json`) — video src correctly points at media.w3.org, variance modal shows all 4 sub-components + no-prior-period edge case, cutoff banner absent when disabled, all 6 regression pages (payroll wizard, IFMIS toggle, civil-service, transparency, careers, dashboard) load with 0 console errors.
+
+### New data-testids
+`variance-open-{runId}`, `variance-modal`, `variance-close`, `variance-headline-totals`, `variance-anomalies`, `variance-no-anomalies`, `variance-anomaly-{kind}-{i}`, `variance-ministry-table`, `cutoff-banner`.
+
