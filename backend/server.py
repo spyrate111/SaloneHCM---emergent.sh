@@ -18,7 +18,7 @@ from routers import (
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
-    sector_presets, promotion, marketing, payroll_budget,
+    sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -81,6 +81,10 @@ api.include_router(sector_presets.router)
 api.include_router(promotion.router)
 api.include_router(marketing.router)
 api.include_router(payroll_budget.router)
+api.include_router(payroll_variance.router)
+api.include_router(payroll_rails.retro_router, prefix="/civil-service")
+api.include_router(payroll_rails.signatures_router, prefix="/civil-service")
+api.include_router(payroll_rails.cutoff_router, prefix="/payroll")
 
 
 @api.get("/")

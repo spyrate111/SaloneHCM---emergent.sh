@@ -124,6 +124,22 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     doc.pop("_id", None)
     await audit(audit_action, f"payroll_runs/{rid}", user,
                 {"period": period, "net": doc["totals"]["net"]})
+    # Settle any pending retro-pay adjustments that fall within this period.
+    try:
+        from routers.payroll_rails import settle_pending_retros_for_run
+        settled = await settle_pending_retros_for_run(rid, period, user["company_id"])
+        if settled["settled"]:
+            await db.payroll_runs.update_one(
+                {"id": rid},
+                {"$set": {
+                    "retro_settled_count": settled["settled"],
+                    "retro_settled_total_sle": settled["total_sle"],
+                }},
+            )
+            doc["retro_settled_count"] = settled["settled"]
+            doc["retro_settled_total_sle"] = settled["total_sle"]
+    except Exception as e:
+        logger.warning("retro settlement failed for run %s: %s", rid, e) if 'logger' in globals() else None
     return doc
 
 

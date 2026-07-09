@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import SmsPayslipButton from "../components/SmsPayslipButton";
 import IfmisActions from "../components/IfmisActions";
 import { BudgetCheckModal, BudgetBalancesPanel } from "../components/BudgetCheck";
+import { VarianceButton } from "../components/Variance";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -276,6 +277,7 @@ export default function Payroll() {
                     </button>
                     {has("ifmis_integration") && <IfmisActions run={r} />}
                     <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#525860] px-2.5 py-1.5 rounded"><FileText className="w-3.5 h-3.5" /> NRA</a>
+                    <VarianceButton runId={r.id} period={r.period} />
                     {has("bulk_sms_payslips") && <SmsPayslipButton run={r} />}
                   </div>
                 </td>
