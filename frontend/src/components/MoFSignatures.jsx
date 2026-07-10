@@ -99,7 +99,7 @@ function MoFSignaturesModal({ runId, onClose }) {
                 required={data.signatures_required}
                 mofStatus={data.mof_status}
               />
-              <SignatureList signatures={data.signatures} />
+              <SignatureList signatures={data.signatures} mofStatus={data.mof_status} />
               {canSign && (
                 <div className="border-t border-[#F1EEE6] pt-4 flex items-center justify-end gap-2" data-testid="mof-sig-actions">
                   <button
@@ -171,8 +171,22 @@ function ProgressBar({ approves, rejects, required, mofStatus }) {
   );
 }
 
-function SignatureList({ signatures }) {
+function SignatureList({ signatures, mofStatus }) {
   if (!signatures || signatures.length === 0) {
+    if (mofStatus === "approved") {
+      return (
+        <div className="text-sm text-[#525860] bg-[#E6F4EC] border border-[#C9E2D2] rounded-md px-3 py-3" data-testid="mof-sig-legacy-approved">
+          This run was approved via the legacy single-signature flow. No signature-chain records exist.
+        </div>
+      );
+    }
+    if (mofStatus === "rejected") {
+      return (
+        <div className="text-sm text-[#525860] bg-[#FBEAEA] border border-[#E9C2C2] rounded-md px-3 py-3" data-testid="mof-sig-legacy-rejected">
+          This run was rejected via the legacy single-signature flow. No signature-chain records exist.
+        </div>
+      );
+    }
     return (
       <div className="text-sm text-[#525860] bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-3 py-3" data-testid="mof-sig-empty">
         No signatures yet. This run is awaiting the first MoF approver.

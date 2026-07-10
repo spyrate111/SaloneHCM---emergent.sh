@@ -391,3 +391,41 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 ### New data-testids
 `variance-open-{runId}`, `variance-modal`, `variance-close`, `variance-headline-totals`, `variance-anomalies`, `variance-no-anomalies`, `variance-anomaly-{kind}-{i}`, `variance-ministry-table`, `cutoff-banner`.
 
+
+## v1.20 — Gov Payroll UI polish: Retro-pay tab + MoF signature chain modal + Talent refactor (Feb 20 2026)
+
+**Wires the previously-scaffolded RetroPayPanel and MoFSignatures components into the app, and extracts PostJobModal from Talent.jsx for cleaner separation.**
+
+### Retro-pay (Option C) UI wiring
+- **New `/civil-service` tab** — "Retro-pay" (data-testid `tab-retro`, icon `Wallet`) between Step Increments and Ghost-Worker Audit.
+- Mounts `RetroPayPanel` (already-built component) which supports filter chips (all / pending / awaiting MoF / settled / rejected), full CRUD table with per-row approve/reject actions for MoF approvers, and a modal-based create form with employee dropdown, monthly delta, effective range, source, and reason ≥10 chars.
+- Panel calls existing backend endpoints: `GET/POST/DELETE /civil-service/retro-pay`, `POST /civil-service/retro-pay/{rid}/approve`.
+
+### MoF multi-signature (Option D) UI wiring
+- **`MoFSignaturesButton`** mounted on every payroll runs history row in `Payroll.jsx` (next to Variance button). Gated on `has("mof_approval")`. Auto-hides when run's `mof_status` is `draft`.
+- Modal opens on click, showing:
+  - Progress bar (n of k signatures required, color-coded: warn → success → error)
+  - Full signature chain list (approves = green, rejects = red, with signer, role, timestamp, note)
+  - Legacy single-sig support: if `mof_status === "approved"` OR `"rejected"` with empty `signatures[]`, shows explanatory pill instead of misleading "No signatures yet" message
+  - Sign approve / Sign reject actions (only shown when `mof_status ∈ {submitted, partially_signed}` AND user is `mof_approver` OR `superadmin`, AND user hasn't already signed).
+- **Added `partially_signed` pill** to `MOF_PILL` in Payroll.jsx (orange badge).
+- Calls existing backend: `GET /civil-service/mof/runs/{rid}/signatures`, `POST /civil-service/mof/runs/{rid}/sign`.
+
+### Talent refactor
+- **Extracted `PostJobModal`** from `Talent.jsx` (was 547 lines) into `/app/frontend/src/components/PostJobModal.jsx` (137 lines).
+- Talent.jsx now consumes the extracted component with `onClose` + `onPosted` callbacks. Owns its own form state, busy-flag, and toast handling.
+- All existing data-testids preserved (`post-job`, and new ones for the modal itself: `post-job-modal`, `post-job-title`, `post-job-department`, `post-job-location`, `post-job-salary-min`, `post-job-salary-max`, `post-job-description`, `post-job-close`, `post-job-cancel`, `post-job-submit`).
+- Talent.jsx dropped from 547 → 510 lines.
+
+### Verification
+- Frontend testing agent **100% pass** (11/11 flows, `iteration_31.json`):
+  - Retro-pay tab appears in Civil Service; all 5 filter chips work; create form successfully persists a new adjustment
+  - MoFSignaturesButton appears on approved runs (only status available in gov seed); modal opens with progress bar + empty state + close
+  - PostJobModal opens/closes on cancel/X/backdrop; submit creates posting; non-admin doesn't see the button
+  - Regression: 7 civil-service tabs + 25 payroll rows + Recruitment + Kanban all render clean (0 console errors)
+- ESLint clean on all 5 modified/new files.
+
+### New data-testids
+`tab-retro`, `retro-pay-panel`, `retro-add-btn`, `retro-filter-{all|pending|pending_approval|settled|rejected}`, `retro-row-{id}`, `retro-approve-{id}`, `retro-reject-{id}`, `retro-del-{id}`, `retro-form-modal`, `retro-emp`, `retro-monthly`, `retro-from`, `retro-to`, `retro-source`, `retro-reason`, `retro-submit`, `mof-sig-open-{runId}`, `mof-sig-modal`, `mof-sig-close`, `mof-sig-progress`, `mof-sig-list`, `mof-sig-entry-{id}`, `mof-sig-empty`, `mof-sig-legacy-approved`, `mof-sig-legacy-rejected`, `mof-sig-actions`, `mof-sig-approve`, `mof-sig-reject`, `mof-sig-already-signed`, `mof-sig-not-approver`, `post-job-modal`, `post-job-title`, `post-job-department`, `post-job-location`, `post-job-salary-min`, `post-job-salary-max`, `post-job-description`, `post-job-close`, `post-job-cancel`, `post-job-submit`.
+
+
