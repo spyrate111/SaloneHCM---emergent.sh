@@ -10,6 +10,7 @@ import {
   SortableContext, useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import PostJobModal from "../components/PostJobModal";
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 const STAGE_BG = {
@@ -57,7 +58,6 @@ function Recruitment({ isAdmin }) {
   const [postings, setPostings] = useState([]);
   const [pipeline, setPipeline] = useState({ stages: [], grouped: {}, total: 0 });
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", department: "", location: "Freetown", employment_type: "Full-time", salary_min_sle: 0, salary_max_sle: 0, description: "", status: "open" });
 
   const load = useCallback(async () => {
     const ps = await api.get("/talent/postings");
@@ -68,12 +68,6 @@ function Recruitment({ isAdmin }) {
     }
   }, [isAdmin]);
   useEffect(() => { load(); }, [load]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    await api.post("/talent/postings", { ...form, salary_min_sle: Number(form.salary_min_sle), salary_max_sle: Number(form.salary_max_sle) });
-    setOpen(false); load();
-  };
 
   const advance = async (aid, stage) => { await api.patch(`/talent/applicants/${aid}/stage`, { stage }); load(); };
 
@@ -142,40 +136,10 @@ function Recruitment({ isAdmin }) {
       )}
 
       {open && (
-        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => setOpen(false)}>
-          <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="bg-white rounded-lg w-full max-w-lg p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-heading text-xl font-semibold">New job posting</h2>
-              <button type="button" onClick={() => setOpen(false)} className="p-1 text-[#686D76]"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-3">
-              {[["title", "Title"], ["department", "Department"], ["location", "Location"]].map(([k, l]) => (
-                <div key={k}>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">{l}</label>
-                  <input required value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
-                </div>
-              ))}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Min SLE</label>
-                  <input type="number" value={form.salary_min_sle} onChange={(e) => setForm({ ...form, salary_min_sle: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Max SLE</label>
-                  <input type="number" value={form.salary_max_sle} onChange={(e) => setForm({ ...form, salary_max_sle: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Description</label>
-                <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button type="submit" className="px-4 py-2 text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white rounded-md">Post</button>
-            </div>
-          </form>
-        </div>
+        <PostJobModal
+          onClose={() => setOpen(false)}
+          onPosted={() => { setOpen(false); load(); }}
+        />
       )}
     </div>
   );

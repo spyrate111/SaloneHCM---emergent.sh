@@ -5,8 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import {
   Award, Building2, Coins, UserCog, Plus, Trash2, AlertTriangle,
-  Layers, Tag, ShieldAlert, X, CheckCircle2, Calendar, Download, FileText, Play,
+  Layers, Tag, ShieldAlert, X, CheckCircle2, Calendar, Download, FileText, Play, Wallet,
 } from "lucide-react";
+import RetroPayPanel from "../components/RetroPayPanel";
 
 const TABS = [
   { id: "grades", label: "Grades & Steps", icon: Layers },
@@ -14,6 +15,7 @@ const TABS = [
   { id: "budgets", label: "Budget Codes", icon: Tag },
   { id: "actings", label: "Acting Allowances", icon: UserCog },
   { id: "increments", label: "Step Increments", icon: Calendar },
+  { id: "retro", label: "Retro-pay", icon: Wallet },
   { id: "ghosts", label: "Ghost-Worker Audit", icon: ShieldAlert },
 ];
 
@@ -64,6 +66,7 @@ export default function CivilService() {
       {tab === "budgets" && <BudgetCodesTab />}
       {tab === "actings" && <ActingsTab />}
       {tab === "increments" && <IncrementsTab />}
+      {tab === "retro" && <RetroPayPanel />}
       {tab === "ghosts" && <GhostsTab />}
     </div>
   );

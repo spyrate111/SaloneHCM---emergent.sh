@@ -238,7 +238,7 @@ function RetroPayForm({ employees, onClose, onCreated }) {
           <div>
             <div className="text-[11px] uppercase tracking-wider text-[#525860]">Anti-fraud rail</div>
             <h3 className="font-heading text-lg font-semibold mt-0.5">Create retro-pay adjustment</h3>
-            <p className="text-xs text-[#525860] mt-1">Adjustments ≥10% of basic require an MoF approver's sign-off before settlement.</p>
+            <p className="text-xs text-[#525860] mt-1">Adjustments &ge;10% of basic require an MoF approver&rsquo;s sign-off before settlement.</p>
           </div>
           <button type="button" onClick={onClose} className="text-[#525860]"><X className="w-4 h-4" /></button>
         </div>
