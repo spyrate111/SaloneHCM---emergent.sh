@@ -143,7 +143,9 @@ export function GenerateFromRunModal({ onClose, onDone }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get("/payroll/runs").then((r) => setRuns(r.data)).catch(() => setRuns([]));
+    api.get("/payroll/runs")
+      .then((r) => setRuns(r.data))
+      .catch(() => { setRuns([]); toast.error("Could not load payroll runs — try again"); });
   }, []);
 
   const generate = async () => {

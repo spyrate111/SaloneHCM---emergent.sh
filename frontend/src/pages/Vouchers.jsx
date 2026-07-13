@@ -19,7 +19,6 @@ export default function Vouchers() {
   const { has } = useFeatures();
   const isAdminRole = ["admin", "superadmin"].includes(user?.role);
   const canManage = isAdminRole || !!user?.finance_officer;
-
   const [tab, setTab] = useState("repo");
   const [vouchers, setVouchers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -61,6 +60,7 @@ export default function Vouchers() {
   }
 
   const bs = summary?.by_status || {};
+  const canCreate = canManage || branches.some((b) => b.supervisor_user_id === user?.id);
 
   return (
     <div className="space-y-6" data-testid="vouchers-page">
@@ -81,10 +81,12 @@ export default function Vouchers() {
                 <Zap className="w-4 h-4 text-[#8B6A14]" /> Generate from run
               </button>
             )}
-            <button data-testid="voucher-new" onClick={() => setCreating(true)}
-              className="inline-flex items-center gap-1.5 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md">
-              <Plus className="w-4 h-4" /> New voucher
-            </button>
+            {canCreate && (
+              <button data-testid="voucher-new" onClick={() => setCreating(true)}
+                className="inline-flex items-center gap-1.5 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md">
+                <Plus className="w-4 h-4" /> New voucher
+              </button>
+            )}
           </div>
         </div>
         {summary && (
