@@ -37,6 +37,7 @@ import Billing from "./pages/Billing";
 import SectorPresets from "./pages/SectorPresets";
 import Promotion from "./pages/Promotion";
 import Vouchers from "./pages/Vouchers";
+import FeatureDirectory from "./pages/FeatureDirectory";
 import LandingPage from "./marketing/LandingPage";
 import PricingPage from "./marketing/PricingPage";
 import DemoPage from "./marketing/DemoPage";
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/verify/:cid" element={<Verify />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/directory" element={<FeatureDirectory />} />
             <Route path="/employees" element={<ProtectedRoute adminOnly><Employees /></ProtectedRoute>} />
             <Route path="/employees/:id" element={<ProtectedRoute adminOnly><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/payroll" element={<ProtectedRoute adminOnly><Payroll /></ProtectedRoute>} />

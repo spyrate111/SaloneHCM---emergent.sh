@@ -2,13 +2,14 @@ import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, ScrollText, Heart, GraduationCap,
   BarChart3, FlaskConical, FolderArchive, Building2, UserCog, MessageSquare,
-  Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video, FileCheck2,
+  Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video, FileCheck2, Compass,
 } from "lucide-react";
 
 // Single source-of-truth for the app sidebar navigation.
 // Each entry: { to, label, icon, roles, feature? }
 export const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "superadmin", "employee"] },
+  { to: "/directory", label: "Feature Directory", icon: Compass, roles: ["admin", "superadmin", "employee"] },
   { to: "/employees", label: "Employees", icon: Users, roles: ["admin", "superadmin"], feature: "employees" },
   { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin", "superadmin"], feature: "payroll" },
   { to: "/schedules", label: "Recurring Schedules", icon: Repeat, roles: ["admin", "superadmin"], feature: "payroll" },
