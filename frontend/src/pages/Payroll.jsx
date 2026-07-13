@@ -8,6 +8,7 @@ import IfmisActions from "../components/IfmisActions";
 import { BudgetCheckModal, BudgetBalancesPanel } from "../components/BudgetCheck";
 import { VarianceButton } from "../components/Variance";
 import { MoFSignaturesButton } from "../components/MoFSignatures";
+import MoFConfigCard from "../components/MoFConfigCard";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -228,6 +229,9 @@ export default function Payroll() {
           onClose={() => setShowBudgetModal(false)}
         />
       )}
+
+      {/* Superadmin-only: multi-sig MoF threshold dial */}
+      {user?.role === "superadmin" && has("mof_approval") && <MoFConfigCard />}
 
       {/* Runs history */}
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
