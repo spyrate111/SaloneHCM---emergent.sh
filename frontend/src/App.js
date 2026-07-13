@@ -36,6 +36,7 @@ import Loans from "./pages/Loans";
 import Billing from "./pages/Billing";
 import SectorPresets from "./pages/SectorPresets";
 import Promotion from "./pages/Promotion";
+import Vouchers from "./pages/Vouchers";
 import LandingPage from "./marketing/LandingPage";
 import PricingPage from "./marketing/PricingPage";
 import DemoPage from "./marketing/DemoPage";
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="/employees/:id" element={<ProtectedRoute adminOnly><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/payroll" element={<ProtectedRoute adminOnly><Payroll /></ProtectedRoute>} />
             <Route path="/schedules" element={<ProtectedRoute adminOnly><Schedules /></ProtectedRoute>} />
+            <Route path="/vouchers" element={<Vouchers />} />
             <Route path="/simulator" element={<ProtectedRoute adminOnly><Simulator /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute adminOnly><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />

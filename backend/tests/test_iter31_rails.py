@@ -144,9 +144,13 @@ class TestMoFSignatures:
         runs = requests.get(f"{API}/payroll/runs", headers=_h(gov_token), timeout=15).json()
         submitted = next((r for r in runs if r.get("mof_status") == "submitted"), None)
         if not submitted:
-            # Create one by running a period + submitting for MoF
+            # Create one by running a rarely-used period + submitting for MoF.
+            # _period(6) stays clear of iter29's poisoned _period(2)/(3) budget periods.
+            p = _period(6)
             _r = requests.post(f"{API}/payroll/run", headers=_h(gov_token),
-                               json={"period_year": 2026, "period_month": 9}, timeout=30).json()
+                               json={"period_year": int(p[:4]), "period_month": int(p[5:])}, timeout=30).json()
+            if "id" not in _r:
+                pytest.skip(f"cannot create run for {p}: {str(_r)[:120]}")
             sub = requests.post(f"{API}/civil-service/mof/submit/{_r['id']}", headers=_h(gov_token), timeout=15)
             if sub.status_code != 200:
                 pytest.skip(f"cannot create submitted run: {sub.text[:100]}")

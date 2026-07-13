@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Calculator, ShieldCheck, CalendarDays, Clock,
   Sparkles, Settings, UserCircle, ScrollText, Heart, GraduationCap,
   BarChart3, FlaskConical, FolderArchive, Building2, UserCog, MessageSquare,
-  Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video,
+  Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video, FileCheck2,
 } from "lucide-react";
 
 // Single source-of-truth for the app sidebar navigation.
@@ -12,6 +12,7 @@ export const NAV = [
   { to: "/employees", label: "Employees", icon: Users, roles: ["admin", "superadmin"], feature: "employees" },
   { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: ["admin", "superadmin"], feature: "payroll" },
   { to: "/schedules", label: "Recurring Schedules", icon: Repeat, roles: ["admin", "superadmin"], feature: "payroll" },
+  { to: "/vouchers", label: "Payroll Vouchers", icon: FileCheck2, roles: ["admin", "superadmin", "employee"], feature: "payroll_vouchers" },
   { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: ["admin", "superadmin"], feature: "simulator" },
   { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: ["admin", "superadmin"], feature: "compliance" },
   { to: "/leave", label: "Leave", icon: CalendarDays, roles: ["admin", "superadmin", "employee"], feature: "leave" },

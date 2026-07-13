@@ -26,6 +26,11 @@ class ResetPasswordIn(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
 
 
+class FlagsIn(BaseModel):
+    finance_officer: Optional[bool] = None
+    mof_approver: Optional[bool] = None
+
+
 def _public(u: dict) -> dict:
     return {
         "id": u["id"],
@@ -166,6 +171,19 @@ async def revoke_invite(iid: str, user: dict = Depends(require_admin)):
         raise HTTPException(404, "Invite not found, already consumed, or already revoked")
     await audit("invite_revoke", f"user_invites/{iid}", user, {})
     return {"ok": True}
+
+
+@router.patch("/{uid}/flags")
+async def set_user_flags(uid: str, body: FlagsIn, user: dict = Depends(require_admin)):
+    target = await db.users.find_one({"id": uid, **tenant_filter(user)}, {"_id": 0, "id": 1})
+    if not target:
+        raise HTTPException(404, "User not found")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(422, "No flags provided")
+    await db.users.update_one({"id": uid}, {"$set": updates})
+    await audit("user_flags_set", f"users/{uid}", user, updates)
+    return {"ok": True, **updates}
 
 
 @router.post("/{uid}/reset-password")

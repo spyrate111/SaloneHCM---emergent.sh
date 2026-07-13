@@ -38,6 +38,7 @@ export function AuthProvider({ children }) {
       company: data.company,
       twofa_enabled: !!data.twofa_enabled,
       mof_approver: !!data.mof_approver,
+      finance_officer: !!data.finance_officer,
     });
     return data;
   }, []);
@@ -54,6 +55,7 @@ export function AuthProvider({ children }) {
       company: data.company,
       twofa_enabled: !!data.twofa_enabled,
       mof_approver: !!data.mof_approver,
+      finance_officer: !!data.finance_officer,
     });
   }, []);
 

@@ -235,5 +235,7 @@ class TestAuthExposesMoFFlag:
         assert gov_admin.get("mof_approver") is True
 
     def test_employee_is_not_mof_approver(self):
-        emp = _login("adama.sankoh@gov.sl", "Employee@2026")
+        # joseph.williams is a plain employee (adama.sankoh became a seeded
+        # second MoF approver for the voucher dual-control chain in iter32).
+        emp = _login("joseph.williams@gov.sl", "Employee@2026")
         assert emp.get("mof_approver") is False

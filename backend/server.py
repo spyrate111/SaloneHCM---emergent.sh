@@ -19,6 +19,7 @@ from routers import (
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
+    vouchers,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -85,6 +86,8 @@ api.include_router(payroll_variance.router)
 api.include_router(payroll_rails.retro_router, prefix="/civil-service")
 api.include_router(payroll_rails.signatures_router, prefix="/civil-service")
 api.include_router(payroll_rails.cutoff_router, prefix="/payroll")
+api.include_router(vouchers.branches_router)
+api.include_router(vouchers.vouchers_router)
 
 
 @api.get("/")

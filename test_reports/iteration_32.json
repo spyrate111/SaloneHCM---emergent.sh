@@ -1,0 +1,48 @@
+{
+  "summary": "Frontend E2E testing of Centralized Payroll Voucher Submission & Approval System — passed all critical flows on gov tenant + superadmin/enterprise regression. Full 4-eyes workflow (draft → pending_supervisor → submitted → under_review → approved → payment_authorized), return-for-correction with revision tracking, immutability post-authorization, segregation-of-duties + dual-control fraud guards, branch CRUD, manual voucher creation, users-page finance flag pill/toggle, plain-employee scoping — all verified via Playwright.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "MINOR/UX: The 'New voucher' (voucher-new) button is rendered for plain employees who are NOT branch supervisors. When Joseph (plain employee) clicks it, the branch dropdown (vc-branch) has only the placeholder because myBranches filter yields []. Consider hiding voucher-new when canManage=false and user is not a supervisor of any branch, or showing an empty-state message instead of an unusable modal.",
+    "OBSERVATION (not a blocker): Generate-from-run modal on gov tenant showed 0 selectable runs — /payroll/runs likely returned empty for the current filter/context even though the dashboard shows LAST RUN NET SLE 50,760.05 for 2026-10. Worth a quick check that generate-from-run has usable runs available on gov tenant, or verify the seeder creates at least one gov payroll run to exercise this modal end-to-end.",
+    "OBSERVATION: Joseph (described as 'plain employee, no flags, not a supervisor') sees 'Pending Leaves 3 — Awaiting your approval' on dashboard, implying she is treated as an approver somewhere. Unrelated to vouchers feature but worth verifying seed data."
+  ],
+  "critical_code_review_comments": [
+    "Vouchers.jsx line 84: <button data-testid='voucher-new'> is always rendered regardless of role. Since CreateVoucherModal only shows supervisor branches for non-manage users, this is at minimum a UX papercut for plain employees.",
+    "VoucherDetail.jsx supervisor-approve visibility (line 232): correctly falls back to isAdminRole so admins can act for supervisors when the branch supervisor is unavailable — matches spec.",
+    "Segregation-of-duties + dual-control checks (lines 246-267) use v.created_by/approved_by string equality against user email — works consistently in testing.",
+    "Return-for-correction confirm button correctly disabled until reason.trim().length >= 10 — verified in UI."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (backend not re-tested — 13/13 pytest already green per main agent handoff)",
+    "frontend": "100% of specified flows pass"
+  },
+  "test_credentials": "admin@gov.sl / GovAdmin@2026, memuna.tucker@gov.sl / Employee@2026, adama.sankoh@gov.sl / Employee@2026, joseph.williams@gov.sl / Employee@2026, admin@salonehcm.sl / Admin@2026 (TOTP KRSXG5BANFXSAYTBORQXG43LMR2A). All credentials worked.",
+  "seed_data_creation": "Created 2 vouchers on gov tenant during testing (residue): PV-207705-5CAE (period 2077-05, MOF-HQ, Payment Authorized — immutable, cannot delete) and PV-207808-DE99 (period 2078-08, MOF-HQ, Awaiting supervisor, Revision 2). Also created + deleted a TEST branch (round-trip verified).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Voucher workflow feature is fully functional on frontend. When re-testing, log out flow requires context.clear_cookies() PLUS sessionStorage.clear() PLUS page.reload() to fully switch user identity — httpOnly cookies otherwise persist across login attempts and cause the previous user to remain authenticated. TOTP for superadmin computed via pyotp with secret KRSXG5BANFXSAYTBORQXG43LMR2A. Test residue vouchers exist on gov tenant with random 20xx periods — expected, ignore.",
+  "detailed_test_results": {
+    "gov_admin_kpis_and_nav": "PASS — sidebar shows Payroll Vouchers, /vouchers loads with KPIs (1/3 branches submitted, 7 awaiting supervisor, 0 in review, 3 approved, 5 authorized, SLE 62,950.00 total net), filter bar, and 15 voucher rows",
+    "status_filter_chips": "PASS — payment_authorized chip narrows to 5 rows, 'all' resets to 15",
+    "branches_tab": "PASS — 3 gov branches visible (MOF-HQ Ministry of Finance HQ / Adama Sankoh supervisor / 6 employees, MOH-FT, MOL-FT). Created TEST branch → row appeared. Deleted with window.confirm accepted → row removed.",
+    "manual_voucher_creation": "PASS — modal opens, MOF-HQ selectable, period 2077-05 accepted, employee dropdown lists 7 employees, gross prefills, vc-submit creates draft with toast 'Draft voucher created', row appears with Draft status",
+    "workflow_admin_creator": "PASS — voucher-action-submit → Awaiting supervisor. voucher-action-supervisor-approve visible for admin acting-for-supervisor → Submitted. voucher-action-start-review → Under review. voucher-approve-blocked notice shown (admin created, cannot approve). Approve button NOT rendered.",
+    "workflow_finance_officer": "PASS — memuna.tucker (employee + finance_officer=true) sees Payroll Vouchers nav, opens voucher under_review, clicks voucher-action-approve → Approved. No authorize button (she is not admin/mof_approver) — correct.",
+    "workflow_mof_authorizer": "PASS — adama.sankoh (mof_approver=true) sees voucher-action-authorize (neither creator nor approver), clicks → Payment authorized. voucher-authorized-banner shows 'Payment authorized by adama.sankoh@gov.sl'. 0 action buttons remain (terminal immutable state).",
+    "return_for_correction": "PASS — created 2078-08 voucher, submitted, sup-approved (as admin), clicked voucher-action-return, voucher-return-form appeared, voucher-return-confirm was disabled with empty/short reason, enabled with 'Wrong gross amounts for two staff' (>= 10 chars). Confirmed → Returned. voucher-returned-banner shows the reason. voucher-edit-toggle → changed gross to 19000 → voucher-edit-save. Resubmit (button label 'Resubmit') → Awaiting supervisor with 'Revision 2' badge visible.",
+    "generate_from_run": "PASS (partial) — voucher-generate opens voucher-generate-modal, gen-run-select renders. On gov tenant no selectable runs were available (see action items). Modal closes cleanly.",
+    "plain_employee_scoping": "PASS — joseph.williams sees empty vouchers-empty state, 0 voucher rows, no vouchers-tab-branches, no voucher-generate button. Sidebar shows only employee-scoped nav (Leave, Time & Attendance, Benefits, Talent, Performance, Document Vault, Loans, AI Assistant, Self Service, My Team). Session correctly scoped.",
+    "users_finance_flag": "PASS — memuna.tucker row shows green 'Finance' pill (user-finance-pill-{id}), adama.sankoh shows 'MoF' pill. Toggled finance on joseph.williams via user-finance-toggle → pill appeared → toggled again to revoke → pill removed (reverted).",
+    "superadmin_regression": "PASS — TOTP 2FA login worked (pyotp code 250056). Demo Salone Ltd. (Enterprise) tenant. Payroll Vouchers nav visible. /vouchers loads with 2 seeded demo branches: HQ-FT Freetown Head Office + BO-01 Bo Branch. Payroll page loads. Dashboard loads with 0 console errors."
+  }
+}

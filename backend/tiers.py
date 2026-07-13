@@ -21,6 +21,7 @@ TIER_FEATURES = {
         "simulator", "scenarios", "scenario_compare", "decision_brief_pdf",
         "ai_action_mode",
         "ifmis_integration", "establishment_control", "loans_advances", "sector_presets",
+        "payroll_vouchers",
     ],
     "gov": [
         "employees", "payroll", "compliance", "leave", "attendance", "self_service",
@@ -31,6 +32,7 @@ TIER_FEATURES = {
         "gov_payroll", "ministry_reports", "bulk_sms_payslips", "nra_export",
         "civil_service", "mof_approval", "ghost_worker_detection",
         "ifmis_integration", "establishment_control", "loans_advances", "sector_presets",
+        "payroll_vouchers",
     ],
 }
 

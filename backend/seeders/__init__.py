@@ -5,6 +5,7 @@ from . import companies, users, employees, benefits, talent, gov, civil_service,
 from . import migrate
 from . import marketing_videos
 from . import budget_balances
+from . import vouchers as vouchers_seed
 
 
 async def _resync_all_company_features() -> None:
@@ -54,6 +55,9 @@ async def seed() -> None:
 
     # Establishment positions (Gov + Demo) — Ministry→Directorate→Unit→Position
     await establishment.seed_establishment(company_id=gov_id)
+
+    # Branches + role flags for the centralized payroll voucher repository
+    await vouchers_seed.seed_branches(gov_id=gov_id, demo_id=demo_id)
 
     # Auto-publish every vacant establishment_position to Talent ATS.
     # Idempotent — safe on every boot. Closes filled/frozen positions too.

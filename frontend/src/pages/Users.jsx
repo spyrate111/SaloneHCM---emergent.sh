@@ -3,7 +3,7 @@ import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import {
-  Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search, Mail, Clock,
+  Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search, Mail, Clock, Banknote,
 } from "lucide-react";
 
 const ROLE_PILL = {
@@ -88,6 +88,16 @@ export default function Users() {
       load();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Delete failed");
+    }
+  };
+
+  const toggleFinance = async (u) => {
+    try {
+      await api.patch(`/users/${u.id}/flags`, { finance_officer: !u.finance_officer });
+      toast.success(u.finance_officer ? "Finance officer revoked" : "Finance officer granted");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Update failed");
     }
   };
 
@@ -182,9 +192,17 @@ export default function Users() {
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full ${rolePill.color}`}>
-                      <RoleIcon className="w-3 h-3" strokeWidth={1.7} /> {rolePill.label}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full ${rolePill.color}`}>
+                        <RoleIcon className="w-3 h-3" strokeWidth={1.7} /> {rolePill.label}
+                      </span>
+                      {u.finance_officer && (
+                        <span data-testid={`user-finance-pill-${u.id}`} className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6F4EC] text-[#2D7A5D]">Finance</span>
+                      )}
+                      {u.mof_approver && (
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF3D9] text-[#8B6A14]">MoF</span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-[#525860] text-xs font-data">{u.employee_id ? u.employee_id.slice(0, 8) + "…" : "—"}</td>
                   <td className="py-3 px-4 text-[#686D76] text-xs font-data">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
@@ -192,6 +210,14 @@ export default function Users() {
                     <div className="inline-flex items-center gap-1">
                       {u.role !== "superadmin" && (
                         <>
+                          <button
+                            data-testid={`user-finance-toggle-${u.id}`}
+                            onClick={() => toggleFinance(u)}
+                            className={`p-1.5 rounded hover:bg-[#F1EEE6] ${u.finance_officer ? "text-[#2D7A5D]" : "text-[#A1A5AB]"}`}
+                            title={u.finance_officer ? "Revoke finance officer" : "Grant finance officer (voucher review & approval)"}
+                          >
+                            <Banknote className="w-4 h-4" strokeWidth={1.5} />
+                          </button>
                           <button
                             data-testid={`user-reset-${u.id}`}
                             onClick={() => setResetting(u)}
