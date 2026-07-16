@@ -38,6 +38,7 @@ import SectorPresets from "./pages/SectorPresets";
 import Promotion from "./pages/Promotion";
 import Vouchers from "./pages/Vouchers";
 import FeatureDirectory from "./pages/FeatureDirectory";
+import TrainingCenterPage from "./marketing/TrainingCenterPage";
 import LandingPage from "./marketing/LandingPage";
 import PricingPage from "./marketing/PricingPage";
 import DemoPage from "./marketing/DemoPage";
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/demo" element={<DemoPage />} />
           <Route path="/tour" element={<TourPage />} />
           <Route path="/videos" element={<VideosPage />} />
+          <Route path="/training" element={<TrainingCenterPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/transparency/:slug" element={<Transparency />} />
           <Route path="/careers/:slug" element={<PublicCareers />} />

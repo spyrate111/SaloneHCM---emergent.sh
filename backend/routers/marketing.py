@@ -99,7 +99,7 @@ async def create_demo_request(body: DemoRequestIn):
 
 # ---------- Marketing videos (training / walkthrough library) ----------
 
-ALLOWED_VIDEO_CATEGORIES = {"getting_started", "by_persona", "deep_dive"}
+ALLOWED_VIDEO_CATEGORIES = {"getting_started", "by_persona", "deep_dive", "training"}
 ALLOWED_VIDEO_PERSONAS = {"small_business", "midsize", "enterprise", "government", "ngo", "mining", "banking", "general"}
 
 

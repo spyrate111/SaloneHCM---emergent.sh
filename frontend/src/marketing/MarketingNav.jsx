@@ -141,6 +141,9 @@ export default function MarketingNav() {
           <Link to="/videos" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-videos">
             Videos
           </Link>
+          <Link to="/training" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-training">
+            Training
+          </Link>
         </nav>
 
         {/* Right CTAs */}
@@ -216,6 +219,11 @@ export default function MarketingNav() {
               onClick={() => setMobileOpen(false)}
               className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
             >Videos</Link>
+            <Link
+              to="/training"
+              onClick={() => setMobileOpen(false)}
+              className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
+            >Training</Link>
             <div className="pt-4 flex flex-col gap-2">
               <Link to={user ? "/dashboard" : "/login"} className="text-center px-4 h-11 inline-flex items-center justify-center text-[14px] font-semibold text-[#0F2C24] border border-[#0F2C24] rounded-full">
                 {user ? "Dashboard" : "Sign in"}

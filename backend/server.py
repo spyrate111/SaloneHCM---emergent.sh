@@ -1,6 +1,7 @@
 """SaloneHCM API entry point — wires routers and middleware."""
 import logging
 import os
+from pathlib import Path
 from fastapi import FastAPI, APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -19,7 +20,7 @@ from routers import (
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
-    vouchers,
+    vouchers, training,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -88,6 +89,7 @@ api.include_router(payroll_rails.signatures_router, prefix="/civil-service")
 api.include_router(payroll_rails.cutoff_router, prefix="/payroll")
 api.include_router(vouchers.branches_router)
 api.include_router(vouchers.vouchers_router)
+api.include_router(training.router)
 
 
 @api.get("/")
@@ -96,6 +98,12 @@ async def root():
 
 
 app.include_router(api)
+
+# Static training media (videos, posters, document pack) — /api prefix for ingress routing
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+_static_dir = Path(__file__).parent / "static"
+_static_dir.mkdir(exist_ok=True)
+app.mount("/api/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # CORS — when cookies are used, browsers reject Access-Control-Allow-Origin='*'.
 #

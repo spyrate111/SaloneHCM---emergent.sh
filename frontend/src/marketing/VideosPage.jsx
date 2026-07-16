@@ -6,6 +6,7 @@ import api from "../lib/api";
 
 const CATEGORIES = [
   { id: "all",             label: "All videos" },
+  { id: "training",        label: "Role-based training" },
   { id: "getting_started", label: "Getting started" },
   { id: "by_persona",      label: "By industry" },
   { id: "deep_dive",       label: "Deep dives" },

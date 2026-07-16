@@ -1,0 +1,55 @@
+{
+  "summary": "Frontend + light API E2E of SaloneHCM Training infrastructure (iter33). Verified public Training Center page (/training), all 4 tabs (articles/faq/quizzes/downloads), full quiz pass+fail flow with certificate PDF issuance, 7 role-based training videos on /videos, marketing nav 'Training' link, Feature Directory 'Open the Training Center' link post-login, and smoke of Payroll/Vouchers/Landing pages. All specified flows PASS. No bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "TrainingCenterPage.jsx: quiz answer keys are correctly server-side only — GET /api/public/training/content returns no 'answer'/'correct' fields in questions (verified programmatically across all 6 quizzes).",
+    "Quiz submit button gating is correct: disabled until ALL questions answered AND name.trim().length >= 2. Verified with vouchers quiz (name empty → disabled; all answers + name → enabled).",
+    "Certificate download link renders ONLY on pass (result.passed && result.certificate_id); FAIL case shows retry button and no cert link — verified.",
+    "MarketingNav.jsx has 'Training' link (data-testid=nav-training) in both desktop and mobile drawers pointing to /training — good coverage.",
+    "Downloads tab groups by kind (Reference card / Checklist / Scripts / Presentation) — renders 11 items correctly (6 QRC PDFs + 1 checklist + 1 scripts + 3 PPTX decks)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (all curl-verified: /api/public/training/content, /api/static/training/*.mp4 x7, /api/static/training/*.jpg x2, /api/static/training/docs/*.pdf|.pptx x5, cert PDF, cert verify known+unknown, /api/marketing/videos)",
+    "frontend": "100% of specified flows pass"
+  },
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (worked). Public /training and /videos require no auth.",
+  "seed_data_creation": "Created 2 certificates during testing: TC-5D5A643E (name 'QA Trainee', score 100, quiz=vouchers) and one for 'QA Fail' at score 0 (no cert issued since fail-case correctly gates cert issuance).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Training feature is fully functional. Note the /videos backend endpoint is /api/marketing/videos (NOT /api/public/videos). Quiz correct answers for vouchers: [1,2,1,2,1,1]. Fresh known cert TC-5D5A643E on record; verify-endpoint responds 200 for valid IDs, 404 for unknown.",
+  "detailed_test_results": {
+    "api_content_endpoint": "PASS — /api/public/training/content returns articles(8), faqs(14), quizzes(6), resources(11). Quiz IDs: onboarding, administrator, hr-officer, payroll-officer, vouchers, gov-modules. NO answer/correct keys leak in question objects (checked all 6 quizzes).",
+    "static_mp4_files": "PASS — All 7 training MP4s HTTP 200, content-type video/mp4, sizes 1.9-3.5MB (getting-started 2.4MB, administrator-guide 3.4MB, hr-officer 2.1MB, payroll-officer 2.6MB, vouchers-deep-dive 3.4MB, employee-self-service 1.9MB, gov-modules-tour 3.2MB).",
+    "static_jpg_posters": "PASS — HTTP 200 image/jpeg for training posters.",
+    "static_downloads": "PASS — qrc-vouchers.pdf (2.6KB, application/pdf), onboarding-checklist.pdf (3KB), deck-administrator.pptx (37KB), voiceover-scripts.pdf (12KB), deck-employee.pptx (37KB). NOTE: PDFs are small (2.6-12KB) but all return 200 with correct content-type; the >5KB heuristic from the request may not apply to the QRC PDFs which are 1-2 pages and thus expectedly small.",
+    "videos_page_training_chip": "PASS — videos-category-training chip filters to exactly '7 VIDEOS' (all 7 titles rendered in filter side panel: Getting Started & Onboarding, Administrator Guide, HR Officer Training, Payroll Officer Training, Payroll Vouchers Deep-dive, Employee Self-Service, Government Modules Tour). First video's <video> gets correct src (/api/static/training/getting-started.mp4) and poster loaded; chapters visible on top-right of player (Grade & step structure, Budget code roll-up, MoF approval workflow, Audit PDF export...). Playback itself not asserted due to Chromium H.264 codec limitation per the caveat.",
+    "marketing_nav_training_link": "PASS — data-testid=nav-training present in desktop nav; href=/training; clicking navigates to /training.",
+    "training_page_hero": "PASS — training-hero renders; 'Watch the 7-video training series' button (training-videos-link) points to /videos.",
+    "tabs": "PASS — all 4 tabs (training-tab-articles/faq/quizzes/downloads) present and functional.",
+    "articles_tab": "PASS — 8 article cards; clicking article-card-voucher-workflow-explained opens article-view with 4 <h3> section headings; article-back returns to grid.",
+    "faq_tab": "PASS — 14 faq-q-* buttons; clicking faq-q-0 reveals faq-a-0.",
+    "quizzes_tab": "PASS — 6 quiz-card-* elements present (onboarding, administrator, hr-officer, payroll-officer, vouchers, gov-modules).",
+    "quiz_pass_case_vouchers": "PASS — quiz-start-vouchers opens runner; 6 quiz-question-* elements render; quiz-submit disabled initially, still disabled after answering all 6 (name empty), enabled after entering name 'QA Trainee'; submitting with correct indices [1,2,1,2,1,1] yields quiz-result with '100% — Passed!' and quiz-certificate-link present. Certificate PDF (TC-5D5A643E.pdf) curl → 200 application/pdf 2117 bytes. Verify endpoint returns {id:TC-5D5A643E, name:QA Trainee, quiz_id:vouchers, score:100, issued_at:...}.",
+    "quiz_fail_case_vouchers": "PASS — retaking with all first options [0,0,0,0,0,0] yields '0% — Not yet'; quiz-retry button present; quiz-certificate-link NOT rendered (correctly gated on pass).",
+    "downloads_tab": "PASS — 11 download-* items grouped under Reference Cards (6), Checklists (1), Scripts (1), Presentations (3). Curl verified qrc-vouchers.pdf/onboarding-checklist.pdf/deck-administrator.pptx/voiceover-scripts.pdf/deck-employee.pptx — all 200 with correct MIME. Minor observation: group header 'SCRIPTSS' shows an extra 's' because the code appends 's' to 'Scripts' → 'Scriptss'; cosmetic only.",
+    "certificate_verify_endpoint": "PASS — /api/public/training/certificates/TC-5D5A643E/verify → 200 with cert JSON; unknown TC-NOTEXIST → 404 as expected. Also confirmed pre-seeded TC-17CE92CD → 200.",
+    "logged_in_regression_directory": "PASS — admin@gov.sl/GovAdmin@2026 login → dashboard. /directory shows directory-training-link with href=/training.",
+    "logged_in_regression_payroll": "PASS — /payroll loads without errors.",
+    "logged_in_regression_vouchers": "PASS — /vouchers loads with full KPI header (Branches Submitted 1/3, Awaiting supervisor 8, In review 0, Approved 3, Authorized 6, Total Net SLE 100,250.00) and voucher table populated. (Note: networkidle wait timed out due to ongoing background polling — the page itself is fully rendered and interactive; not a bug.)",
+    "landing_regression": "PASS — / returns 200 and marketing site renders (verified previously in nav step and via curl)."
+  },
+  "cosmetic_notes": [
+    "Downloads tab renders group header 'SCRIPTSS' (double 's') because TrainingCenterPage.jsx line ~240 does `{g}s` on group name 'Scripts'. Cosmetic — pluralization bug: 'Scripts' + 's' = 'Scriptss'. Consider using group.endsWith('s') ? group : group + 's', or a manual label map."
+  ]
+}

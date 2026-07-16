@@ -6,6 +6,7 @@ from . import migrate
 from . import marketing_videos
 from . import budget_balances
 from . import vouchers as vouchers_seed
+from . import training_videos as training_videos_seed
 
 
 async def _resync_all_company_features() -> None:
@@ -58,6 +59,9 @@ async def seed() -> None:
 
     # Branches + role flags for the centralized payroll voucher repository
     await vouchers_seed.seed_branches(gov_id=gov_id, demo_id=demo_id)
+
+    # Produced training videos (from static/training/manifest.json)
+    await training_videos_seed.seed_training_videos()
 
     # Auto-publish every vacant establishment_position to Talent ATS.
     # Idempotent — safe on every boot. Closes filled/frozen positions too.

@@ -1,0 +1,269 @@
+{
+  "getting-started": {
+    "slug": "getting-started",
+    "title": "Getting Started & Onboarding \u2014 your first day in SaloneHCM",
+    "summary": "Sign in, learn the dashboard, master the navigation, and discover every module with the Feature Directory. The essential first video for every new user.",
+    "persona": "general",
+    "sort": 10,
+    "duration_s": 107,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "Signing in"
+      },
+      {
+        "t": 36,
+        "label": "Dashboard tour"
+      },
+      {
+        "t": 52,
+        "label": "Navigation"
+      },
+      {
+        "t": 69,
+        "label": "Feature Directory"
+      },
+      {
+        "t": 88,
+        "label": "Your profile & help"
+      }
+    ],
+    "src": "/api/static/training/getting-started.mp4",
+    "poster": "/api/static/training/getting-started.jpg",
+    "category": "training"
+  },
+  "administrator-guide": {
+    "slug": "administrator-guide",
+    "title": "Administrator Guide \u2014 users, access, settings & branches",
+    "summary": "For system administrators: inviting users, granting Finance and MoF approval powers, organisation settings, plan tiers, and managing branches and offices.",
+    "persona": "government",
+    "sort": 20,
+    "duration_s": 139,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 19,
+        "label": "Users & access"
+      },
+      {
+        "t": 35,
+        "label": "Finance & MoF flags"
+      },
+      {
+        "t": 59,
+        "label": "Organisation settings"
+      },
+      {
+        "t": 74,
+        "label": "Branches & offices"
+      },
+      {
+        "t": 106,
+        "label": "Audit log"
+      },
+      {
+        "t": 121,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/administrator-guide.mp4",
+    "poster": "/api/static/training/administrator-guide.jpg",
+    "category": "training"
+  },
+  "hr-officer-training": {
+    "slug": "hr-officer-training",
+    "title": "HR Officer Training \u2014 employees, leave, attendance & documents",
+    "summary": "The complete human resources workflow: maintaining employee records, approving leave, monitoring attendance, and managing the secure document vault.",
+    "persona": "general",
+    "sort": 30,
+    "duration_s": 94,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Employee register"
+      },
+      {
+        "t": 36,
+        "label": "Leave management"
+      },
+      {
+        "t": 52,
+        "label": "Attendance"
+      },
+      {
+        "t": 66,
+        "label": "Document vault"
+      },
+      {
+        "t": 82,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/hr-officer-training.mp4",
+    "poster": "/api/static/training/hr-officer-training.jpg",
+    "category": "training"
+  },
+  "payroll-officer-training": {
+    "slug": "payroll-officer-training",
+    "title": "Payroll Officer Training \u2014 runs, payslips, bank files & compliance",
+    "summary": "Run gross-to-net payroll with Sierra Leone PAYE and NASSIT, preview before you commit, export payslips and bank files, and file NRA returns on time.",
+    "persona": "general",
+    "sort": 40,
+    "duration_s": 115,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "The payroll engine"
+      },
+      {
+        "t": 44,
+        "label": "Committing a run"
+      },
+      {
+        "t": 66,
+        "label": "Payslips & bank files"
+      },
+      {
+        "t": 83,
+        "label": "Compliance & filing"
+      },
+      {
+        "t": 101,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/payroll-officer-training.mp4",
+    "poster": "/api/static/training/payroll-officer-training.jpg",
+    "category": "training"
+  },
+  "vouchers-deep-dive": {
+    "slug": "vouchers-deep-dive",
+    "title": "Payroll Vouchers Deep-dive \u2014 branch submission to MoF authorization",
+    "summary": "The centralized voucher repository end-to-end: branch submission, supervisor approval, finance review, MoF payment authorization \u2014 and the anti-fraud rails at every step.",
+    "persona": "government",
+    "sort": 50,
+    "duration_s": 155,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 20,
+        "label": "The central repository"
+      },
+      {
+        "t": 59,
+        "label": "Inside a voucher"
+      },
+      {
+        "t": 78,
+        "label": "The approval chain"
+      },
+      {
+        "t": 106,
+        "label": "Returns & corrections"
+      },
+      {
+        "t": 123,
+        "label": "Fraud rails"
+      },
+      {
+        "t": 144,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/vouchers-deep-dive.mp4",
+    "poster": "/api/static/training/vouchers-deep-dive.jpg",
+    "category": "training"
+  },
+  "employee-self-service": {
+    "slug": "employee-self-service",
+    "title": "Employee Self-Service \u2014 payslips, leave & attendance",
+    "summary": "For every employee: view and download payslips, request leave, clock attendance, and keep your personal records current \u2014 all from your own portal.",
+    "persona": "general",
+    "sort": 60,
+    "duration_s": 92,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 15,
+        "label": "Signing in"
+      },
+      {
+        "t": 27,
+        "label": "Your payslips"
+      },
+      {
+        "t": 46,
+        "label": "Requesting leave"
+      },
+      {
+        "t": 65,
+        "label": "Attendance"
+      },
+      {
+        "t": 79,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/employee-self-service.mp4",
+    "poster": "/api/static/training/employee-self-service.jpg",
+    "category": "training"
+  },
+  "gov-modules-tour": {
+    "slug": "gov-modules-tour",
+    "title": "Government Modules Tour \u2014 civil service, establishment & transparency",
+    "summary": "For MDAs and government payroll teams: grade & step salary structure, establishment control, pre-payroll budget checks, and the public transparency portal.",
+    "persona": "government",
+    "sort": 70,
+    "duration_s": 121,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Civil service structure"
+      },
+      {
+        "t": 36,
+        "label": "Establishment control"
+      },
+      {
+        "t": 70,
+        "label": "Budget checks"
+      },
+      {
+        "t": 90,
+        "label": "Transparency portal"
+      },
+      {
+        "t": 107,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/gov-modules-tour.mp4",
+    "poster": "/api/static/training/gov-modules-tour.jpg",
+    "category": "training"
+  }
+}

@@ -4,7 +4,7 @@ import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../lib/features";
 import { NAV } from "../lib/nav";
-import { Compass, ArrowRight, Lock, ShieldAlert } from "lucide-react";
+import { Compass, ArrowRight, Lock, ShieldAlert, GraduationCap } from "lucide-react";
 
 // Descriptions + grouping keyed by route. Route/feature/role gating stays in lib/nav.js.
 const META = {
@@ -95,6 +95,10 @@ export default function FeatureDirectory() {
               <span className="font-semibold text-[#133326]" data-testid="directory-available-count">{availableCount} of {entries.length}</span>{" "}
               modules with your current role ({user?.role}) and plan{user?.company?.label ? ` (${user.company.label})` : ""}.
             </p>
+            <a href="/training" target="_blank" rel="noreferrer" data-testid="directory-training-link"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm text-[#26547C] hover:underline">
+              <GraduationCap className="w-4 h-4" /> Open the Training Center — videos, guides &amp; certification quizzes
+            </a>
           </div>
         </div>
       </div>
