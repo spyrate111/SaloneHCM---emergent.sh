@@ -467,3 +467,19 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **New page** `/directory` (`pages/FeatureDirectory.jsx`) — "Feature Directory" nav entry (all roles, second item): every module grouped (Core HR / Payroll & Finance / Government / Talent & Performance / Intelligence / Administration) with description and live status per current user — Available (links in), Requires {tier} (from /company/tiers), or Admin/Superadmin-only. Verified: Gov admin sees 28/30 available.
 - Data-testids: `directory-page`, `directory-available-count`, `directory-group-{slug}`, `directory-item-{route}`.
 - **Deployment guidance given to user**: preview URLs are per-session and sleep; permanent URL requires Deploy button (50 credits/month, custom domain supported via Entri).
+
+## v1.22 (Jun 2026) — Complete Training Infrastructure (videos + Training Center)
+**User request: role-specific training videos "recorded like a human trainer", quick reference cards, FAQs, KB articles, quizzes+certification, voiceover scripts, PPTX decks, onboarding checklists — all in the app.**
+
+### Video production pipeline (`/app/training_production/`)
+- `produce.py`: drives the REAL app in recorded headless Chromium (Playwright, 1280x720, fake cursor overlay + click ripple for human-trainer feel), paces each scene to its OpenAI TTS narration (tts-1-hd, voice coral, via Emergent key, cached by hash), assembles narration track with ffmpeg adelay/amix, muxes to H.264+AAC MP4 (+poster jpg, +chapter offsets) into `/app/backend/static/training/` and writes `manifest.json`.
+- `scenes.py`: 7 screenplays (narration + step scripts). `make_docs.py`: generates the full document pack.
+- **7 produced videos (92–156s each, 2–3.5MB)**: getting-started, administrator-guide, hr-officer-training, payroll-officer-training, vouchers-deep-dive, employee-self-service, gov-modules-tour. Seeded into `marketing_videos` under new category `training` (seeders/training_videos.py reads manifest). Videos page gained "Role-based training" filter chip.
+- Rerun anytime: `cd /app/training_production && python produce.py [slug...]` (needs playwright+chromium+ffmpeg, installed).
+
+### Training Center (`/training`, PUBLIC marketing page)
+- Backend `routers/training.py` (prefix /api/public/training): `GET /content` (8 KB articles, 14 FAQs, 6 quizzes WITHOUT answers, 11 resources), `POST /quiz/{qid}/submit` (grades server-side, 70% pass → cert in `training_certs`), `GET /certificates/{cid}.pdf` (branded ReportLab certificate), `GET /certificates/{cid}/verify`. Content source: `training_content.py`.
+- Static mount `app.mount("/api/static", ...)` in server.py serves videos + `/docs` pack: 6 quick-reference PDFs, onboarding-checklist.pdf (4-week rollout), voiceover-scripts.pdf, 3 PPTX decks (python-pptx).
+- Frontend `marketing/TrainingCenterPage.jsx`: hero, 4 tabs (Knowledge base / FAQ / Quizzes & certification / Downloads), interactive quiz runner (submit gated on all-answered + name, pass → certificate download, fail → retry). Nav "Training" link (desktop+mobile), Feature Directory "Open the Training Center" link.
+- **Testing**: iteration_33.json — 100% pass, 0 bugs (1 cosmetic pluralization fixed post-report). NOTE: headless Chromium lacks H.264 so automated browsers can't decode playback; files verified h264/aac + HTTP 200 video/mp4 — play in all real browsers.
+- New deps: playwright, python-pptx, pydub (pip), ffmpeg (apt). requirements.txt NOT frozen with playwright (production backend doesn't need it — production only serves static files).

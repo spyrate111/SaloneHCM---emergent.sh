@@ -237,7 +237,7 @@ function Downloads({ resources }) {
         if (!items.length) return null;
         return (
           <div key={g}>
-            <h3 className="text-[11px] uppercase tracking-[0.18em] text-[#525860] mb-3">{g}s</h3>
+            <h3 className="text-[11px] uppercase tracking-[0.18em] text-[#525860] mb-3">{g.endsWith("s") ? g : `${g}s`}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {items.map((r) => (
                 <a key={r.file} data-testid={`download-${r.file}`} href={`${BACKEND}${r.url}`} download
