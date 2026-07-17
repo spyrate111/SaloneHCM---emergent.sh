@@ -117,7 +117,11 @@ async def do_step(page, step):
     if op == "slide":
         await page.set_content(SLIDE.format(tag=step[1], title=step[2], subtitle=step[3]))
     elif op == "goto":
-        await page.goto(BASE + step[1], wait_until="networkidle", timeout=30000)
+        try:
+            await page.goto(BASE + step[1], wait_until="networkidle", timeout=30000)
+        except Exception:
+            await page.goto(BASE + step[1], wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(2500)
         await page.wait_for_timeout(800)
     elif op == "login":
         await page.goto(BASE + "/login", wait_until="networkidle", timeout=30000)

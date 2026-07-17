@@ -131,19 +131,19 @@
         "label": "The payroll engine"
       },
       {
-        "t": 44,
+        "t": 46,
         "label": "Committing a run"
       },
       {
-        "t": 66,
+        "t": 68,
         "label": "Payslips & bank files"
       },
       {
-        "t": 83,
+        "t": 85,
         "label": "Compliance & filing"
       },
       {
-        "t": 101,
+        "t": 103,
         "label": "Wrap-up"
       }
     ],
@@ -168,7 +168,7 @@
         "label": "The central repository"
       },
       {
-        "t": 59,
+        "t": 58,
         "label": "Inside a voucher"
       },
       {
@@ -184,7 +184,7 @@
         "label": "Fraud rails"
       },
       {
-        "t": 144,
+        "t": 143,
         "label": "Wrap-up"
       }
     ],
@@ -235,7 +235,7 @@
     "summary": "For MDAs and government payroll teams: grade & step salary structure, establishment control, pre-payroll budget checks, and the public transparency portal.",
     "persona": "government",
     "sort": 70,
-    "duration_s": 121,
+    "duration_s": 144,
     "chapters": [
       {
         "t": 0,
@@ -250,15 +250,15 @@
         "label": "Establishment control"
       },
       {
-        "t": 70,
+        "t": 73,
         "label": "Budget checks"
       },
       {
-        "t": 90,
+        "t": 113,
         "label": "Transparency portal"
       },
       {
-        "t": 107,
+        "t": 130,
         "label": "Wrap-up"
       }
     ],
