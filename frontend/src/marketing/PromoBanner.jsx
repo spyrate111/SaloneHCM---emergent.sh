@@ -29,7 +29,7 @@ export default function PromoBanner() {
   }, []);
 
   return (
-    <div data-testid="promo-banner" className="bg-[#C02719] text-white">
+    <div data-testid="promo-banner" className="bg-[#0072C6] text-white">
       <div className="max-w-[1280px] mx-auto px-4 lg:px-10 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center">
         <div className="flex items-center gap-2 text-[12px] sm:text-[13px]">
           <span className="hidden sm:inline-block uppercase tracking-[0.14em] font-bold text-white/85">Limited offer ends in</span>
@@ -50,7 +50,7 @@ export default function PromoBanner() {
         <button
           type="button"
           onClick={() => nav("/pricing")}
-          className="px-4 h-8 text-[12.5px] font-bold bg-white text-[#C02719] rounded-full hover:bg-[#FAF8F2] transition-colors"
+          className="px-4 h-8 text-[12.5px] font-bold bg-white text-[#0072C6] rounded-full hover:bg-[#FAF8F2] transition-colors"
           data-testid="promo-cta"
         >
           Claim offer

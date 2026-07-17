@@ -18,14 +18,14 @@ const STAGE_BG = {
   screening: "bg-[#E5EEF6] text-[#26547C]",
   interview: "bg-[#FBF1DE] text-[#8B6A14]",
   offer: "bg-[#FBE9DF] text-[#B84F2F]",
-  hired: "bg-[#E6F4EC] text-[#2D7A5D]",
-  rejected: "bg-[#FBEAEA] text-[#B83A3A]",
+  hired: "bg-[#E4F7E7] text-[#17A035]",
+  rejected: "bg-[#E9F2FB] text-[#3A7CB8]",
 };
 
 function Tab({ active, onClick, icon: Icon, children, testId }) {
   return (
     <button data-testid={testId} role="tab" aria-selected={active} onClick={onClick} className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-      active ? "text-[#133326] border-[#133326]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
+      active ? "text-[#0A4A1E] border-[#0A4A1E]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
     }`}>
       <Icon className="w-4 h-4" strokeWidth={1.5} /> {children}
     </button>
@@ -103,7 +103,7 @@ function Recruitment({ isAdmin }) {
                     From Establishment
                   </span>
                 )}
-                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${p.status === "open" ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{p.status}</span>
+                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${p.status === "open" ? "bg-[#E4F7E7] text-[#17A035]" : "bg-[#EBE8E0] text-[#525860]"}`}>{p.status}</span>
               </div>
             </div>
             <div className="mt-3 text-sm text-[#525860]">
@@ -308,7 +308,7 @@ function Learning({ isAdmin }) {
                 <div className="mt-2 text-[10px] text-[#8B6A14] font-data">Next due: {new Date(p.next_due_at).toLocaleDateString()}</div>
               )}
             </div>
-            <button onClick={() => markComplete(p.id)} className="mt-3 text-xs bg-[#133326] hover:bg-[#0F281E] text-white rounded px-3 py-2 font-medium">Mark complete</button>
+            <button onClick={() => markComplete(p.id)} className="mt-3 text-xs bg-[#0A4A1E] hover:bg-[#063514] text-white rounded px-3 py-2 font-medium">Mark complete</button>
           </div>
         ))}
         {!programs.length && <div className="col-span-3 text-center py-12 text-sm text-[#686D76]">No programs yet.</div>}
@@ -332,7 +332,7 @@ function Learning({ isAdmin }) {
                 <td className="py-3 px-4 font-data">{c.completed_on}</td>
                 <td className="py-3 px-4 font-data">{c.score ?? "—"}{c.score && "%"}</td>
                 <td className="py-3 px-4 text-right">
-                  <button data-testid={`cert-download-${c.id}`} onClick={() => downloadCert(c.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-2.5 py-1.5 rounded">
+                  <button data-testid={`cert-download-${c.id}`} onClick={() => downloadCert(c.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-2.5 py-1.5 rounded">
                     <Download className="w-3.5 h-3.5" /> Certificate
                   </button>
                 </td>
@@ -367,7 +367,7 @@ function Learning({ isAdmin }) {
               </div>
               <div className="border-t border-[#F1EEE6] pt-3">
                 <label className="inline-flex items-center gap-2 text-sm cursor-pointer" data-testid="program-recurring-toggle">
-                  <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} className="w-4 h-4 accent-[#133326]" />
+                  <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} className="w-4 h-4 accent-[#0A4A1E]" />
                   <span><RefreshCw className="w-3.5 h-3.5 inline mr-1" />Recurring (mandatory refresher)</span>
                 </label>
                 {form.is_recurring && (

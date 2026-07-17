@@ -3,12 +3,12 @@ import api from "../lib/api";
 import { ScrollText, User } from "lucide-react";
 
 const ACTION_COLORS = {
-  create: "bg-[#E6F4EC] text-[#2D7A5D]",
+  create: "bg-[#E4F7E7] text-[#17A035]",
   update: "bg-[#E5EEF6] text-[#26547C]",
-  delete: "bg-[#FBEAEA] text-[#B83A3A]",
+  delete: "bg-[#E9F2FB] text-[#3A7CB8]",
   payroll_run: "bg-[#FBE9DF] text-[#B84F2F]",
-  leave_approved: "bg-[#E6F4EC] text-[#2D7A5D]",
-  leave_rejected: "bg-[#FBEAEA] text-[#B83A3A]",
+  leave_approved: "bg-[#E4F7E7] text-[#17A035]",
+  leave_rejected: "bg-[#E9F2FB] text-[#3A7CB8]",
   export_bank_file: "bg-[#FBF1DE] text-[#8B6A14]",
 };
 

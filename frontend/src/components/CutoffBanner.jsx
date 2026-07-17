@@ -21,7 +21,7 @@ export default function CutoffBanner() {
   return (
     <div
       data-testid="cutoff-banner"
-      className="bg-[#FBEAEA] border-b border-[#E9C2C2] px-6 py-2.5 flex items-center gap-2 text-sm text-[#8C2F2F]"
+      className="bg-[#E9F2FB] border-b border-[#C2D9E9] px-6 py-2.5 flex items-center gap-2 text-sm text-[#2F6390]"
       role="alert"
     >
       <Lock className="w-4 h-4" strokeWidth={1.7} />

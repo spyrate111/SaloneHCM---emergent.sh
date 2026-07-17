@@ -90,13 +90,13 @@ async def certificate_pdf(cid: str):
     c = canvas.Canvas(buf, pagesize=landscape(A4))
     c.setFillColor(colors.HexColor("#FDFCFB"))
     c.rect(0, 0, W, H, fill=1, stroke=0)
-    c.setStrokeColor(colors.HexColor("#133326"))
+    c.setStrokeColor(colors.HexColor("#0A4A1E"))
     c.setLineWidth(4)
     c.rect(1.2 * cm, 1.2 * cm, W - 2.4 * cm, H - 2.4 * cm)
     c.setLineWidth(0.8)
     c.rect(1.6 * cm, 1.6 * cm, W - 3.2 * cm, H - 3.2 * cm)
 
-    c.setFillColor(colors.HexColor("#133326"))
+    c.setFillColor(colors.HexColor("#0A4A1E"))
     c.setFont("Helvetica-Bold", 11)
     c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · Training Center")
     c.setFont("Helvetica-Bold", 34)
@@ -114,7 +114,7 @@ async def certificate_pdf(cid: str):
     c.setFillColor(colors.HexColor("#26547C"))
     c.drawCentredString(W / 2, H - 11.8 * cm, doc["quiz_title"])
     c.setFont("Helvetica-Bold", 14)
-    c.setFillColor(colors.HexColor("#2D7A5D"))
+    c.setFillColor(colors.HexColor("#17A035"))
     c.drawCentredString(W / 2, H - 13.2 * cm, f"Score: {doc['score']}%")
 
     issued = doc.get("issued_at", "")[:10]

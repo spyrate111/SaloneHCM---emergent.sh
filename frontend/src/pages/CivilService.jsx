@@ -54,7 +54,7 @@ export default function CivilService() {
             role="tab"
             aria-selected={tab === t.id}
             className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-              tab === t.id ? "text-[#133326] border-[#133326]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
+              tab === t.id ? "text-[#0A4A1E] border-[#0A4A1E]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
             }`}
           >
             <t.icon className="w-4 h-4" strokeWidth={1.5} /> {t.label}
@@ -150,7 +150,7 @@ function GradesTab() {
                   <td className="py-3 px-4 font-data text-[#26547C]">{min ? `${fmtSLE(min)} → ${fmtSLE(max)}` : "—"}</td>
                   <td className="py-3 px-4 text-right">
                     <button data-testid={`edit-steps-${g.code}`} onClick={() => setEditing({ grade: g, steps: g.steps?.length ? g.steps : [{ step_number: 1, monthly_amount_sle: 0 }] })} className="text-xs text-[#26547C] hover:underline mr-3">Edit steps</button>
-                    <button onClick={() => remove(g.code)} className="text-xs text-[#B83A3A] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                    <button onClick={() => remove(g.code)} className="text-xs text-[#3A7CB8] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
                   </td>
                 </tr>
               );
@@ -261,10 +261,10 @@ function AllowancesTab() {
                 </td>
                 <td className="py-3 px-4 font-data text-xs">{r.applies_to_grades?.length ? r.applies_to_grades.join(", ") : "All"}</td>
                 <td className="py-3 px-4">
-                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${r.enabled ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{r.enabled ? "On" : "Off"}</span>
+                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${r.enabled ? "bg-[#E4F7E7] text-[#17A035]" : "bg-[#EBE8E0] text-[#525860]"}`}>{r.enabled ? "On" : "Off"}</span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button onClick={() => remove(r.id)} className="text-xs text-[#B83A3A] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                  <button onClick={() => remove(r.id)} className="text-xs text-[#3A7CB8] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
                 </td>
               </tr>
             ))}
@@ -357,7 +357,7 @@ function BudgetCodesTab() {
                 <td className="py-3 px-4 text-[#525860]">{c.program}</td>
                 <td className="py-3 px-4 font-data">{c.fiscal_year || "—"}</td>
                 <td className="py-3 px-4 text-right">
-                  <button onClick={() => remove(c.code)} className="text-xs text-[#B83A3A] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                  <button onClick={() => remove(c.code)} className="text-xs text-[#3A7CB8] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
                 </td>
               </tr>
             ))}
@@ -451,10 +451,10 @@ function ActingsTab() {
                 <td className="py-3 px-4 font-data">{a.start_date}</td>
                 <td className="py-3 px-4 font-data">{a.end_date || <span className="text-[#A1A5AB]">open</span>}</td>
                 <td className="py-3 px-4">
-                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${isActive(a) ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{isActive(a) ? "Active" : "Inactive"}</span>
+                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${isActive(a) ? "bg-[#E4F7E7] text-[#17A035]" : "bg-[#EBE8E0] text-[#525860]"}`}>{isActive(a) ? "Active" : "Inactive"}</span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button onClick={() => remove(a.id)} className="text-xs text-[#B83A3A] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                  <button onClick={() => remove(a.id)} className="text-xs text-[#3A7CB8] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
                 </td>
               </tr>
             ))}
@@ -569,7 +569,7 @@ function IncrementsTab() {
                     <td className="py-2 px-3 font-medium">{a.employee_name}</td>
                     <td className="py-2 px-3 font-data">{a.grade_code}</td>
                     <td className="py-2 px-3 font-data">{a.from_step}</td>
-                    <td className="py-2 px-3 font-data text-[#2D7A5D] font-semibold">{a.to_step}</td>
+                    <td className="py-2 px-3 font-data text-[#17A035] font-semibold">{a.to_step}</td>
                     <td className="py-2 px-3 font-data text-[#26547C]">+{fmtSLE(a.delta_sle)}</td>
                   </tr>
                 ))}
@@ -599,7 +599,7 @@ function IncrementsTab() {
                 <td className="py-2.5 px-4 font-medium">{h.employee_name}</td>
                 <td className="py-2.5 px-4 font-data">{h.grade_code}</td>
                 <td className="py-2.5 px-4 font-data">{h.from_step} → {h.to_step}</td>
-                <td className="py-2.5 px-4 font-data text-[#2D7A5D]">+{fmtSLE(h.delta_sle)}</td>
+                <td className="py-2.5 px-4 font-data text-[#17A035]">+{fmtSLE(h.delta_sle)}</td>
                 <td className="py-2.5 px-4 text-xs text-[#525860]">{h.applied_by}</td>
               </tr>
             ))}
@@ -661,10 +661,10 @@ function GhostsTab() {
           </select>
           {report && (
             <>
-              <button data-testid="ghost-pdf" onClick={() => downloadReport("pdf")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-3 py-2 rounded-md">
+              <button data-testid="ghost-pdf" onClick={() => downloadReport("pdf")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md">
                 <FileText className="w-3.5 h-3.5" /> PDF
               </button>
-              <button data-testid="ghost-csv" onClick={() => downloadReport("csv")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-3 py-2 rounded-md">
+              <button data-testid="ghost-csv" onClick={() => downloadReport("csv")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md">
                 <Download className="w-3.5 h-3.5" /> CSV
               </button>
             </>
@@ -684,7 +684,7 @@ function GhostsTab() {
           </div>
           {report.suspects.length > 0 && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
-              <div className="px-6 py-3 bg-[#FBEAEA] border-b border-[#F2D0D0] flex items-center gap-2 text-sm text-[#B83A3A]">
+              <div className="px-6 py-3 bg-[#E9F2FB] border-b border-[#D0E2F2] flex items-center gap-2 text-sm text-[#3A7CB8]">
                 <AlertTriangle className="w-4 h-4" /> {report.ghost_suspects} unacknowledged payslip{report.ghost_suspects !== 1 ? "s" : ""} totalling {fmtSLE(report.suspects.reduce((a, s) => a + s.net_unacknowledged_sle, 0))} in net pay
               </div>
               <table className="w-full text-sm">
@@ -701,7 +701,7 @@ function GhostsTab() {
                       <td className="py-2.5 px-4 text-[#525860] text-xs">{s.ministry || "—"}</td>
                       <td className="py-2.5 px-4 font-data text-xs">{s.grade_code || "—"}</td>
                       <td className="py-2.5 px-4 font-data text-xs">{s.budget_code || "—"}</td>
-                      <td className="py-2.5 px-4 font-data font-semibold text-[#B83A3A]">{fmtSLE(s.net_unacknowledged_sle)}</td>
+                      <td className="py-2.5 px-4 font-data font-semibold text-[#3A7CB8]">{fmtSLE(s.net_unacknowledged_sle)}</td>
                       <td className="py-2.5 px-4 font-data text-xs">{s.hire_date || "—"}</td>
                     </tr>
                   ))}
@@ -711,7 +711,7 @@ function GhostsTab() {
           )}
           {!report.suspects.length && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center">
-              <CheckCircle2 className="w-12 h-12 mx-auto text-[#2D7A5D]" strokeWidth={1.3} />
+              <CheckCircle2 className="w-12 h-12 mx-auto text-[#17A035]" strokeWidth={1.3} />
               <div className="font-heading text-lg font-semibold mt-3">No ghost workers detected</div>
               <p className="text-sm text-[#525860] mt-1">All employees acknowledged this period&rsquo;s payslips.</p>
             </div>
@@ -752,8 +752,8 @@ function Field({ label, children }) {
 
 function Kpi({ label, value, tone }) {
   const tones = {
-    success: "text-[#2D7A5D]",
-    danger: "text-[#B83A3A]",
+    success: "text-[#17A035]",
+    danger: "text-[#3A7CB8]",
     muted: "text-[#525860]",
   };
   return (

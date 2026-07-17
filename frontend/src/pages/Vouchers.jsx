@@ -83,7 +83,7 @@ export default function Vouchers() {
             )}
             {canCreate && (
               <button data-testid="voucher-new" onClick={() => setCreating(true)}
-                className="inline-flex items-center gap-1.5 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md">
+                className="inline-flex items-center gap-1.5 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md">
                 <Plus className="w-4 h-4" /> New voucher
               </button>
             )}
@@ -94,8 +94,8 @@ export default function Vouchers() {
             <KPI label="Branches submitted" value={`${summary.branches_submitted}/${summary.branches_total}`} color="text-[#26547C]" />
             <KPI label="Awaiting supervisor" value={bs.pending_supervisor || 0} color="text-[#8B6A14]" />
             <KPI label="In review" value={(bs.submitted || 0) + (bs.under_review || 0)} color="text-[#26547C]" />
-            <KPI label="Approved" value={bs.approved || 0} color="text-[#2D7A5D]" />
-            <KPI label="Authorized" value={bs.payment_authorized || 0} color="text-[#2D7A5D]" />
+            <KPI label="Approved" value={bs.approved || 0} color="text-[#17A035]" />
+            <KPI label="Authorized" value={bs.payment_authorized || 0} color="text-[#17A035]" />
             <KPI label="Total net" value={fmtSLE(summary.total_net)} small />
           </div>
         )}
@@ -125,7 +125,7 @@ export default function Vouchers() {
               {STATUS_FILTERS.map(([s, label]) => (
                 <button key={s || "all"} data-testid={`voucher-filter-status-${s || "all"}`}
                   onClick={() => setStatus(s)}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition ${status === s ? "bg-[#133326] text-white border-[#133326]" : "border-[#E2DFD6] text-[#525860] hover:bg-[#F7F6F2]"}`}>
+                  className={`text-xs px-3 py-1.5 rounded-full border transition ${status === s ? "bg-[#0A4A1E] text-white border-[#0A4A1E]" : "border-[#E2DFD6] text-[#525860] hover:bg-[#F7F6F2]"}`}>
                   {label}
                 </button>
               ))}
@@ -170,7 +170,7 @@ function KPI({ label, value, color = "text-[#1A1C1E]", small }) {
 function TabBtn({ id, active, onClick, icon: Icon, label }) {
   return (
     <button data-testid={id} onClick={onClick}
-      className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded transition ${active ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
+      className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded transition ${active ? "bg-white text-[#0A4A1E] shadow-sm" : "text-[#686D76]"}`}>
       <Icon className="w-3.5 h-3.5" /> {label}
     </button>
   );

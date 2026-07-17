@@ -72,7 +72,7 @@ export default function Compliance() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <KPI dark icon={ShieldCheck} label="YTD PAYE remitted" value={fmtSLE(summary.ytd_paye_sle)} />
         <KPI icon={Receipt} label="YTD NASSIT" value={fmtSLE(summary.ytd_nassit_sle)} sub="Employee + Employer" />
-        <KPI icon={FileCheck} label="Returns filed" value={summary.filed_count || 0} sub={`of ${summary.runs_count} runs`} color="text-[#2D7A5D]" />
+        <KPI icon={FileCheck} label="Returns filed" value={summary.filed_count || 0} sub={`of ${summary.runs_count} runs`} color="text-[#17A035]" />
         <KPI icon={AlertCircle} label="Outstanding" value={(summary.outstanding || []).length} color={summary.outstanding?.length ? "text-[#B84F2F]" : "text-[#525860]"} sub={summary.next_filing} />
       </div>
 
@@ -119,7 +119,7 @@ export default function Compliance() {
                 <td className="py-3 px-4 font-data">{fmtSLE(r.nassit_total)}</td>
                 <td className="py-3 px-4">
                   {r.nra_filed
-                    ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6F4EC] text-[#2D7A5D]" title={`Filed ${new Date(r.nra_filed_at).toLocaleDateString()} · ${r.nra_reference}`}>
+                    ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]" title={`Filed ${new Date(r.nra_filed_at).toLocaleDateString()} · ${r.nra_reference}`}>
                         <FileCheck className="w-3 h-3" /> Filed
                       </span>
                     : <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF1DE] text-[#8B6A14]">
@@ -150,7 +150,7 @@ export default function Compliance() {
                           data-testid={`export-nassit-${r.run_id}`}
                           disabled={busy === `NASSIT-Schedule-${r.period}.csv`}
                           onClick={() => downloadBlob(`/compliance/nassit-schedule.csv/${r.run_id}`, `NASSIT-Schedule-${r.period}.csv`)}
-                          className="inline-flex items-center gap-1 text-xs bg-[#2D7A5D] hover:bg-[#256449] text-white px-2.5 py-1.5 rounded"
+                          className="inline-flex items-center gap-1 text-xs bg-[#17A035] hover:bg-[#148231] text-white px-2.5 py-1.5 rounded"
                         >
                           <Download className="w-3.5 h-3.5" /> NASSIT
                         </button>
@@ -158,7 +158,7 @@ export default function Compliance() {
                           <button
                             data-testid={`mark-filed-${r.run_id}`}
                             onClick={() => markFiled(r.run_id)}
-                            className="inline-flex items-center gap-1 text-xs bg-white border border-[#2D7A5D] text-[#2D7A5D] hover:bg-[#E6F4EC] px-2.5 py-1.5 rounded"
+                            className="inline-flex items-center gap-1 text-xs bg-white border border-[#17A035] text-[#17A035] hover:bg-[#E4F7E7] px-2.5 py-1.5 rounded"
                           >
                             <FileCheck className="w-3.5 h-3.5" /> Mark filed
                           </button>
@@ -184,7 +184,7 @@ export default function Compliance() {
 
 function KPI({ icon: Icon, label, value, sub, dark, color }) {
   return (
-    <div className={`${dark ? "bg-[#133326] text-white" : "bg-white border border-[#E2DFD6]"} rounded-lg p-4`}>
+    <div className={`${dark ? "bg-[#0A4A1E] text-white" : "bg-white border border-[#E2DFD6]"} rounded-lg p-4`}>
       <Icon className={`w-5 h-5 ${dark ? "text-white/80" : "text-[#525860]"} mb-2`} strokeWidth={1.5} />
       <div className={`text-[10px] uppercase tracking-[0.16em] ${dark ? "text-white/60" : "text-[#525860]"}`}>{label}</div>
       <div className={`font-heading text-xl font-bold mt-1 font-data ${color || (dark ? "text-white" : "text-[#1A1C1E]")}`}>{value}</div>

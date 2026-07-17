@@ -8,7 +8,7 @@ import { Star, Plus, X, ChevronRight, ChevronDown, Award, CheckCircle2, Clock3, 
 const STATUS_PILL = {
   pending_self: { label: "Pending self-review", color: "bg-[#FBF1DE] text-[#8B6A14]" },
   pending_manager: { label: "Pending manager", color: "bg-[#E5EEF6] text-[#26547C]" },
-  completed: { label: "Completed", color: "bg-[#E6F4EC] text-[#2D7A5D]" },
+  completed: { label: "Completed", color: "bg-[#E4F7E7] text-[#17A035]" },
   cancelled: { label: "Cancelled", color: "bg-[#EBE8E0] text-[#525860]" },
 };
 
@@ -56,7 +56,7 @@ export default function Performance() {
 function TabBtn({ active, onClick, children, testId }) {
   return (
     <button data-testid={testId} role="tab" aria-selected={active} onClick={onClick} className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-      active ? "text-[#133326] border-[#133326]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
+      active ? "text-[#0A4A1E] border-[#0A4A1E]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
     }`}>{children}</button>
   );
 }
@@ -184,7 +184,7 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics, onDownloa
         <td className="py-3 px-4 font-data">{c.employee_count}</td>
         <td className="py-3 px-4 font-data text-[#8B6A14]">{p.pending_self || 0}</td>
         <td className="py-3 px-4 font-data text-[#26547C]">{p.pending_manager || 0}</td>
-        <td className="py-3 px-4 font-data text-[#2D7A5D] font-semibold">{p.completed || 0}</td>
+        <td className="py-3 px-4 font-data text-[#17A035] font-semibold">{p.completed || 0}</td>
       </tr>
       {expanded && (
         <tr><td colSpan={7} className="bg-[#F7F6F2] p-0">
@@ -193,7 +193,7 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics, onDownloa
               <button
                 data-testid={`cycle-pdf-${c.id}`}
                 onClick={(e) => { e.stopPropagation(); onDownloadSummary && onDownloadSummary(); }}
-                className="inline-flex items-center gap-2 text-xs bg-white border border-[#E2DFD6] hover:bg-[#FDFCFB] text-[#133326] px-3 py-1.5 rounded"
+                className="inline-flex items-center gap-2 text-xs bg-white border border-[#E2DFD6] hover:bg-[#FDFCFB] text-[#0A4A1E] px-3 py-1.5 rounded"
               >
                 <Download className="w-3.5 h-3.5" /> Download PDF summary
               </button>
@@ -205,7 +205,7 @@ function CycleRowGroup({ c, p, expanded, onExpand, reviews, analytics, onDownloa
                 {deptFilter && (
                   <span className="ml-2 text-xs font-normal text-[#525860]">
                     · filtered by <strong className="text-[#26547C]">{deptFilter}</strong>
-                    <button onClick={() => setDeptFilter(null)} className="ml-1.5 text-[#B83A3A] hover:underline" data-testid="clear-dept-filter">clear</button>
+                    <button onClick={() => setDeptFilter(null)} className="ml-1.5 text-[#3A7CB8] hover:underline" data-testid="clear-dept-filter">clear</button>
                   </span>
                 )}
               </h4>
@@ -298,7 +298,7 @@ function AnalyticsBlock({ a, onDeptClick, active }) {
 function Kpi({ label, value, sub, tone }) {
   const colors = {
     primary: "text-[#26547C]",
-    success: "text-[#2D7A5D]",
+    success: "text-[#17A035]",
     warning: "text-[#8B6A14]",
   };
   return (
@@ -367,12 +367,12 @@ function MyReviews() {
             )}
             <div className="mt-3 flex gap-2">
               {r.status === "pending_self" && (
-                <button data-testid={`self-start-${r.id}`} onClick={() => { setEditing(r); setForm({ achievements: "", challenges: "", goals_next: "", self_rating: 4 }); }} className="text-xs bg-[#133326] hover:bg-[#0F281E] text-white px-3 py-2 rounded">
+                <button data-testid={`self-start-${r.id}`} onClick={() => { setEditing(r); setForm({ achievements: "", challenges: "", goals_next: "", self_rating: 4 }); }} className="text-xs bg-[#0A4A1E] hover:bg-[#063514] text-white px-3 py-2 rounded">
                   Start self-assessment
                 </button>
               )}
               {r.status === "completed" && !r.acknowledged_at && (
-                <button data-testid={`ack-${r.id}`} onClick={() => acknowledge(r.id)} className="text-xs bg-[#2D7A5D] hover:bg-[#256449] text-white px-3 py-2 rounded">
+                <button data-testid={`ack-${r.id}`} onClick={() => acknowledge(r.id)} className="text-xs bg-[#17A035] hover:bg-[#148231] text-white px-3 py-2 rounded">
                   Acknowledge
                 </button>
               )}
@@ -459,7 +459,7 @@ function TeamReviews() {
                 </td>
                 <td className="py-3 px-4 text-right">
                   {r.status === "pending_manager" && (
-                    <button data-testid={`score-${r.id}`} onClick={() => setEditing(r)} className="text-xs bg-[#133326] hover:bg-[#0F281E] text-white px-3 py-1.5 rounded">
+                    <button data-testid={`score-${r.id}`} onClick={() => setEditing(r)} className="text-xs bg-[#0A4A1E] hover:bg-[#063514] text-white px-3 py-1.5 rounded">
                       Score
                     </button>
                   )}

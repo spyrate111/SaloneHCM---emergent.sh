@@ -390,7 +390,7 @@ async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_adm
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
     styles = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#133326"), alignment=0, spaceAfter=6)
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#0A4A1E"), alignment=0, spaceAfter=6)
     small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
 
     story = [
@@ -513,7 +513,7 @@ def _ghost_pdf_story(data: dict, company: dict, styles, small, h1) -> list:
             f"<b>{company.get('name','—')}</b> &nbsp;|&nbsp; "
             f"Total slips: <b>{data['total_slips']}</b> &nbsp;|&nbsp; "
             f"Acknowledged: <b>{data['acknowledged']}</b> &nbsp;|&nbsp; "
-            f"Unacknowledged: <b style='color:#B83A3A'>{data['ghost_suspects']}</b> "
+            f"Unacknowledged: <b style='color:#3A7CB8'>{data['ghost_suspects']}</b> "
             f"({data['ghost_rate']:.0%})",
             small,
         ),
@@ -540,13 +540,13 @@ def _ghost_pdf_suspects_table(suspects: list):
     t.setStyle(TableStyle([
         ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
         ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FBEAEA")),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#B83A3A")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E9F2FB")),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#3A7CB8")),
         ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
         ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
         ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
         ("ALIGN", (5, 1), (5, -1), "RIGHT"),
-        ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#B83A3A")),
+        ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#3A7CB8")),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
@@ -569,7 +569,7 @@ async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
     styles = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#B83A3A"), alignment=0, spaceAfter=6)
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#3A7CB8"), alignment=0, spaceAfter=6)
     small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
 
     story = _ghost_pdf_story(data, company, styles, small, h1)
@@ -577,7 +577,7 @@ async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
         story.append(_ghost_pdf_suspects_table(data["suspects"]))
     else:
         story.append(Paragraph(
-            "<font color='#2D7A5D'><b>No ghost workers detected — all payslips acknowledged.</b></font>",
+            "<font color='#17A035'><b>No ghost workers detected — all payslips acknowledged.</b></font>",
             styles["BodyText"],
         ))
     doc.build(story)

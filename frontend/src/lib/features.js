@@ -5,7 +5,7 @@ export const TIER_COLORS = {
   lite: "bg-[#EBE8E0] text-[#525860]",
   professional: "bg-[#E5EEF6] text-[#26547C]",
   enterprise: "bg-[#FBE9DF] text-[#B84F2F]",
-  gov: "bg-[#E6F4EC] text-[#2D7A5D]",
+  gov: "bg-[#E4F7E7] text-[#17A035]",
 };
 
 export const TIER_DESCRIPTIONS = {

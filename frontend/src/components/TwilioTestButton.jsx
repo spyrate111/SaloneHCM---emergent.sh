@@ -64,7 +64,7 @@ export default function TwilioTestButton() {
         type="button"
         onClick={() => setOpen(true)}
         data-testid="sms-test-open"
-        className="inline-flex items-center gap-2 bg-white hover:bg-[#F1EEE6] text-[#133326] text-sm px-4 py-2.5 rounded-md border border-[#E2DFD6] transition"
+        className="inline-flex items-center gap-2 bg-white hover:bg-[#F1EEE6] text-[#0A4A1E] text-sm px-4 py-2.5 rounded-md border border-[#E2DFD6] transition"
       >
         <MessageSquare className="w-4 h-4" strokeWidth={1.5} /> Test Twilio SMS
       </button>
@@ -95,7 +95,7 @@ export default function TwilioTestButton() {
                 data-testid="sms-test-status"
                 className={`text-xs px-3 py-2 rounded-md inline-flex items-center gap-1.5 ${
                   twilioConfigured
-                    ? "bg-[#EFF6F2] text-[#2D7A5D] border border-[#C9E2D2]"
+                    ? "bg-[#EDF8EE] text-[#17A035] border border-[#BFEBC8]"
                     : "bg-[#FBEBDF] text-[#8C4A2F] border border-[#F1C3A1]"
                 }`}
               >
@@ -143,7 +143,7 @@ export default function TwilioTestButton() {
                 data-testid="sms-test-result"
                 className={`text-xs px-3 py-2.5 rounded-md border ${
                   result.ok
-                    ? "bg-[#EFF6F2] text-[#2D7A5D] border-[#C9E2D2]"
+                    ? "bg-[#EDF8EE] text-[#17A035] border-[#BFEBC8]"
                     : "bg-[#FBEBDF] text-[#8C4A2F] border-[#F1C3A1]"
                 }`}
               >
@@ -179,7 +179,7 @@ export default function TwilioTestButton() {
                 type="submit"
                 disabled={busy || !to.trim()}
                 data-testid="sms-test-submit"
-                className="inline-flex items-center gap-2 text-sm bg-[#133326] hover:bg-[#0F281E] disabled:opacity-60 text-white px-4 py-2 rounded-md"
+                className="inline-flex items-center gap-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] disabled:opacity-60 text-white px-4 py-2 rounded-md"
               >
                 <Send className="w-4 h-4" strokeWidth={1.7} /> {busy ? "Sending…" : "Send test SMS"}
               </button>

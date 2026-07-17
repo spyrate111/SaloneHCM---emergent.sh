@@ -52,10 +52,10 @@ export default function Dashboard() {
       {isAdmin && <ComplianceScoreWidget />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <KPI label="Headcount" value={fmtNum(data.headcount)} sub={`${data.total_employees} total records`} icon={Users} accent="bg-[#133326]" />
+        <KPI label="Headcount" value={fmtNum(data.headcount)} sub={`${data.total_employees} total records`} icon={Users} accent="bg-[#0A4A1E]" />
         <KPI label="Monthly Payroll" value={fmtSLE(data.monthly_payroll_sle)} sub="Gross run estimate" icon={Wallet} accent="bg-[#26547C]" />
         <KPI label="Pending Leaves" value={fmtNum(data.pending_leaves)} sub="Awaiting your approval" icon={CalendarClock} accent="bg-[#D1603D]" />
-        <KPI label="Last Run Net" value={fmtSLE(data.last_run?.totals?.net || 0)} sub={data.last_run?.period || "No runs yet"} icon={Receipt} accent="bg-[#2D7A5D]" />
+        <KPI label="Last Run Net" value={fmtSLE(data.last_run?.totals?.net || 0)} sub={data.last_run?.period || "No runs yet"} icon={Receipt} accent="bg-[#17A035]" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -72,15 +72,15 @@ export default function Dashboard() {
                 <AreaChart data={data.runs_history}>
                   <defs>
                     <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#133326" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#133326" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#0A4A1E" stopOpacity={0.45} />
+                      <stop offset="100%" stopColor="#0A4A1E" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="#EBE8E0" vertical={false} />
                   <XAxis dataKey="period" stroke="#686D76" fontSize={11} />
                   <YAxis stroke="#686D76" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
-                  <Area type="monotone" dataKey="net" stroke="#133326" strokeWidth={2} fill="url(#g1)" />
+                  <Area type="monotone" dataKey="net" stroke="#0A4A1E" strokeWidth={2} fill="url(#g1)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -107,7 +107,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <a href="/payroll" className="group bg-[#133326] text-white rounded-lg p-6 hover:bg-[#0F281E] transition" data-testid="quick-payroll">
+        <a href="/payroll" className="group bg-[#0A4A1E] text-white rounded-lg p-6 hover:bg-[#063514] transition" data-testid="quick-payroll">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/60">Quick action</div>
           <div className="font-heading text-xl font-semibold mt-2">Run this month&rsquo;s payroll</div>
           <div className="text-white/70 text-sm mt-1">Auto-calculates PAYE & NASSIT for active employees.</div>

@@ -20,8 +20,8 @@ export default function Industries() {
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
         <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-start">
           <div className="lg:col-span-4">
-            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#C02719]">Industries</p>
-            <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#0F2C24] leading-tight">
+            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">Industries</p>
+            <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#073A16] leading-tight">
               Sector-aware allowance presets.
             </h2>
             <p className="mt-3 text-[15px] text-[#374049] leading-relaxed">
@@ -29,7 +29,7 @@ export default function Industries() {
             </p>
             <Link
               to="/pricing"
-              className="mt-5 inline-flex items-center px-5 h-11 text-[13px] font-semibold border border-[#0F2C24] rounded-full text-[#0F2C24] hover:bg-[#0F2C24] hover:text-white transition-colors"
+              className="mt-5 inline-flex items-center px-5 h-11 text-[13px] font-semibold border border-[#073A16] rounded-full text-[#073A16] hover:bg-[#073A16] hover:text-white transition-colors"
               data-testid="industries-cta"
             >
               See sector pricing
@@ -41,11 +41,11 @@ export default function Industries() {
               return (
                 <div
                   key={it.label}
-                  className="border border-[#EAE7DF] rounded-xl p-5 hover:border-[#C02719] transition-colors group bg-[#FAF8F2]"
+                  className="border border-[#EAE7DF] rounded-xl p-5 hover:border-[#0072C6] transition-colors group bg-[#FAF8F2]"
                   data-testid={`industry-${it.label.toLowerCase().replace(/\s+/g, "-")}`}
                 >
-                  <Icon className="w-7 h-7 text-[#0F2C24] group-hover:text-[#C02719] transition-colors" />
-                  <h3 className="mt-3 text-[15px] font-bold text-[#0F2C24]">{it.label}</h3>
+                  <Icon className="w-7 h-7 text-[#073A16] group-hover:text-[#0072C6] transition-colors" />
+                  <h3 className="mt-3 text-[15px] font-bold text-[#073A16]">{it.label}</h3>
                   <p className="mt-1 text-[12.5px] text-[#525860] leading-snug">{it.desc}</p>
                 </div>
               );

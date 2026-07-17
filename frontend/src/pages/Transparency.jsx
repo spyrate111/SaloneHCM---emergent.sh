@@ -36,7 +36,7 @@ export default function Transparency() {
 
   return (
     <div className="min-h-screen bg-[#F7F6F2]" data-testid="transparency-page">
-      <header className="bg-gradient-to-br from-[#133326] via-[#0F281E] to-[#26547C] text-white relative overflow-hidden">
+      <header className="bg-gradient-to-br from-[#0A4A1E] via-[#063514] to-[#26547C] text-white relative overflow-hidden">
         <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[#D1603D]/20 blur-3xl pointer-events-none" />
         <div className="max-w-6xl mx-auto px-6 sm:px-10 py-12 sm:py-16 relative">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -73,9 +73,9 @@ export default function Transparency() {
       <main className="max-w-6xl mx-auto px-6 sm:px-10 py-8 sm:py-12 space-y-8">
         <section data-testid="kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KPI icon={Users} label={t(lang, "kpi_headcount")} value={totals.headcount.toLocaleString()} sub={t(lang, "kpi_headcount_sub", totals.ministries)} accent="bg-[#26547C]" />
-          <KPI icon={Wallet} label={t(lang, "kpi_gross")} value={fmtSLE(totals.monthly_gross_sle)} sub={t(lang, "kpi_gross_sub")} accent="bg-[#133326]" />
+          <KPI icon={Wallet} label={t(lang, "kpi_gross")} value={fmtSLE(totals.monthly_gross_sle)} sub={t(lang, "kpi_gross_sub")} accent="bg-[#0A4A1E]" />
           <KPI icon={Receipt} label={t(lang, "kpi_paye")} value={fmtSLE(totals.monthly_paye_sle)} sub={t(lang, "kpi_paye_sub")} accent="bg-[#D1603D]" />
-          <KPI icon={ArrowDownToLine} label={t(lang, "kpi_nassit")} value={fmtSLE(totals.monthly_nassit_sle)} sub={t(lang, "kpi_nassit_sub")} accent="bg-[#2D7A5D]" />
+          <KPI icon={ArrowDownToLine} label={t(lang, "kpi_nassit")} value={fmtSLE(totals.monthly_nassit_sle)} sub={t(lang, "kpi_nassit_sub")} accent="bg-[#17A035]" />
         </section>
 
         <section className="bg-white border border-[#E2DFD6] rounded-xl overflow-hidden">
@@ -127,7 +127,7 @@ export default function Transparency() {
             <div className="text-[10px] uppercase tracking-wider text-[#525860] flex items-center gap-2">
               <FileCheck className="w-3.5 h-3.5" /> {t(lang, "filings_12m")}
             </div>
-            <div className="font-heading text-2xl font-bold mt-2 font-data text-[#2D7A5D]">
+            <div className="font-heading text-2xl font-bold mt-2 font-data text-[#17A035]">
               {compliance.returns_filed_12m}
               <span className="text-base text-[#A1A5AB] font-normal"> {t(lang, "returns_filed")}</span>
             </div>
@@ -139,9 +139,9 @@ export default function Transparency() {
 
         <footer className="border-t border-[#E2DFD6] pt-6 text-xs text-[#686D76] text-center space-y-2">
           <div className="flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#2D7A5D]" /> {t(lang, "footer_verified")}
+            <ShieldCheck className="w-3.5 h-3.5 text-[#17A035]" /> {t(lang, "footer_verified")}
           </div>
-          <div>{t(lang, "footer_powered")} <span className="font-medium text-[#133326]">SaloneHCM</span> · {t(lang, "footer_ogp")}</div>
+          <div>{t(lang, "footer_powered")} <span className="font-medium text-[#0A4A1E]">SaloneHCM</span> · {t(lang, "footer_ogp")}</div>
         </footer>
       </main>
     </div>
@@ -157,7 +157,7 @@ function LanguagePicker({ lang, setLang }) {
           key={l.code}
           data-testid={`lang-${l.code}`}
           onClick={() => setLang(l.code)}
-          className={`px-2 py-0.5 rounded transition ${lang === l.code ? "bg-white text-[#133326] font-semibold" : "text-white/80 hover:text-white"}`}
+          className={`px-2 py-0.5 rounded transition ${lang === l.code ? "bg-white text-[#0A4A1E] font-semibold" : "text-white/80 hover:text-white"}`}
         >
           {l.label}
         </button>

@@ -105,7 +105,7 @@ export default function Companies() {
           <button
             data-testid="company-create-open"
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+            className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} /> Create tenant
           </button>
@@ -118,13 +118,13 @@ export default function Companies() {
           data-testid="drift-monitor"
           className={`border rounded-lg p-4 ${
             drift.ok
-              ? "border-[#C9E2D2] bg-[#EFF6F2]"
+              ? "border-[#BFEBC8] bg-[#EDF8EE]"
               : "border-[#F1C3A1] bg-[#FBEBDF]"
           }`}
         >
           <div className="flex items-start gap-3 flex-wrap">
             {drift.ok ? (
-              <ShieldCheck className="w-5 h-5 text-[#2D7A5D] mt-0.5" strokeWidth={1.5} />
+              <ShieldCheck className="w-5 h-5 text-[#17A035] mt-0.5" strokeWidth={1.5} />
             ) : (
               <ShieldAlert className="w-5 h-5 text-[#B84F2F] mt-0.5" strokeWidth={1.5} />
             )}
@@ -137,7 +137,7 @@ export default function Companies() {
                   data-testid="drift-badge"
                   className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
                     drift.ok
-                      ? "bg-[#2D7A5D] text-white"
+                      ? "bg-[#17A035] text-white"
                       : "bg-[#B84F2F] text-white"
                   }`}
                 >
@@ -200,16 +200,16 @@ export default function Companies() {
         {companies.map((c) => {
           const isMine = c.id === user?.company_id;
           return (
-            <div key={c.id} data-testid={`company-card-${c.id}`} className={`bg-white border rounded-lg p-5 ${isMine ? "border-[#133326] shadow-sm" : "border-[#E2DFD6]"}`}>
+            <div key={c.id} data-testid={`company-card-${c.id}`} className={`bg-white border rounded-lg p-5 ${isMine ? "border-[#0A4A1E] shadow-sm" : "border-[#E2DFD6]"}`}>
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-md bg-[#F1EEE6] grid place-items-center text-[#133326]">
+                <div className="w-10 h-10 rounded-md bg-[#F1EEE6] grid place-items-center text-[#0A4A1E]">
                   <Building2 className="w-5 h-5" strokeWidth={1.5} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-heading font-semibold text-lg truncate">{c.name}</h3>
                     {isMine && (
-                      <span className="text-[9px] uppercase tracking-widest font-semibold bg-[#133326] text-white px-1.5 py-0.5 rounded-full">
+                      <span className="text-[9px] uppercase tracking-widest font-semibold bg-[#0A4A1E] text-white px-1.5 py-0.5 rounded-full">
                         Active
                       </span>
                     )}
@@ -249,7 +249,7 @@ export default function Companies() {
                   </button>
                 )}
                 {isMine && (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-[#2D7A5D] px-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs text-[#17A035] px-2">
                     <Crown className="w-3.5 h-3.5" /> You are operating here
                   </span>
                 )}
@@ -292,7 +292,7 @@ export default function Companies() {
             </div>
             <div className="flex items-center justify-end gap-2">
               <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
-              <button type="submit" data-testid="new-company-submit" className="inline-flex items-center gap-2 text-sm bg-[#133326] text-white px-4 py-2 rounded-md">
+              <button type="submit" data-testid="new-company-submit" className="inline-flex items-center gap-2 text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md">
                 <Plus className="w-4 h-4" strokeWidth={1.5} /> Create
               </button>
             </div>

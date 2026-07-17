@@ -109,7 +109,7 @@ export default function Assistant() {
               type="button"
               onClick={() => setUseContext((v) => !v)}
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-medium transition ${
-                useContext ? "bg-[#133326] border-[#133326] text-white" : "bg-white border-[#E2DFD6] text-[#525860] hover:border-[#133326]"
+                useContext ? "bg-[#0A4A1E] border-[#0A4A1E] text-white" : "bg-white border-[#E2DFD6] text-[#525860] hover:border-[#0A4A1E]"
               }`}
             >
               <Database className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -159,7 +159,7 @@ export default function Assistant() {
               </p>
               <div className="grid grid-cols-1 gap-2 mt-5 text-left">
                 {suggestions.map((s) => (
-                  <button key={s} onClick={() => send(s)} className="text-sm border border-[#E2DFD6] hover:border-[#133326] hover:bg-[#F7F6F2] rounded-md px-3 py-2 transition text-[#1A1C1E]">{s}</button>
+                  <button key={s} onClick={() => send(s)} className="text-sm border border-[#E2DFD6] hover:border-[#0A4A1E] hover:bg-[#F7F6F2] rounded-md px-3 py-2 transition text-[#1A1C1E]">{s}</button>
                 ))}
               </div>
             </div>
@@ -186,7 +186,7 @@ export default function Assistant() {
                     {m.cancelled && <div className="text-xs text-[#686D76] mt-1 italic">Plan cancelled.</div>}
                   </>
                 ) : (
-                  <div className="bg-[#133326] text-white rounded-lg px-4 py-3 text-sm whitespace-pre-wrap">
+                  <div className="bg-[#0A4A1E] text-white rounded-lg px-4 py-3 text-sm whitespace-pre-wrap">
                     {m.withAction && <div className="text-[10px] uppercase tracking-wider text-[#D1603D] mb-1 inline-flex items-center gap-1"><Wand2 className="w-2.5 h-2.5" /> action request</div>}
                     {m.withCtx && !m.withAction && <div className="text-[10px] uppercase tracking-wider text-[#D1603D]/80 mb-1 inline-flex items-center gap-1"><Database className="w-2.5 h-2.5" /> with company data</div>}
                     {m.content}

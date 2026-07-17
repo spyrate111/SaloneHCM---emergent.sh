@@ -10,15 +10,15 @@ export function OverviewMock() {
       <div className="flex items-baseline justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#525860]">Dashboard</div>
-          <h1 className="text-[24px] font-extrabold text-[#0F2C24]">Good morning, Aminata</h1>
+          <h1 className="text-[24px] font-extrabold text-[#073A16]">Good morning, Aminata</h1>
           <p className="text-[12.5px] text-[#525860] mt-0.5">June 2026 cycle &middot; 142 active employees</p>
         </div>
-        <span className="hidden sm:inline-flex items-center px-3 h-7 text-[10px] font-bold uppercase tracking-[0.14em] bg-[#0F2C24] text-white rounded-full">Government tier</span>
+        <span className="hidden sm:inline-flex items-center px-3 h-7 text-[10px] font-bold uppercase tracking-[0.14em] bg-[#073A16] text-white rounded-full">Government tier</span>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4 mt-6">
-        <KpiTile testid="kpi-payroll"    icon={Wallet}      title="Payroll due"      value="SLE 184,720" sub="+2.3% vs May" tone="text-[#1f6f55]" />
-        <KpiTile testid="kpi-headcount"  icon={Users}       title="Active headcount" value="142"          sub="3 new this month" tone="text-[#0F2C24]" />
+        <KpiTile testid="kpi-payroll"    icon={Wallet}      title="Payroll due"      value="SLE 184,720" sub="+2.3% vs May" tone="text-[#128A2C]" />
+        <KpiTile testid="kpi-headcount"  icon={Users}       title="Active headcount" value="142"          sub="3 new this month" tone="text-[#073A16]" />
         <KpiTile testid="kpi-compliance" icon={ShieldCheck} title="Compliance score" value="98 / 100"     sub="NRA + NASSIT current" tone="text-[#E07B4A]" />
       </div>
 
@@ -36,19 +36,19 @@ export function OverviewMock() {
               return (
                 <button key={a.label} type="button" className="flex items-center justify-between bg-[#FAF8F2] hover:bg-[#F1EEE6] rounded-lg px-3.5 py-2.5 text-left transition-colors group">
                   <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-[#0F2C24]" />
+                    <Icon className="w-4 h-4 text-[#073A16]" />
                     <div>
-                      <div className="text-[13px] font-extrabold text-[#0F2C24]">{a.label}</div>
+                      <div className="text-[13px] font-extrabold text-[#073A16]">{a.label}</div>
                       <div className="text-[10px] text-[#525860]">{a.hint}</div>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[#9aa0a6] group-hover:text-[#C02719]" />
+                  <ChevronRight className="w-4 h-4 text-[#9aa0a6] group-hover:text-[#0072C6]" />
                 </button>
               );
             })}
           </div>
         </div>
-        <div className="bg-gradient-to-br from-[#0F2C24] to-[#1f6f55] rounded-xl p-5 text-white" data-tour-anchor="ai-card">
+        <div className="bg-gradient-to-br from-[#073A16] to-[#128A2C] rounded-xl p-5 text-white" data-tour-anchor="ai-card">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-full bg-white/15 grid place-items-center"><Sparkles className="w-4 h-4 text-[#E07B4A]" /></div>
             <div>
@@ -66,7 +66,7 @@ export function OverviewMock() {
       <div className="bg-white border border-[#EAE7DF] rounded-xl p-5 mt-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#525860]">Compliance feed</div>
-          <span className="text-[10px] text-[#1f6f55] font-bold">All current</span>
+          <span className="text-[10px] text-[#128A2C] font-bold">All current</span>
         </div>
         <ul className="space-y-2 text-[13px]">
           {[
@@ -75,8 +75,8 @@ export function OverviewMock() {
             "MoF approval — signed by Permanent Secretary",
             "Ghost-worker audit — 0 exceptions",
           ].map((t) => (
-            <li key={t} className="flex items-center gap-2 text-[#0F2C24]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#1f6f55]" />
+            <li key={t} className="flex items-center gap-2 text-[#073A16]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#128A2C]" />
               <span>{t}</span>
             </li>
           ))}
@@ -92,9 +92,9 @@ export function RunPayrollMock() {
       <div className="flex items-baseline justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#525860]">Payroll</div>
-          <h1 className="text-[24px] font-extrabold text-[#0F2C24]">Run payroll &middot; June 2026</h1>
+          <h1 className="text-[24px] font-extrabold text-[#073A16]">Run payroll &middot; June 2026</h1>
         </div>
-        <button type="button" className="px-4 h-9 text-[12px] font-bold bg-[#C02719] text-white rounded-full" data-tour-anchor="approve-btn">
+        <button type="button" className="px-4 h-9 text-[12px] font-bold bg-[#0072C6] text-white rounded-full" data-tour-anchor="approve-btn">
           Send for MoF approval
         </button>
       </div>
@@ -125,12 +125,12 @@ export function RunPayrollMock() {
               ["Kabba Lansana",    "G08-S4", "SLE  7,300", "SLE   730",  "SLE 365",  "SLE  6,205"],
             ].map(([n, g, gr, p, na, net], i) => (
               <tr key={n} className={i % 2 ? "bg-[#FAF8F2]/40" : ""}>
-                <td className="py-2.5 px-4 font-semibold text-[#0F2C24]">{n}</td>
+                <td className="py-2.5 px-4 font-semibold text-[#073A16]">{n}</td>
                 <td className="py-2.5 px-4 text-[#525860] font-mono">{g}</td>
-                <td className="py-2.5 px-4 font-mono text-[#0F2C24]">{gr}</td>
-                <td className="py-2.5 px-4 font-mono text-[#C02719]">{p}</td>
-                <td className="py-2.5 px-4 font-mono text-[#C02719]">{na}</td>
-                <td className="py-2.5 px-4 font-mono font-bold text-[#1f6f55]">{net}</td>
+                <td className="py-2.5 px-4 font-mono text-[#073A16]">{gr}</td>
+                <td className="py-2.5 px-4 font-mono text-[#0072C6]">{p}</td>
+                <td className="py-2.5 px-4 font-mono text-[#0072C6]">{na}</td>
+                <td className="py-2.5 px-4 font-mono font-bold text-[#128A2C]">{net}</td>
               </tr>
             ))}
           </tbody>
@@ -138,10 +138,10 @@ export function RunPayrollMock() {
       </div>
 
       <div className="mt-4 grid sm:grid-cols-4 gap-3" data-tour-anchor="totals-strip">
-        <Tile label="Gross"  val="SLE 71,200" tone="text-[#0F2C24]" />
-        <Tile label="PAYE"   val="SLE 11,596" tone="text-[#C02719]" />
-        <Tile label="NASSIT" val="SLE  3,560" tone="text-[#C02719]" />
-        <Tile label="Net"    val="SLE 56,044" tone="text-[#1f6f55]" hi />
+        <Tile label="Gross"  val="SLE 71,200" tone="text-[#073A16]" />
+        <Tile label="PAYE"   val="SLE 11,596" tone="text-[#0072C6]" />
+        <Tile label="NASSIT" val="SLE  3,560" tone="text-[#0072C6]" />
+        <Tile label="Net"    val="SLE 56,044" tone="text-[#128A2C]" hi />
       </div>
     </div>
   );
@@ -153,9 +153,9 @@ export function HirePersonMock() {
       <div className="flex items-baseline justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#525860]">Hiring &middot; Step 2 of 4</div>
-          <h1 className="text-[24px] font-extrabold text-[#0F2C24]">Hire a new employee</h1>
+          <h1 className="text-[24px] font-extrabold text-[#073A16]">Hire a new employee</h1>
         </div>
-        <button type="button" className="px-4 h-9 text-[12px] font-bold bg-[#C02719] text-white rounded-full" data-tour-anchor="send-offer">
+        <button type="button" className="px-4 h-9 text-[12px] font-bold bg-[#0072C6] text-white rounded-full" data-tour-anchor="send-offer">
           Generate &amp; send offer
         </button>
       </div>
@@ -164,12 +164,12 @@ export function HirePersonMock() {
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white border border-[#EAE7DF] rounded-xl p-5" data-tour-anchor="candidate-card">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#FAF8F2] grid place-items-center text-[#0F2C24] font-extrabold">AB</div>
+              <div className="w-12 h-12 rounded-full bg-[#FAF8F2] grid place-items-center text-[#073A16] font-extrabold">AB</div>
               <div className="flex-1">
-                <div className="text-[15px] font-extrabold text-[#0F2C24]">Aisha Bangura</div>
+                <div className="text-[15px] font-extrabold text-[#073A16]">Aisha Bangura</div>
                 <div className="text-[11.5px] text-[#525860]">Pulled from ATS &middot; Senior Accountant pipeline</div>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.12em] bg-[#E6F2EC] text-[#1f6f55] px-2 py-1 rounded">Verified</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.12em] bg-[#E2F5E5] text-[#128A2C] px-2 py-1 rounded">Verified</span>
             </div>
             <div className="grid sm:grid-cols-2 gap-3 mt-4">
               <FieldRow label="Date of birth" value="14 Mar 1990" />
@@ -184,27 +184,27 @@ export function HirePersonMock() {
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-[#FAF8F2] rounded-lg p-3">
                 <div className="text-[10px] uppercase tracking-wider text-[#525860]">Grade</div>
-                <div className="text-[18px] font-extrabold text-[#0F2C24] font-mono mt-0.5">G13</div>
+                <div className="text-[18px] font-extrabold text-[#073A16] font-mono mt-0.5">G13</div>
               </div>
               <div className="bg-[#FAF8F2] rounded-lg p-3">
                 <div className="text-[10px] uppercase tracking-wider text-[#525860]">Step</div>
-                <div className="text-[18px] font-extrabold text-[#0F2C24] font-mono mt-0.5">S2</div>
+                <div className="text-[18px] font-extrabold text-[#073A16] font-mono mt-0.5">S2</div>
               </div>
-              <div className="bg-[#FFE9E5] rounded-lg p-3">
+              <div className="bg-[#E5F1FD] rounded-lg p-3">
                 <div className="text-[10px] uppercase tracking-wider text-[#525860]">Proposed salary</div>
-                <div className="text-[18px] font-extrabold text-[#C02719] font-mono mt-0.5">SLE 14,200</div>
+                <div className="text-[18px] font-extrabold text-[#0072C6] font-mono mt-0.5">SLE 14,200</div>
               </div>
             </div>
-            <div className="mt-3 text-[11px] text-[#525860]">PAYE impact: <strong className="text-[#0F2C24] font-mono">SLE 1,988/mo</strong> &middot; NASSIT employer: <strong className="text-[#0F2C24] font-mono">SLE 710/mo</strong></div>
+            <div className="mt-3 text-[11px] text-[#525860]">PAYE impact: <strong className="text-[#073A16] font-mono">SLE 1,988/mo</strong> &middot; NASSIT employer: <strong className="text-[#073A16] font-mono">SLE 710/mo</strong></div>
           </div>
         </div>
 
         <div className="bg-white border border-[#EAE7DF] rounded-xl p-5" data-tour-anchor="establishment">
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#525860] mb-3">Establishment slot</div>
           <div className="flex items-start gap-2">
-            <Building2 className="w-5 h-5 text-[#1f6f55] mt-0.5" />
+            <Building2 className="w-5 h-5 text-[#128A2C] mt-0.5" />
             <div>
-              <div className="text-[13px] font-extrabold text-[#0F2C24] leading-snug">Senior Accountant</div>
+              <div className="text-[13px] font-extrabold text-[#073A16] leading-snug">Senior Accountant</div>
               <div className="text-[11px] text-[#525860] mt-0.5">Ministry of Finance &middot; Directorate of Audit &middot; Accounts Unit</div>
             </div>
           </div>
@@ -212,9 +212,9 @@ export function HirePersonMock() {
             <Row k="Budget code" v="MoF-AUD-ACC-G13" />
             <Row k="Headcount limit" v="6" />
             <Row k="Currently filled" v="4 of 6" />
-            <Row k="Vacant" v="2" tone="text-[#1f6f55] font-bold" />
+            <Row k="Vacant" v="2" tone="text-[#128A2C] font-bold" />
           </div>
-          <div className="mt-4 text-[11px] bg-[#E6F2EC] text-[#1f6f55] rounded px-2 py-1.5">
+          <div className="mt-4 text-[11px] bg-[#E2F5E5] text-[#128A2C] rounded px-2 py-1.5">
             On-budget &middot; no MoF override required.
           </div>
         </div>
@@ -230,7 +230,7 @@ function KpiTile({ icon: Icon, title, value, sub, tone, testid }) {
         <Icon className={`w-5 h-5 ${tone}`} />
         <span className="text-[10px] uppercase tracking-[0.12em] text-[#525860]">{title}</span>
       </div>
-      <div className="mt-3 text-[26px] font-extrabold text-[#0F2C24] font-mono leading-none">{value}</div>
+      <div className="mt-3 text-[26px] font-extrabold text-[#073A16] font-mono leading-none">{value}</div>
       <div className={`text-[11px] ${tone} font-semibold mt-1`}>{sub}</div>
     </div>
   );
@@ -240,14 +240,14 @@ function Stat({ label, value }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-[0.12em] text-[#525860]">{label}</div>
-      <div className="text-[15px] font-extrabold text-[#0F2C24] mt-0.5">{value}</div>
+      <div className="text-[15px] font-extrabold text-[#073A16] mt-0.5">{value}</div>
     </div>
   );
 }
 
 function Tile({ label, val, tone, hi }) {
   return (
-    <div className={`${hi ? "bg-[#0F2C24] text-white" : "bg-white border border-[#EAE7DF]"} rounded-xl p-4`}>
+    <div className={`${hi ? "bg-[#073A16] text-white" : "bg-white border border-[#EAE7DF]"} rounded-xl p-4`}>
       <div className={`text-[10px] uppercase tracking-[0.12em] ${hi ? "text-white/70" : "text-[#525860]"}`}>{label}</div>
       <div className={`text-[20px] font-extrabold font-mono mt-1 ${hi ? "text-white" : tone}`}>{val}</div>
     </div>
@@ -258,12 +258,12 @@ function FieldRow({ label, value }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-[0.1em] text-[#525860]">{label}</div>
-      <div className="text-[12.5px] font-semibold text-[#0F2C24] mt-0.5">{value}</div>
+      <div className="text-[12.5px] font-semibold text-[#073A16] mt-0.5">{value}</div>
     </div>
   );
 }
 
-function Row({ k, v, tone = "text-[#0F2C24]" }) {
+function Row({ k, v, tone = "text-[#073A16]" }) {
   return (
     <div className="flex items-center justify-between text-[11.5px]">
       <span className="text-[#525860]">{k}</span>

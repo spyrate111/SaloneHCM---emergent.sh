@@ -11,7 +11,7 @@ const ICON_MAP = {
 const COLOR_MAP = {
   ngo: { bg: "bg-[#E5EEF6]", border: "border-[#26547C]", text: "text-[#26547C]" },
   mining: { bg: "bg-[#FBF1DE]", border: "border-[#8B6A14]", text: "text-[#8B6A14]" },
-  banking: { bg: "bg-[#E6F4EC]", border: "border-[#2D7A5D]", text: "text-[#2D7A5D]" },
+  banking: { bg: "bg-[#E4F7E7]", border: "border-[#17A035]", text: "text-[#17A035]" },
   telecom: { bg: "bg-[#EBE3F4]", border: "border-[#6A4FA0]", text: "text-[#6A4FA0]" },
   general: { bg: "bg-[#EBE8E0]", border: "border-[#525860]", text: "text-[#525860]" },
 };
@@ -105,7 +105,7 @@ export default function SectorPresets() {
               <ul className="text-sm divide-y divide-[#F1EEE6]">
                 {catalog.find((p) => p.id === selectedPreset)?.allowances.map((a) => (
                   <li key={a.label} className="py-1.5 flex justify-between">
-                    <span>{a.label}{!a.taxable && <span className="ml-1 text-[9px] uppercase tracking-wider text-[#2D7A5D]">tax-free</span>}</span>
+                    <span>{a.label}{!a.taxable && <span className="ml-1 text-[9px] uppercase tracking-wider text-[#17A035]">tax-free</span>}</span>
                     <span className="font-data">{fmtSLE(a.amount_sle)}</span>
                   </li>
                 ))}
@@ -116,11 +116,11 @@ export default function SectorPresets() {
                 <div className="text-[10px] uppercase tracking-wider text-[#525860] mb-1">Apply to</div>
                 <div className="flex gap-2 flex-wrap">
                   <button data-testid="mode-single" onClick={() => setTarget({ mode: "single", employee_id: "", department: "" })}
-                          className={`text-xs px-3 py-1.5 rounded border ${target.mode === "single" ? "bg-[#133326] text-white border-[#133326]" : "border-[#E2DFD6]"}`}>
+                          className={`text-xs px-3 py-1.5 rounded border ${target.mode === "single" ? "bg-[#0A4A1E] text-white border-[#0A4A1E]" : "border-[#E2DFD6]"}`}>
                     <Users className="w-3.5 h-3.5 inline mr-1" /> One employee
                   </button>
                   <button data-testid="mode-department" onClick={() => setTarget({ mode: "department", employee_id: "", department: "" })}
-                          className={`text-xs px-3 py-1.5 rounded border ${target.mode === "department" ? "bg-[#133326] text-white border-[#133326]" : "border-[#E2DFD6]"}`}>
+                          className={`text-xs px-3 py-1.5 rounded border ${target.mode === "department" ? "bg-[#0A4A1E] text-white border-[#0A4A1E]" : "border-[#E2DFD6]"}`}>
                     Whole department
                   </button>
                 </div>
@@ -145,7 +145,7 @@ export default function SectorPresets() {
               )}
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setSelectedPreset(null)} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
-                <button data-testid="apply-btn" disabled={busy} onClick={apply} className="text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md disabled:opacity-60 inline-flex items-center gap-1">
+                <button data-testid="apply-btn" disabled={busy} onClick={apply} className="text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2 rounded-md disabled:opacity-60 inline-flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" /> {busy ? "Applying…" : "Apply preset"}
                 </button>
               </div>

@@ -64,13 +64,13 @@ def _wrap_html(title: str, body_html: str, cta_label: Optional[str] = None, cta_
     if cta_label and cta_url:
         cta = f"""
         <tr><td style="padding:24px 0 8px 0;">
-          <a href="{cta_url}" style="background:#133326;color:#ffffff;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;padding:12px 22px;border-radius:6px;display:inline-block;">{cta_label}</a>
+          <a href="{cta_url}" style="background:#0A4A1E;color:#ffffff;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;padding:12px 22px;border-radius:6px;display:inline-block;">{cta_label}</a>
         </td></tr>"""
     return f"""<!doctype html><html><body style="margin:0;background:#F7F6F2;font-family:Inter,Arial,sans-serif;color:#1A1C1E;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F6F2;padding:32px 12px;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #E2DFD6;border-radius:12px;overflow:hidden;">
-      <tr><td style="background:linear-gradient(135deg,#133326,#26547C);color:#ffffff;padding:24px 28px;">
+      <tr><td style="background:linear-gradient(135deg,#0A4A1E,#26547C);color:#ffffff;padding:24px 28px;">
         <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.7;">SaloneHCM</div>
         <div style="font-size:22px;font-weight:700;margin-top:4px;">{title}</div>
       </td></tr>
@@ -131,7 +131,7 @@ async def send_scenario_decision(
     """Notify the requester of an approver's decision."""
     cta_url = f"{FRONTEND_URL}/simulator?scenario={scenario_id}" if FRONTEND_URL else None
     pretty = decision.capitalize()
-    accent = "#2D7A5D" if decision == "approved" else "#B83A3A"
+    accent = "#17A035" if decision == "approved" else "#3A7CB8"
     html = _wrap_html(
         title=f"Scenario {pretty.lower()}",
         body_html=f"""

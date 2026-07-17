@@ -1,8 +1,8 @@
 import { Check, X, Sparkles } from "lucide-react";
 
 export default function ApprovalBanner({ scenario, onDecide, onApply, onClose }) {
-  const bgClass = scenario.approval_status === "approved" ? "bg-[#E6F4EC] border-[#2D7A5D]"
-    : scenario.approval_status === "rejected" ? "bg-[#FBEAEA] border-[#B83A3A]"
+  const bgClass = scenario.approval_status === "approved" ? "bg-[#E4F7E7] border-[#17A035]"
+    : scenario.approval_status === "rejected" ? "bg-[#E9F2FB] border-[#3A7CB8]"
     : scenario.approval_status === "pending" ? "bg-[#FBF1DE] border-[#8B6A14]"
     : "bg-[#F7F6F2] border-[#525860]";
   return (
@@ -26,8 +26,8 @@ export default function ApprovalBanner({ scenario, onDecide, onApply, onClose })
         <div className="flex gap-2 flex-wrap">
           {scenario.approval_status === "pending" && (
             <>
-              <button data-testid="reject-scenario" onClick={() => onDecide("rejected")} className="inline-flex items-center gap-1.5 text-sm border border-[#B83A3A] text-[#B83A3A] hover:bg-[#FBEAEA] px-3 py-2 rounded-md"><X className="w-3.5 h-3.5" /> Reject</button>
-              <button data-testid="approve-scenario" onClick={() => onDecide("approved")} className="inline-flex items-center gap-1.5 text-sm bg-[#2D7A5D] hover:bg-[#256449] text-white px-4 py-2 rounded-md"><Check className="w-3.5 h-3.5" /> Approve</button>
+              <button data-testid="reject-scenario" onClick={() => onDecide("rejected")} className="inline-flex items-center gap-1.5 text-sm border border-[#3A7CB8] text-[#3A7CB8] hover:bg-[#E9F2FB] px-3 py-2 rounded-md"><X className="w-3.5 h-3.5" /> Reject</button>
+              <button data-testid="approve-scenario" onClick={() => onDecide("approved")} className="inline-flex items-center gap-1.5 text-sm bg-[#17A035] hover:bg-[#148231] text-white px-4 py-2 rounded-md"><Check className="w-3.5 h-3.5" /> Approve</button>
             </>
           )}
           {scenario.approval_status === "approved" && !scenario.applied && (
@@ -36,7 +36,7 @@ export default function ApprovalBanner({ scenario, onDecide, onApply, onClose })
             </button>
           )}
           {scenario.applied && (
-            <span className="inline-flex items-center gap-1.5 text-sm bg-[#2D7A5D] text-white px-3 py-2 rounded-md">
+            <span className="inline-flex items-center gap-1.5 text-sm bg-[#17A035] text-white px-3 py-2 rounded-md">
               <Check className="w-3.5 h-3.5" /> Applied {scenario.applied_at ? new Date(scenario.applied_at).toLocaleDateString() : ""}
             </span>
           )}

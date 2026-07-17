@@ -72,7 +72,7 @@ export default function Promotion() {
         </p>
         {eligible && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-            <KPI label="Eligible" value={eligible.eligible_count} color="text-[#2D7A5D]" />
+            <KPI label="Eligible" value={eligible.eligible_count} color="text-[#17A035]" />
             <KPI label="Total reviewed" value={eligible.rows.length} />
             <KPI label="Min tenure" value={`${eligible.thresholds.min_tenure_days}d`} small />
             <KPI label="Min rating" value={eligible.thresholds.min_rating} small />
@@ -106,17 +106,17 @@ export default function Promotion() {
                   </td>
                   <td className="py-2 px-4 font-data">
                     {r.grade_code} · {r.current_step}
-                    {r.next_step && <span className="text-[#2D7A5D]"> → {r.next_step}</span>}
+                    {r.next_step && <span className="text-[#17A035]"> → {r.next_step}</span>}
                   </td>
                   <td className="py-2 px-4 font-data text-xs">{r.tenure_days}d</td>
                   <td className="py-2 px-4 font-data text-xs">{r.last_rating || "—"}/5</td>
                   <td className="py-2 px-4">
                     {r.eligible ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6F4EC] text-[#2D7A5D]">
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]">
                         <Check className="w-3 h-3" /> Eligible
                       </span>
                     ) : (
-                      <span title={r.reasons.join("; ")} className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBEAEA] text-[#B83A3A] cursor-help">
+                      <span title={r.reasons.join("; ")} className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E9F2FB] text-[#3A7CB8] cursor-help">
                         <AlertCircle className="w-3 h-3" /> Blocked
                       </span>
                     )}
@@ -161,11 +161,11 @@ export default function Promotion() {
                     {rec.status === "pending" && isApprover && (
                       <>
                         <button data-testid={`approve-${rec.id}`} onClick={() => decide(rec.id, "approve")} disabled={busy}
-                                className="text-xs bg-[#2D7A5D] hover:bg-[#256048] text-white px-2.5 py-1 rounded mr-1 disabled:opacity-60">
+                                className="text-xs bg-[#17A035] hover:bg-[#137D30] text-white px-2.5 py-1 rounded mr-1 disabled:opacity-60">
                           <Check className="w-3 h-3 inline" /> Approve
                         </button>
                         <button data-testid={`reject-${rec.id}`} onClick={() => decide(rec.id, "reject")} disabled={busy}
-                                className="text-xs bg-[#B83A3A] hover:bg-[#9c2e2e] text-white px-2.5 py-1 rounded disabled:opacity-60">
+                                className="text-xs bg-[#3A7CB8] hover:bg-[#34689A] text-white px-2.5 py-1 rounded disabled:opacity-60">
                           <X className="w-3 h-3 inline" /> Reject
                         </button>
                       </>
@@ -183,7 +183,7 @@ export default function Promotion() {
 
 function Tab({ active, onClick, children, testid }) {
   return (
-    <button data-testid={testid} onClick={onClick} className={`text-sm px-3 py-1.5 rounded ${active ? "bg-[#133326] text-white" : "text-[#525860] hover:bg-[#F7F6F2]"}`}>
+    <button data-testid={testid} onClick={onClick} className={`text-sm px-3 py-1.5 rounded ${active ? "bg-[#0A4A1E] text-white" : "text-[#525860] hover:bg-[#F7F6F2]"}`}>
       {children}
     </button>
   );
@@ -201,8 +201,8 @@ function KPI({ label, value, color = "text-[#1A1C1E]", small }) {
 function StatusPill({ status }) {
   const map = {
     pending: { bg: "bg-[#FBF1DE]", fg: "text-[#8B6A14]", icon: Clock, label: "Pending" },
-    approved: { bg: "bg-[#E6F4EC]", fg: "text-[#2D7A5D]", icon: Check, label: "Approved" },
-    rejected: { bg: "bg-[#FBEAEA]", fg: "text-[#B83A3A]", icon: X, label: "Rejected" },
+    approved: { bg: "bg-[#E4F7E7]", fg: "text-[#17A035]", icon: Check, label: "Approved" },
+    rejected: { bg: "bg-[#E9F2FB]", fg: "text-[#3A7CB8]", icon: X, label: "Rejected" },
   };
   const p = map[status] || map.pending;
   const Icon = p.icon;

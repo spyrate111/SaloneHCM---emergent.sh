@@ -496,3 +496,10 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 ## v1.22.2 (Jun 2026) — Deployment readiness: PASS
 - Fixed 2 deploy blockers: frontend/.env line 3 malformed concatenation (ENABLE_HEALTH_CHECK + REACT_APP_VAPID_PUBLIC_KEY merged on one line — split); removed 24 `.env`/`.env.*`/`*.env` blocking entries from .gitignore (credentials.json/token.json exclusions kept).
 - Re-run verdict: DEPLOYABLE. Non-blocking perf recommendations logged as backlog: add projections/pagination to employees/dashboard/analytics/leave/payroll list queries + compound indexes on (company_id, status/created_at).
+
+## v1.23 (Jun 2026) — Sierra Leone flag color rebrand
+**User request: replace all dark/brand greens with Sierra Leone flag green, all reds/maroons with flag blue — across marketing site, logged-in app, training slides and certificates. Videos kept as-is (re-record = backlog).**
+- Palette: official Flag Green #1EB53A / Flag Blue #0072C6 used for accents; deepened variants for readability — primary dark green #0A4A1E (was #133326), hover #063514, action green #17A035 (was #2D7A5D), primary blue #0072C6 (was red #C02719), deep blue #005A9C (was #9C1F14), muted blue #3A7CB8 (was #B83A3A). All tints (light green/red backgrounds) remapped to matching flag-tone tints.
+- Swapped via mapping script `/app/memory/color_swap.py` (kept for reference): 104 files — all frontend src, marketing sections, MockScreens, tailwind.config.js `forest` palette, index.css HSL vars (--primary/--ring/--chart-1 → 139 76%; --destructive → 205 100% 39%), toast.jsx red-* classes → blue-*, manifest.json + index.html theme-color, PWA icons (PIL pixel recolor), backend email templates, ReportLab certificate + decision brief + civil service PDFs, training_production scripts.
+- Regenerated training doc pack (6 QRC PDFs, onboarding checklist, voiceover scripts, 3 PPTX decks) with new palette via make_docs.py.
+- Verified: screenshots of marketing home, pricing, gov dashboard, Training Center — all new colors, readable. Backend regression: 437/438 pass (1 order-dependent flake in test_iter32 duplicate-guard passes standalone + in-file; unrelated to colors).

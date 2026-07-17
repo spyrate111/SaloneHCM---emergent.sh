@@ -15,7 +15,7 @@ export default function SaveScenarioModal({ rulesCount, onClose, onSave }) {
     <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => onClose(null)}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="bg-white rounded-lg w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="font-heading text-xl font-semibold flex items-center gap-2"><Save className="w-5 h-5 text-[#133326]" /> Save scenario</h2>
+          <h2 className="font-heading text-xl font-semibold flex items-center gap-2"><Save className="w-5 h-5 text-[#0A4A1E]" /> Save scenario</h2>
           <button type="button" onClick={() => onClose(null)} className="p-1 text-[#686D76]"><X className="w-4 h-4" /></button>
         </div>
         <div className="space-y-4">
@@ -35,7 +35,7 @@ export default function SaveScenarioModal({ rulesCount, onClose, onSave }) {
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <button type="button" onClick={() => onClose(null)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-          <button data-testid="save-submit" type="submit" className="px-4 py-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white rounded-md">Save & share</button>
+          <button data-testid="save-submit" type="submit" className="px-4 py-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md">Save & share</button>
         </div>
       </form>
     </div>

@@ -48,8 +48,8 @@ export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose, cu
   const isBlocked = ["over", "unallocated_employees"].includes(verdict);
   const isOverridden = !!check?.override;
   const canProceed = isSafe || (isBlocked && isOverridden) || verdict === "warn";
-  let proceed = { cls: "bg-[#B83A3A] hover:bg-[#8C2F2F]", label: "Blocked" };
-  if (isSafe) proceed = { cls: "bg-[#2D7A5D] hover:bg-[#215D46]", label: "Confirm & run payroll" };
+  let proceed = { cls: "bg-[#3A7CB8] hover:bg-[#2F6390]", label: "Blocked" };
+  if (isSafe) proceed = { cls: "bg-[#17A035] hover:bg-[#127530]", label: "Confirm & run payroll" };
   else if (isOverridden) proceed = { cls: "bg-[#D1603D] hover:bg-[#B84F2F]", label: "Override & run payroll" };
 
   return (
@@ -58,7 +58,7 @@ export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose, cu
         <ModalHeader onClose={onClose} period={period} />
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {busy && <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#133326]" /></div>}
+          {busy && <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0A4A1E]" /></div>}
           {check && (
             <>
               <VerdictBanner verdict={verdict} totals={check.totals} isOverridden={isOverridden} />
@@ -74,7 +74,7 @@ export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose, cu
                 />
               )}
               {isBlocked && !isOverridden && !isMofApprover && (
-                <div className="bg-[#FBEAEA] border border-[#E9C2C2] rounded-md px-4 py-3 text-sm text-[#8C2F2F]" data-testid="budget-check-need-approver">
+                <div className="bg-[#E9F2FB] border border-[#C2D9E9] rounded-md px-4 py-3 text-sm text-[#2F6390]" data-testid="budget-check-need-approver">
                   <div className="font-semibold mb-1">Blocked — MoF approver required</div>
                   <div>Your user does not have the <code className="font-data">mof_approver</code> flag. Ask a MoF approver to review this check and apply an override.</div>
                 </div>
@@ -125,10 +125,10 @@ function ModalHeader({ onClose, period }) {
 
 function VerdictBanner({ verdict, totals, isOverridden }) {
   const cfg = {
-    safe: { icon: ShieldCheck, bg: "bg-[#E6F4EC]", border: "border-[#C9E2D2]", fg: "text-[#2D7A5D]", label: "Safe to run" },
+    safe: { icon: ShieldCheck, bg: "bg-[#E4F7E7]", border: "border-[#BFEBC8]", fg: "text-[#17A035]", label: "Safe to run" },
     warn: { icon: AlertTriangle, bg: "bg-[#FBF1DE]", border: "border-[#E8D5A2]", fg: "text-[#8B6A14]", label: "Warning — within 10% of budget" },
-    over: { icon: XCircle, bg: "bg-[#FBEAEA]", border: "border-[#E9C2C2]", fg: "text-[#8C2F2F]", label: "Blocked — over budget" },
-    unallocated_employees: { icon: UserX, bg: "bg-[#FBEAEA]", border: "border-[#E9C2C2]", fg: "text-[#8C2F2F]", label: "Blocked — unallocated employees" },
+    over: { icon: XCircle, bg: "bg-[#E9F2FB]", border: "border-[#C2D9E9]", fg: "text-[#2F6390]", label: "Blocked — over budget" },
+    unallocated_employees: { icon: UserX, bg: "bg-[#E9F2FB]", border: "border-[#C2D9E9]", fg: "text-[#2F6390]", label: "Blocked — unallocated employees" },
   }[verdict] || { icon: AlertTriangle, bg: "bg-[#F7F6F2]", border: "border-[#E2DFD6]", fg: "text-[#525860]", label: verdict };
   const Icon = cfg.icon;
   return (
@@ -176,26 +176,26 @@ function BudgetTable({ rows }) {
 
 function VerdictPill({ v }) {
   const c = {
-    safe: "bg-[#E6F4EC] text-[#2D7A5D]",
+    safe: "bg-[#E4F7E7] text-[#17A035]",
     warn: "bg-[#FBF1DE] text-[#8B6A14]",
-    over: "bg-[#FBEAEA] text-[#8C2F2F]",
+    over: "bg-[#E9F2FB] text-[#2F6390]",
   }[v] || "bg-[#EBE8E0] text-[#525860]";
   return <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${c}`}>{v}</span>;
 }
 
 function UnallocatedList({ list }) {
   return (
-    <div className="bg-[#FBEAEA] border border-[#E9C2C2] rounded-md px-4 py-3" data-testid="budget-check-unallocated-list">
-      <div className="text-[13px] font-semibold text-[#8C2F2F] flex items-center gap-2 mb-2">
+    <div className="bg-[#E9F2FB] border border-[#C2D9E9] rounded-md px-4 py-3" data-testid="budget-check-unallocated-list">
+      <div className="text-[13px] font-semibold text-[#2F6390] flex items-center gap-2 mb-2">
         <UserX className="w-4 h-4" /> {list.length} employee(s) without a budget code — a #1 ghost-worker vector
       </div>
-      <ul className="text-xs text-[#8C2F2F] space-y-0.5">
+      <ul className="text-xs text-[#2F6390] space-y-0.5">
         {list.slice(0, 10).map((e) => (
           <li key={e.employee_id} className="font-data">· {e.name} — {fmtSLE(e.gross)}</li>
         ))}
         {list.length > 10 && <li className="italic">…and {list.length - 10} more</li>}
       </ul>
-      <div className="text-[11px] text-[#8C2F2F] mt-2 opacity-80">Assign a budget_code to each via <code className="font-data">/civil-service</code> before running payroll.</div>
+      <div className="text-[11px] text-[#2F6390] mt-2 opacity-80">Assign a budget_code to each via <code className="font-data">/civil-service</code> before running payroll.</div>
     </div>
   );
 }
@@ -204,8 +204,8 @@ function OverrideForm({ reason, setReason, confirmText, setConfirmText, applying
   const reasonOk = reason.trim().length >= 20;
   const confirmOk = confirmText === "OVERRIDE";
   return (
-    <div className="bg-[#F7F6F2] border-2 border-[#B83A3A] rounded-md p-4 space-y-3" data-testid="budget-check-override-form">
-      <div className="text-[13px] font-semibold text-[#8C2F2F] flex items-center gap-2">
+    <div className="bg-[#F7F6F2] border-2 border-[#3A7CB8] rounded-md p-4 space-y-3" data-testid="budget-check-override-form">
+      <div className="text-[13px] font-semibold text-[#2F6390] flex items-center gap-2">
         <ShieldCheck className="w-4 h-4" /> MoF approver override
       </div>
       <p className="text-xs text-[#525860]">You are about to override an anti-fraud budget guardrail. This action:</p>
@@ -241,7 +241,7 @@ function OverrideForm({ reason, setReason, confirmText, setConfirmText, applying
         onClick={onApply}
         disabled={!reasonOk || !confirmOk || applying}
         data-testid="budget-check-override-apply"
-        className="inline-flex items-center gap-2 bg-[#B83A3A] hover:bg-[#8C2F2F] disabled:opacity-50 text-white text-sm px-4 py-2 rounded-md"
+        className="inline-flex items-center gap-2 bg-[#3A7CB8] hover:bg-[#2F6390] disabled:opacity-50 text-white text-sm px-4 py-2 rounded-md"
       >
         {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
         Apply override & notify all approvers
@@ -310,7 +310,7 @@ export function BudgetBalancesPanel({ period }) {
         </span>
       </div>
       {busy ? (
-        <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-[#133326]" /></div>
+        <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-[#0A4A1E]" /></div>
       ) : (
         <table className="w-full text-sm">
           <thead className="bg-[#F7F6F2]">
@@ -325,7 +325,7 @@ export function BudgetBalancesPanel({ period }) {
                 <td className="px-4 py-2.5 text-[13px] text-[#525860] truncate max-w-[220px]">{r.ministry}</td>
                 <td className="px-4 py-2.5 text-[13px] text-[#525860] truncate max-w-[220px]">{r.name}</td>
                 <td className="px-4 py-2.5 font-data">
-                  {r.allocated_sle == null ? <span className="text-[#B83A3A]">— none —</span> : fmtSLE(r.allocated_sle)}
+                  {r.allocated_sle == null ? <span className="text-[#3A7CB8]">— none —</span> : fmtSLE(r.allocated_sle)}
                 </td>
                 <td className="px-4 py-2.5 text-[11px] text-[#686D76] font-data">
                   {r.updated_at ? new Date(r.updated_at).toLocaleDateString() : "—"}
@@ -376,7 +376,7 @@ export function BudgetBalancesPanel({ period }) {
               <button onClick={() => setEditing(null)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]" data-testid="budget-balance-cancel">
                 <Ban className="w-3.5 h-3.5 inline mr-1" /> Cancel
               </button>
-              <button onClick={save} className="text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md inline-flex items-center gap-1.5" data-testid="budget-balance-save">
+              <button onClick={save} className="text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2 rounded-md inline-flex items-center gap-1.5" data-testid="budget-balance-save">
                 <Check className="w-3.5 h-3.5" /> Save
               </button>
             </div>

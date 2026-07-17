@@ -80,7 +80,7 @@ export default function Login() {
       {/* Left - visual */}
       <div className="relative hidden lg:block">
         <img src={BG} alt="Sierra Leone" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a1f17]/85 via-[#133326]/70 to-[#0a1f17]/90" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#04270E]/85 via-[#0A4A1E]/70 to-[#04270E]/90" />
         <div className="relative z-10 h-full flex flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-[#D1603D] grid place-items-center font-heading font-bold">S</div>
@@ -113,7 +113,7 @@ export default function Login() {
       <div className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md bg-[#133326] grid place-items-center font-heading font-bold text-white">S</div>
+            <div className="w-10 h-10 rounded-md bg-[#0A4A1E] grid place-items-center font-heading font-bold text-white">S</div>
             <div className="font-heading font-bold text-lg">SaloneHCM</div>
           </div>
           <div className="text-[11px] uppercase tracking-[0.22em] text-[#525860] mb-3">
@@ -131,7 +131,7 @@ export default function Login() {
           {mode === "accept" ? (
             <>
               {inviteErr ? (
-                <div className="bg-[#FBEAEA] border border-[#F2D0D0] text-[#B83A3A] text-sm rounded-md p-4 flex gap-2" data-testid="invite-error">
+                <div className="bg-[#E9F2FB] border border-[#D0E2F2] text-[#3A7CB8] text-sm rounded-md p-4 flex gap-2" data-testid="invite-error">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">{inviteErr}</div>
@@ -164,12 +164,12 @@ export default function Login() {
                       />
                     </div>
                   </div>
-                  {err && <div data-testid="login-error" className="text-sm text-[#B83A3A] bg-[#FBEAEA] border border-[#F2D0D0] rounded-md px-3 py-2">{err}</div>}
+                  {err && <div data-testid="login-error" className="text-sm text-[#3A7CB8] bg-[#E9F2FB] border border-[#D0E2F2] rounded-md px-3 py-2">{err}</div>}
                   <button
                     data-testid="accept-submit-button"
                     type="submit"
                     disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+                    className="w-full inline-flex items-center justify-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
                   >
                     {loading ? "Activating…" : "Accept invitation"}
                     <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
@@ -234,13 +234,13 @@ export default function Login() {
               </div>
             )}
 
-            {err && <div data-testid="login-error" className="text-sm text-[#B83A3A] bg-[#FBEAEA] border border-[#F2D0D0] rounded-md px-3 py-2">{err}</div>}
+            {err && <div data-testid="login-error" className="text-sm text-[#3A7CB8] bg-[#E9F2FB] border border-[#D0E2F2] rounded-md px-3 py-2">{err}</div>}
 
             <button
               data-testid="login-submit-button"
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
             >
               {loading ? "Signing in…" : "Sign In"}
               <ArrowRight className="w-4 h-4" strokeWidth={1.5} />

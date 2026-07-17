@@ -32,7 +32,7 @@ export default function AppHeader({ company, tierColor, isSuperAdmin, onOpenSide
           {company?.label || "SaloneHCM"}
         </span>
         <span className="hidden xl:inline-flex items-center gap-2 text-xs text-[#525860] font-data px-3 py-1.5 rounded-full border border-[#E2DFD6] bg-white">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#2D7A5D]" /> NRA & NASSIT compliant
+          <span className="w-1.5 h-1.5 rounded-full bg-[#17A035]" /> NRA & NASSIT compliant
         </span>
       </div>
     </header>

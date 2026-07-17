@@ -43,7 +43,7 @@ export default function TwoFactorCard() {
             data-testid="twofa-begin"
             disabled={busy}
             onClick={beginSetup}
-            className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60"
+            className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60"
           >
             <Smartphone className="w-4 h-4" strokeWidth={1.5} /> Begin setup
           </button>
@@ -82,7 +82,7 @@ function TwoFactorHeader({ enabled, required, role }) {
           <h2 className="font-heading text-2xl font-bold mt-1 flex items-center gap-2">
             Two-factor authentication
             {enabled ? (
-              <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#E6F4EC] text-[#2D7A5D] inline-flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#E4F7E7] text-[#17A035] inline-flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" /> Enabled
               </span>
             ) : (
@@ -170,7 +170,7 @@ function SetupPanel({ setup, busy, setBusy, onCancel, onEnabled }) {
           data-testid="twofa-enable"
           type="submit"
           disabled={busy || code.length !== 6}
-          className="w-full inline-flex items-center justify-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60"
+          className="w-full inline-flex items-center justify-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60"
         >
           <ShieldCheck className="w-4 h-4" /> Enable 2FA
         </button>
@@ -198,7 +198,7 @@ function EnabledPanel({ required, onDisable }) {
         <button
           data-testid="twofa-disable-open"
           onClick={onDisable}
-          className="text-sm text-[#B83A3A] hover:bg-[#FBEAEA] border border-[#E2DFD6] rounded-md px-3 py-2"
+          className="text-sm text-[#3A7CB8] hover:bg-[#E9F2FB] border border-[#E2DFD6] rounded-md px-3 py-2"
         >
           Disable 2FA
         </button>
@@ -242,7 +242,7 @@ function DisablePanel({ busy, setBusy, onCancel, onDisabled }) {
       />
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
-        <button type="submit" disabled={busy} className="text-sm bg-[#B83A3A] hover:bg-[#9c2e2e] text-white px-4 py-2 rounded-md disabled:opacity-60">Disable</button>
+        <button type="submit" disabled={busy} className="text-sm bg-[#3A7CB8] hover:bg-[#34689A] text-white px-4 py-2 rounded-md disabled:opacity-60">Disable</button>
       </div>
     </form>
   );

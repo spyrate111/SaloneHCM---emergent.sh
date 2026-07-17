@@ -12,7 +12,7 @@ export default function StatsRow() {
     <section
       id="why"
       data-testid="stats-section"
-      className="py-14 lg:py-20 bg-[#0F2C24] text-white"
+      className="py-14 lg:py-20 bg-[#073A16] text-white"
     >
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
         <div className="max-w-[760px] mb-10">
@@ -28,7 +28,7 @@ export default function StatsRow() {
           {STATS.map((s) => {
             const Icon = s.icon;
             return (
-              <div key={s.label} className="bg-[#0F2C24] p-7" data-testid={`stat-${s.label.toLowerCase().replace(/\s+/g, "-")}`}>
+              <div key={s.label} className="bg-[#073A16] p-7" data-testid={`stat-${s.label.toLowerCase().replace(/\s+/g, "-")}`}>
                 <Icon className="w-7 h-7 text-[#E07B4A]" />
                 <div className="mt-4 text-[28px] sm:text-[36px] font-extrabold leading-none">{s.value}</div>
                 <div className="mt-2 text-[12.5px] text-white/70 leading-snug">{s.label}</div>

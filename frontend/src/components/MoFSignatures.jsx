@@ -90,7 +90,7 @@ function MoFSignaturesModal({ runId, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {busy && <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#133326]" /></div>}
+          {busy && <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0A4A1E]" /></div>}
           {data && (
             <>
               <ProgressBar
@@ -106,7 +106,7 @@ function MoFSignaturesModal({ runId, onClose }) {
                     onClick={() => sign("reject")}
                     disabled={signing}
                     data-testid="mof-sig-reject"
-                    className="inline-flex items-center gap-1.5 text-sm bg-white border border-[#E9C2C2] text-[#8C2F2F] hover:bg-[#FBEAEA] px-4 py-2 rounded-md disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 text-sm bg-white border border-[#C2D9E9] text-[#2F6390] hover:bg-[#E9F2FB] px-4 py-2 rounded-md disabled:opacity-60"
                   >
                     <XCircle className="w-4 h-4" /> Reject
                   </button>
@@ -114,7 +114,7 @@ function MoFSignaturesModal({ runId, onClose }) {
                     onClick={() => sign("approve")}
                     disabled={signing}
                     data-testid="mof-sig-approve"
-                    className="inline-flex items-center gap-2 text-sm bg-[#2D7A5D] hover:bg-[#215D46] disabled:opacity-60 text-white px-4 py-2 rounded-md"
+                    className="inline-flex items-center gap-2 text-sm bg-[#17A035] hover:bg-[#127530] disabled:opacity-60 text-white px-4 py-2 rounded-md"
                   >
                     {signing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Sign approval
                   </button>
@@ -152,8 +152,8 @@ function ProgressBar({ approves, rejects, required, mofStatus }) {
   const complete = approves >= required && !showRejected;
   const pct = Math.min(100, (approves / required) * 100);
   let tone = { text: "text-[#8B6A14]", bar: "bg-[#D1603D]", label: `${approves} of ${required}`, width: pct };
-  if (showRejected) tone = { text: "text-[#8C2F2F]", bar: "bg-[#B83A3A]", label: "Rejected", width: 100 };
-  else if (complete) tone = { text: "text-[#2D7A5D]", bar: "bg-[#2D7A5D]", label: "Approved", width: pct };
+  if (showRejected) tone = { text: "text-[#2F6390]", bar: "bg-[#3A7CB8]", label: "Rejected", width: 100 };
+  else if (complete) tone = { text: "text-[#17A035]", bar: "bg-[#17A035]", label: "Approved", width: pct };
   return (
     <div data-testid="mof-sig-progress">
       <div className="flex items-center justify-between mb-2">
@@ -173,14 +173,14 @@ function SignatureList({ signatures, mofStatus }) {
   if (!signatures || signatures.length === 0) {
     if (mofStatus === "approved") {
       return (
-        <div className="text-sm text-[#525860] bg-[#E6F4EC] border border-[#C9E2D2] rounded-md px-3 py-3" data-testid="mof-sig-legacy-approved">
+        <div className="text-sm text-[#525860] bg-[#E4F7E7] border border-[#BFEBC8] rounded-md px-3 py-3" data-testid="mof-sig-legacy-approved">
           This run was approved via the legacy single-signature flow. No signature-chain records exist.
         </div>
       );
     }
     if (mofStatus === "rejected") {
       return (
-        <div className="text-sm text-[#525860] bg-[#FBEAEA] border border-[#E9C2C2] rounded-md px-3 py-3" data-testid="mof-sig-legacy-rejected">
+        <div className="text-sm text-[#525860] bg-[#E9F2FB] border border-[#C2D9E9] rounded-md px-3 py-3" data-testid="mof-sig-legacy-rejected">
           This run was rejected via the legacy single-signature flow. No signature-chain records exist.
         </div>
       );
@@ -199,11 +199,11 @@ function SignatureList({ signatures, mofStatus }) {
           data-testid={`mof-sig-entry-${s.id}`}
           className={`px-3 py-2.5 rounded-md border flex items-start gap-3 ${
             s.action === "approve"
-              ? "bg-[#E6F4EC] border-[#C9E2D2]"
-              : "bg-[#FBEAEA] border-[#E9C2C2]"
+              ? "bg-[#E4F7E7] border-[#BFEBC8]"
+              : "bg-[#E9F2FB] border-[#C2D9E9]"
           }`}
         >
-          <div className={s.action === "approve" ? "text-[#2D7A5D]" : "text-[#8C2F2F]"}>
+          <div className={s.action === "approve" ? "text-[#17A035]" : "text-[#2F6390]"}>
             {s.action === "approve" ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
           </div>
           <div className="flex-1 min-w-0">
@@ -217,7 +217,7 @@ function SignatureList({ signatures, mofStatus }) {
             {s.note && <div className="text-xs mt-1 italic text-[#525860]">&ldquo;{s.note}&rdquo;</div>}
           </div>
           <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-semibold ${
-            s.action === "approve" ? "bg-[#C9E2D2] text-[#2D7A5D]" : "bg-[#E9C2C2] text-[#8C2F2F]"
+            s.action === "approve" ? "bg-[#BFEBC8] text-[#17A035]" : "bg-[#C2D9E9] text-[#2F6390]"
           }`}>
             {s.action}
           </span>

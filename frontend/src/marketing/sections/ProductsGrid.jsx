@@ -80,12 +80,12 @@ export default function ProductsGrid() {
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-12">
           <div className="max-w-[680px]">
-            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#C02719]">What we offer</p>
-            <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#0F2C24] leading-tight">
+            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">What we offer</p>
+            <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#073A16] leading-tight">
               Nine pillars, one platform — all localized for Sierra Leone.
             </h2>
           </div>
-          <Link to="/pricing" className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0F2C24] hover:text-[#C02719]" data-testid="products-see-all">
+          <Link to="/pricing" className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[#073A16] hover:text-[#0072C6]" data-testid="products-see-all">
             See all features <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
@@ -96,15 +96,15 @@ export default function ProductsGrid() {
             return (
               <div
                 key={p.title}
-                className="bg-white border border-[#EAE7DF] rounded-xl p-6 hover:border-[#0F2C24] hover:shadow-md transition-all group"
+                className="bg-white border border-[#EAE7DF] rounded-xl p-6 hover:border-[#073A16] hover:shadow-md transition-all group"
                 data-testid={p.testId}
               >
-                <div className="w-11 h-11 rounded-lg bg-[#FAF8F2] grid place-items-center group-hover:bg-[#0F2C24] transition-colors">
-                  <Icon className="w-5 h-5 text-[#0F2C24] group-hover:text-white transition-colors" />
+                <div className="w-11 h-11 rounded-lg bg-[#FAF8F2] grid place-items-center group-hover:bg-[#073A16] transition-colors">
+                  <Icon className="w-5 h-5 text-[#073A16] group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="mt-4 text-[18px] font-extrabold text-[#0F2C24]">{p.title}</h3>
+                <h3 className="mt-4 text-[18px] font-extrabold text-[#073A16]">{p.title}</h3>
                 <p className="mt-2 text-[14px] text-[#525860] leading-relaxed">{p.desc}</p>
-                <Link to="/pricing" className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold text-[#C02719] hover:gap-2 transition-all">
+                <Link to="/pricing" className="mt-4 inline-flex items-center gap-1 text-[13px] font-bold text-[#0072C6] hover:gap-2 transition-all">
                   {p.cta} <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </div>

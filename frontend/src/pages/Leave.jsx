@@ -28,7 +28,7 @@ export default function Leave() {
 
   const decide = async (id, status) => { await api.put(`/leave/${id}/decision`, { status }); load(); };
 
-  const STATUS_BG = { pending: "bg-[#FBF1DE] text-[#8B6A14]", approved: "bg-[#E6F4EC] text-[#2D7A5D]", rejected: "bg-[#FBEAEA] text-[#B83A3A]" };
+  const STATUS_BG = { pending: "bg-[#FBF1DE] text-[#8B6A14]", approved: "bg-[#E4F7E7] text-[#17A035]", rejected: "bg-[#E9F2FB] text-[#3A7CB8]" };
 
   const filtered = statusFilter ? list.filter((l) => l.status === statusFilter) : list;
 
@@ -40,7 +40,7 @@ export default function Leave() {
           <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">Leave management</h1>
           <p className="text-[#525860] text-sm mt-1">Employment Act 2023 entitlements — annual, sick, maternity, paternity.</p>
         </div>
-        <button data-testid="leave-new-button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm font-medium px-4 py-2.5 rounded-md">
+        <button data-testid="leave-new-button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm font-medium px-4 py-2.5 rounded-md">
           <Plus className="w-4 h-4" /> New request
         </button>
       </div>
@@ -48,7 +48,7 @@ export default function Leave() {
       {statusFilter && (
         <div data-testid="leave-filter-banner" className="bg-[#E5EEF6] border border-[#26547C]/30 rounded-md px-4 py-2.5 text-sm text-[#26547C] inline-flex items-center gap-2">
           <Filter className="w-3.5 h-3.5" /> Filtered by <strong className="capitalize">{statusFilter}</strong>
-          <button data-testid="leave-clear-filter" onClick={() => setParams({})} className="ml-2 text-xs text-[#B83A3A] hover:underline">clear</button>
+          <button data-testid="leave-clear-filter" onClick={() => setParams({})} className="ml-2 text-xs text-[#3A7CB8] hover:underline">clear</button>
         </div>
       )}
 
@@ -69,8 +69,8 @@ export default function Leave() {
                 <td className="py-3 px-4 text-right">
                   {user?.role === "admin" && l.status === "pending" && (
                     <div className="inline-flex gap-1.5">
-                      <button data-testid={`approve-${l.id}`} onClick={() => decide(l.id, "approved")} className="p-1.5 rounded bg-[#E6F4EC] text-[#2D7A5D] hover:bg-[#d2eadd]"><Check className="w-3.5 h-3.5" /></button>
-                      <button data-testid={`reject-${l.id}`} onClick={() => decide(l.id, "rejected")} className="p-1.5 rounded bg-[#FBEAEA] text-[#B83A3A] hover:bg-[#f4d5d5]"><X className="w-3.5 h-3.5" /></button>
+                      <button data-testid={`approve-${l.id}`} onClick={() => decide(l.id, "approved")} className="p-1.5 rounded bg-[#E4F7E7] text-[#17A035] hover:bg-[#C9EED1]"><Check className="w-3.5 h-3.5" /></button>
+                      <button data-testid={`reject-${l.id}`} onClick={() => decide(l.id, "rejected")} className="p-1.5 rounded bg-[#E9F2FB] text-[#3A7CB8] hover:bg-[#D5E5F4]"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
                 </td>
@@ -118,7 +118,7 @@ export default function Leave() {
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button data-testid="leave-submit" type="submit" className="px-4 py-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white rounded-md">Submit</button>
+              <button data-testid="leave-submit" type="submit" className="px-4 py-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md">Submit</button>
             </div>
           </form>
         </div>

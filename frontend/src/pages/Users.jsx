@@ -121,7 +121,7 @@ export default function Users() {
         <button
           data-testid="users-invite-open"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+          className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
         >
           <UserPlus className="w-4 h-4" strokeWidth={1.5} /> Invite user
         </button>
@@ -144,7 +144,7 @@ export default function Users() {
                   <td className="py-2.5 px-5 text-xs text-[#525860] capitalize">{iv.role}</td>
                   <td className="py-2.5 px-5 text-xs text-[#525860] font-data">expires {new Date(iv.expires_at).toLocaleDateString()}</td>
                   <td className="py-2.5 px-5 text-right">
-                    <button data-testid={`invite-revoke-${iv.id}`} onClick={() => revokeInvite(iv.id)} className="text-xs text-[#B83A3A] hover:underline">Revoke</button>
+                    <button data-testid={`invite-revoke-${iv.id}`} onClick={() => revokeInvite(iv.id)} className="text-xs text-[#3A7CB8] hover:underline">Revoke</button>
                   </td>
                 </tr>
               ))}
@@ -183,7 +183,7 @@ export default function Users() {
                 <tr key={u.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]" data-testid={`user-row-${u.id}`}>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#F1EEE6] grid place-items-center text-xs font-medium text-[#133326]">
+                      <div className="w-8 h-8 rounded-full bg-[#F1EEE6] grid place-items-center text-xs font-medium text-[#0A4A1E]">
                         {u.name?.[0] || "?"}
                       </div>
                       <div>
@@ -198,7 +198,7 @@ export default function Users() {
                         <RoleIcon className="w-3 h-3" strokeWidth={1.7} /> {rolePill.label}
                       </span>
                       {u.finance_officer && (
-                        <span data-testid={`user-finance-pill-${u.id}`} className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6F4EC] text-[#2D7A5D]">Finance</span>
+                        <span data-testid={`user-finance-pill-${u.id}`} className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]">Finance</span>
                       )}
                       {u.mof_approver && (
                         <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF3D9] text-[#8B6A14]">MoF</span>
@@ -214,7 +214,7 @@ export default function Users() {
                           <button
                             data-testid={`user-finance-toggle-${u.id}`}
                             onClick={() => toggleFinance(u)}
-                            className={`p-1.5 rounded hover:bg-[#F1EEE6] ${u.finance_officer ? "text-[#2D7A5D]" : "text-[#A1A5AB]"}`}
+                            className={`p-1.5 rounded hover:bg-[#F1EEE6] ${u.finance_officer ? "text-[#17A035]" : "text-[#A1A5AB]"}`}
                             title={u.finance_officer ? "Revoke finance officer" : "Grant finance officer (voucher review & approval)"}
                           >
                             <Banknote className="w-4 h-4" strokeWidth={1.5} />
@@ -231,7 +231,7 @@ export default function Users() {
                             <button
                               data-testid={`user-delete-${u.id}`}
                               onClick={() => onDelete(u)}
-                              className="p-1.5 rounded hover:bg-[#FBEAEA] text-[#B83A3A]"
+                              className="p-1.5 rounded hover:bg-[#E9F2FB] text-[#3A7CB8]"
                               title="Delete"
                             >
                               <Trash2 className="w-4 h-4" strokeWidth={1.5} />
@@ -275,7 +275,7 @@ export default function Users() {
             <input required name="password" type="password" minLength={8} placeholder="New password (8+ chars)" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
             <div className="flex items-center justify-end gap-2">
               <button type="button" onClick={() => setResetting(null)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
-              <button type="submit" data-testid="reset-submit" className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md">Save</button>
+              <button type="submit" data-testid="reset-submit" className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md">Save</button>
             </div>
           </form>
         </div>

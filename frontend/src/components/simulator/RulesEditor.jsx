@@ -36,7 +36,7 @@ export default function RulesEditor({
             <Plus className="w-3.5 h-3.5" /> Add rule
           </button>
           {hasResult && (
-            <button data-testid="save-scenario" onClick={onSaveOpen} className="inline-flex items-center gap-1.5 text-sm border border-[#133326] text-[#133326] hover:bg-[#133326] hover:text-white px-3 py-2 rounded-md transition">
+            <button data-testid="save-scenario" onClick={onSaveOpen} className="inline-flex items-center gap-1.5 text-sm border border-[#0A4A1E] text-[#0A4A1E] hover:bg-[#0A4A1E] hover:text-white px-3 py-2 rounded-md transition">
               <Save className="w-3.5 h-3.5" /> Save scenario
             </button>
           )}
@@ -50,7 +50,7 @@ export default function RulesEditor({
           <div key={r._id} className="border border-[#E2DFD6] rounded-md p-4">
             <div className="flex items-center justify-between mb-3">
               <input value={r.name} onChange={(e) => updateRule(i, { name: e.target.value })} placeholder="Rule label" className="font-heading text-base font-semibold bg-transparent outline-none flex-1" />
-              <button onClick={() => removeRule(i)} className="text-[#B83A3A] hover:bg-[#FBEAEA] p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+              <button onClick={() => removeRule(i)} className="text-[#3A7CB8] hover:bg-[#E9F2FB] p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
               <Select label="Apply to" value={r.target} onChange={(v) => updateRule(i, { target: v })}>

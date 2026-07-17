@@ -7,7 +7,7 @@ import {
 import ChartShell from "../components/ChartShell";
 import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
-const PIE_COLORS = ["#133326", "#26547C", "#D1603D", "#8B6A14", "#2D7A5D", "#9A2A52"];
+const PIE_COLORS = ["#0A4A1E", "#26547C", "#D1603D", "#8B6A14", "#17A035", "#2A5C9C"];
 const LEGEND_STYLE = { fontSize: 12 };
 
 export default function Analytics() {
@@ -48,7 +48,7 @@ export default function Analytics() {
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
                 <Legend wrapperStyle={LEGEND_STYLE} />
                 <Line type="monotone" dataKey="gross" stroke="#26547C" strokeWidth={2} dot={false} name="Gross" />
-                <Line type="monotone" dataKey="net" stroke="#133326" strokeWidth={2} dot={false} name="Net" />
+                <Line type="monotone" dataKey="net" stroke="#0A4A1E" strokeWidth={2} dot={false} name="Net" />
                 <Line type="monotone" dataKey="paye" stroke="#D1603D" strokeWidth={2} dot={false} name="PAYE" />
                 <Line type="monotone" dataKey="nassit" stroke="#8B6A14" strokeWidth={2} dot={false} name="NASSIT" />
               </LineChart>

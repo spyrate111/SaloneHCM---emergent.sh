@@ -38,7 +38,7 @@ export default function MoFConfigCard() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-md bg-[#F1EEE6] grid place-items-center shrink-0">
-            <PenLine className="w-4 h-4 text-[#133326]" strokeWidth={1.6} />
+            <PenLine className="w-4 h-4 text-[#0A4A1E]" strokeWidth={1.6} />
           </div>
           <div>
             <h3 className="font-heading text-sm font-semibold">Multi-signature MoF approval</h3>
@@ -63,7 +63,7 @@ export default function MoFConfigCard() {
             </button>
           </div>
           <button data-testid="mof-config-save" onClick={save} disabled={busy || required === saved}
-            className="text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md disabled:opacity-40">
+            className="text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2 rounded-md disabled:opacity-40">
             {required === saved ? "Saved" : "Save"}
           </button>
         </div>

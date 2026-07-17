@@ -103,7 +103,7 @@ function NativePlayer({ video, autoPlay, className }) {
             <Loader2 className="w-12 h-12 text-white animate-spin" />
           ) : (
             <span className="w-20 h-20 rounded-full bg-white grid place-items-center shadow-xl group-hover:scale-105 transition-transform">
-              <Play className="w-9 h-9 text-[#C02719] ml-1.5" fill="#C02719" />
+              <Play className="w-9 h-9 text-[#0072C6] ml-1.5" fill="#0072C6" />
             </span>
           )}
         </button>
@@ -138,7 +138,7 @@ function NativePlayer({ video, autoPlay, className }) {
               key={c.t}
               type="button"
               onClick={() => jump(c.t)}
-              className="block w-full text-left px-2.5 py-1.5 rounded-md text-[11px] bg-black/40 hover:bg-[#C02719] text-white backdrop-blur-sm transition-colors"
+              className="block w-full text-left px-2.5 py-1.5 rounded-md text-[11px] bg-black/40 hover:bg-[#0072C6] text-white backdrop-blur-sm transition-colors"
             >
               <span className="font-mono text-[10px] opacity-80 mr-2">{fmt(c.t)}</span>
               {c.label}

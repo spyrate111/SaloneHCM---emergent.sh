@@ -97,7 +97,7 @@ def _build_email_body_html(admin_name: str, items: list[dict]) -> str:
     """Compose the inner HTML body for a digest email."""
     greeting = f"<p>Good morning {admin_name},</p>"
     if not items:
-        return greeting + '<p style="color:#2D7A5D;font-weight:600;">All clear — no pending actions today. 🎉</p>'
+        return greeting + '<p style="color:#17A035;font-weight:600;">All clear — no pending actions today. 🎉</p>'
     rows = "".join(
         f'<tr><td style="padding:10px 0;border-bottom:1px solid #E2DFD6;">'
         f'<div style="font-size:13px;">{it["label"]}</div>'

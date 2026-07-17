@@ -156,7 +156,7 @@ def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd."
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
-    h = ParagraphStyle("h", parent=styles["Heading1"], fontSize=20, textColor=colors.HexColor("#133326"), spaceAfter=4)
+    h = ParagraphStyle("h", parent=styles["Heading1"], fontSize=20, textColor=colors.HexColor("#0A4A1E"), spaceAfter=4)
     sub = ParagraphStyle("s", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#525860"))
     label = ParagraphStyle("l", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#525860"))
     story = [
@@ -177,13 +177,13 @@ def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd."
     ]
     t = Table(rows, colWidths=[300, 200])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#133326")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A4A1E")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("ALIGN", (1, 0), (1, -1), "RIGHT"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.HexColor("#F7F6F2"), colors.white]),
-        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E6F4EC")),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E4F7E7")),
         ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2DFD6")),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),

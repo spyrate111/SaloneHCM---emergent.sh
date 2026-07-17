@@ -5,12 +5,12 @@ import {
 } from "lucide-react";
 
 const GRADE_COLOR = {
-  "A+": { bg: "from-[#2D7A5D] to-[#1F5A40]", ring: "#2D7A5D", chip: "bg-[#E6F4EC] text-[#2D7A5D]" },
-  "A":  { bg: "from-[#2D7A5D] to-[#1F5A40]", ring: "#2D7A5D", chip: "bg-[#E6F4EC] text-[#2D7A5D]" },
+  "A+": { bg: "from-[#17A035] to-[#117030]", ring: "#17A035", chip: "bg-[#E4F7E7] text-[#17A035]" },
+  "A":  { bg: "from-[#17A035] to-[#117030]", ring: "#17A035", chip: "bg-[#E4F7E7] text-[#17A035]" },
   "B":  { bg: "from-[#26547C] to-[#1A3D5C]", ring: "#26547C", chip: "bg-[#E5EEF6] text-[#26547C]" },
   "C":  { bg: "from-[#8B6A14] to-[#6B4F0D]", ring: "#8B6A14", chip: "bg-[#FBF1DE] text-[#8B6A14]" },
   "D":  { bg: "from-[#D1603D] to-[#A8462B]", ring: "#D1603D", chip: "bg-[#FBE9DF] text-[#B84F2F]" },
-  "F":  { bg: "from-[#B83A3A] to-[#8E2727]", ring: "#B83A3A", chip: "bg-[#FBEAEA] text-[#B83A3A]" },
+  "F":  { bg: "from-[#3A7CB8] to-[#2C5E8E]", ring: "#3A7CB8", chip: "bg-[#E9F2FB] text-[#3A7CB8]" },
 };
 
 const GRADE_LABEL = {

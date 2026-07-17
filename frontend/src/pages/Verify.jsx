@@ -18,7 +18,7 @@ export default function Verify() {
   return (
     <div className="min-h-screen bg-[#F7F6F2] py-12 px-4" data-testid="verify-page">
       <div className="max-w-2xl mx-auto">
-        <Link to="/" className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[#525860] mb-6 hover:text-[#133326]">
+        <Link to="/" className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[#525860] mb-6 hover:text-[#0A4A1E]">
           <ShieldCheck className="w-4 h-4" /> SaloneHCM Certificate Verification
         </Link>
 
@@ -26,8 +26,8 @@ export default function Verify() {
 
         {!loading && result && !result.valid && (
           <div className="bg-white border border-[#E2DFD6] rounded-xl overflow-hidden" data-testid="verify-invalid">
-            <div className="bg-[#FBEAEA] px-8 py-10 text-center border-b border-[#F2D0D0]">
-              <XCircle className="w-14 h-14 text-[#B83A3A] mx-auto" strokeWidth={1.5} />
+            <div className="bg-[#E9F2FB] px-8 py-10 text-center border-b border-[#D0E2F2]">
+              <XCircle className="w-14 h-14 text-[#3A7CB8] mx-auto" strokeWidth={1.5} />
               <h1 className="font-heading text-3xl font-bold mt-4 text-[#1A1C1E]">Certificate not found</h1>
               <p className="text-[#525860] mt-2 text-sm">No SaloneHCM certificate matches this identifier.</p>
             </div>
@@ -39,8 +39,8 @@ export default function Verify() {
 
         {!loading && result && result.valid && (
           <div className="bg-white border border-[#E2DFD6] rounded-xl overflow-hidden" data-testid="verify-valid">
-            <div className="bg-gradient-to-br from-[#E6F4EC] to-[#F7F6F2] px-8 py-10 text-center border-b border-[#E2DFD6]">
-              <CheckCircle2 className="w-14 h-14 text-[#2D7A5D] mx-auto" strokeWidth={1.5} />
+            <div className="bg-gradient-to-br from-[#E4F7E7] to-[#F7F6F2] px-8 py-10 text-center border-b border-[#E2DFD6]">
+              <CheckCircle2 className="w-14 h-14 text-[#17A035] mx-auto" strokeWidth={1.5} />
               <div className="text-[10px] uppercase tracking-[0.22em] text-[#525860] mt-4">Verified certificate</div>
               <h1 className="font-heading text-3xl font-bold mt-2 text-[#1A1C1E]" data-testid="verify-employee-name">{result.employee_name}</h1>
               <p className="text-[#525860] mt-2 text-sm">successfully completed</p>
@@ -52,7 +52,7 @@ export default function Verify() {
               <Row icon={Award} label="Training hours" value={`${result.hours}h`} />
               <Row icon={Calendar} label="Completed on" value={result.completed_on} />
               {result.score !== null && result.score !== undefined && (
-                <Row icon={Star} label="Final score" value={`${result.score}%`} accent="#2D7A5D" />
+                <Row icon={Star} label="Final score" value={`${result.score}%`} accent="#17A035" />
               )}
               <Row icon={Building2} label="Issued by" value={result.issued_by} fullWidth />
             </div>

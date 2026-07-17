@@ -13,7 +13,7 @@
     --card-foreground: 220 6% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 6% 11%;
-    --primary: 153 45% 14%;
+    --primary: 139 76% 16%;
     --primary-foreground: 0 0% 100%;
     --secondary: 211 51% 32%;
     --secondary-foreground: 0 0% 100%;
@@ -21,7 +21,7 @@
     --muted-foreground: 217 5% 42%;
     --accent: 17 60% 53%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 53% 47%;
+    --destructive: 205 100% 39%;
     --destructive-foreground: 0 0% 100%;
     --border: 40 17% 86%;
     --input: 40 17% 86%;
@@ -77,7 +77,7 @@ h1, h2, h3, h4, h5, h6 {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-::selection { background: #133326; color: #fff; }
+::selection { background: #0A4A1E; color: #fff; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #d4d0c4; border-radius: 8px; }

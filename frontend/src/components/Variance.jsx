@@ -51,7 +51,7 @@ function VarianceModal({ runId, period, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {busy && <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#133326]" /></div>}
+          {busy && <div className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0A4A1E]" /></div>}
           {data && (
             <>
               <HeadlineTotals totals={data.totals} />
@@ -89,7 +89,7 @@ function MetricCell({ label, value, deltaAbs, deltaPct, isMoney }) {
   const negative = (deltaAbs ?? 0) < 0;
   const arrow = positive ? TrendingUp : (negative ? TrendingDown : null);
   const Arrow = arrow;
-  const color = positive ? "text-[#B84F2F]" : negative ? "text-[#2D7A5D]" : "text-[#525860]";
+  const color = positive ? "text-[#B84F2F]" : negative ? "text-[#17A035]" : "text-[#525860]";
   return (
     <div className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-3">
       <div className="text-[10px] uppercase tracking-wider text-[#525860]">{label}</div>
@@ -108,9 +108,9 @@ function MetricCell({ label, value, deltaAbs, deltaPct, isMoney }) {
 function AnomaliesList({ anomalies, summary }) {
   if (!anomalies || anomalies.length === 0) {
     return (
-      <div className="bg-[#E6F4EC] border border-[#C9E2D2] rounded-md px-4 py-3 flex items-center gap-2" data-testid="variance-no-anomalies">
-        <ShieldCheck className="w-4 h-4 text-[#2D7A5D]" />
-        <span className="text-sm text-[#2D7A5D]">No anomalies detected — variance falls within normal thresholds.</span>
+      <div className="bg-[#E4F7E7] border border-[#BFEBC8] rounded-md px-4 py-3 flex items-center gap-2" data-testid="variance-no-anomalies">
+        <ShieldCheck className="w-4 h-4 text-[#17A035]" />
+        <span className="text-sm text-[#17A035]">No anomalies detected — variance falls within normal thresholds.</span>
       </div>
     );
   }
@@ -132,7 +132,7 @@ function AnomaliesList({ anomalies, summary }) {
             data-testid={`variance-anomaly-${a.kind}-${i}`}
             className={`text-xs rounded-md border px-3 py-2.5 ${
               a.severity === "high"
-                ? "bg-[#FBEAEA] border-[#E9C2C2] text-[#8C2F2F]"
+                ? "bg-[#E9F2FB] border-[#C2D9E9] text-[#2F6390]"
                 : "bg-[#FBF1DE] border-[#E8D5A2] text-[#8B6A14]"
             }`}
           >
@@ -173,10 +173,10 @@ function MinistryTable({ rows }) {
                 <td className="px-3 py-2 truncate max-w-[220px]" title={r.ministry}>{r.ministry}</td>
                 <td className="px-3 py-2 font-data text-[13px]">{r.headcount_prev} · {fmtSLE(r.gross_prev)}</td>
                 <td className="px-3 py-2 font-data text-[13px]">{r.headcount} · {fmtSLE(r.gross)}</td>
-                <td className={`px-3 py-2 font-data ${r.delta_gross > 0 ? "text-[#B84F2F]" : r.delta_gross < 0 ? "text-[#2D7A5D]" : ""}`}>
+                <td className={`px-3 py-2 font-data ${r.delta_gross > 0 ? "text-[#B84F2F]" : r.delta_gross < 0 ? "text-[#17A035]" : ""}`}>
                   {r.delta_gross > 0 && "+"}{fmtSLE(r.delta_gross)}
                 </td>
-                <td className={`px-3 py-2 font-data ${flag ? "text-[#8C2F2F] font-semibold" : ""}`}>
+                <td className={`px-3 py-2 font-data ${flag ? "text-[#2F6390] font-semibold" : ""}`}>
                   {dp === null ? "—" : (dp > 0 ? "+" : "") + dp + "%"}
                 </td>
               </tr>

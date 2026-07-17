@@ -84,7 +84,7 @@ export default function FeatureDirectory() {
     <div className="space-y-6" data-testid="directory-page">
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-md bg-[#133326] grid place-items-center shrink-0">
+          <div className="w-11 h-11 rounded-md bg-[#0A4A1E] grid place-items-center shrink-0">
             <Compass className="w-5 h-5 text-white" strokeWidth={1.6} />
           </div>
           <div>
@@ -92,7 +92,7 @@ export default function FeatureDirectory() {
             <h1 className="font-heading text-3xl font-bold mt-1">Feature Directory</h1>
             <p className="text-sm text-[#525860] mt-1 max-w-2xl">
               Every module in SaloneHCM and what unlocks it. You can open{" "}
-              <span className="font-semibold text-[#133326]" data-testid="directory-available-count">{availableCount} of {entries.length}</span>{" "}
+              <span className="font-semibold text-[#0A4A1E]" data-testid="directory-available-count">{availableCount} of {entries.length}</span>{" "}
               modules with your current role ({user?.role}) and plan{user?.company?.label ? ` (${user.company.label})` : ""}.
             </p>
             <a href="/training" target="_blank" rel="noreferrer" data-testid="directory-training-link"
@@ -119,11 +119,11 @@ function ModuleCard({ entry }) {
   const Icon = entry.icon;
   const locked = entry.status !== "available";
   const inner = (
-    <div className={`bg-white border rounded-lg p-4 h-full flex flex-col gap-2 transition ${locked ? "border-[#E2DFD6] opacity-70" : "border-[#E2DFD6] hover:border-[#133326] hover:shadow-sm"}`}>
+    <div className={`bg-white border rounded-lg p-4 h-full flex flex-col gap-2 transition ${locked ? "border-[#E2DFD6] opacity-70" : "border-[#E2DFD6] hover:border-[#0A4A1E] hover:shadow-sm"}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-md grid place-items-center ${locked ? "bg-[#F1EEE6]" : "bg-[#E6F4EC]"}`}>
-            <Icon className={`w-4 h-4 ${locked ? "text-[#A1A5AB]" : "text-[#133326]"}`} strokeWidth={1.6} />
+          <div className={`w-8 h-8 rounded-md grid place-items-center ${locked ? "bg-[#F1EEE6]" : "bg-[#E4F7E7]"}`}>
+            <Icon className={`w-4 h-4 ${locked ? "text-[#A1A5AB]" : "text-[#0A4A1E]"}`} strokeWidth={1.6} />
           </div>
           <span className="font-heading text-sm font-semibold">{entry.label}</span>
         </div>
@@ -137,7 +137,7 @@ function ModuleCard({ entry }) {
           {entry.statusLabel}
         </span>
       ) : (
-        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full w-fit bg-[#E6F4EC] text-[#2D7A5D]">Available</span>
+        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full w-fit bg-[#E4F7E7] text-[#17A035]">Available</span>
       )}
     </div>
   );

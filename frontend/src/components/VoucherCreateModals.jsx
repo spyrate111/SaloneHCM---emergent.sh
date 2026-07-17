@@ -115,7 +115,7 @@ export function CreateVoucherModal({ branches, user, canManage, onClose, onSaved
                     <td className="py-1.5 px-2 font-data font-semibold">{fmtSLE(netOf(l))}</td>
                     <td className="py-1.5 px-2">
                       <button type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}
-                        className="p-1 rounded hover:bg-[#FBEAEA] text-[#B83A3A]"><Trash2 className="w-3.5 h-3.5" /></button>
+                        className="p-1 rounded hover:bg-[#E9F2FB] text-[#3A7CB8]"><Trash2 className="w-3.5 h-3.5" /></button>
                     </td>
                   </tr>
                 ))}
@@ -128,7 +128,7 @@ export function CreateVoucherModal({ branches, user, canManage, onClose, onSaved
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
             <button type="submit" data-testid="vc-submit" disabled={busy || !branchId || !lines.length}
-              className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">Create draft</button>
+              className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">Create draft</button>
           </div>
         </div>
       </form>
@@ -184,12 +184,12 @@ export function GenerateFromRunModal({ onClose, onDone }) {
         </select>
         {result && (
           <div className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-4 text-sm space-y-2" data-testid="gen-result">
-            <div><span className="font-semibold text-[#2D7A5D]">{result.created.length} created:</span> {result.created.map((c) => `${c.voucher_ref} (${c.branch})`).join(", ") || "none"}</div>
+            <div><span className="font-semibold text-[#17A035]">{result.created.length} created:</span> {result.created.map((c) => `${c.voucher_ref} (${c.branch})`).join(", ") || "none"}</div>
             {result.skipped_existing.length > 0 && (
               <div><span className="font-semibold text-[#8B6A14]">{result.skipped_existing.length} skipped</span> — voucher already exists: {result.skipped_existing.map((s) => s.branch).join(", ")}</div>
             )}
             {result.unassigned_count > 0 && (
-              <div className="text-[#B83A3A]">{result.unassigned_count} employee(s) have no branch — assign them under Branches & Offices: {result.unassigned.join(", ")}</div>
+              <div className="text-[#3A7CB8]">{result.unassigned_count} employee(s) have no branch — assign them under Branches & Offices: {result.unassigned.join(", ")}</div>
             )}
           </div>
         )}
@@ -197,7 +197,7 @@ export function GenerateFromRunModal({ onClose, onDone }) {
           <button onClick={onClose} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">{result ? "Close" : "Cancel"}</button>
           {!result && (
             <button data-testid="gen-submit" disabled={busy || !runId} onClick={generate}
-              className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">Generate</button>
+              className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">Generate</button>
           )}
         </div>
       </div>

@@ -65,7 +65,7 @@ export default function MarketingNav() {
       className={`sticky top-0 z-50 bg-white transition-shadow ${scrolled ? "shadow-md" : "shadow-sm"}`}
     >
       {/* Sales bar */}
-      <div className="hidden lg:flex items-center justify-end gap-6 px-8 py-1.5 bg-[#0F2C24] text-white text-[12px]">
+      <div className="hidden lg:flex items-center justify-end gap-6 px-8 py-1.5 bg-[#073A16] text-white text-[12px]">
         <a href="tel:+23230000000" className="flex items-center gap-1.5 hover:text-[#E07B4A]" data-testid="nav-sales-phone">
           <Phone className="w-3.5 h-3.5" /> Talk to sales: +232 30 000 000
         </a>
@@ -82,14 +82,14 @@ export default function MarketingNav() {
           onClick={() => setMobileOpen(true)}
           data-testid="nav-hamburger"
         >
-          <Menu className="w-6 h-6 text-[#0F2C24]" />
+          <Menu className="w-6 h-6 text-[#073A16]" />
         </button>
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group" data-testid="nav-logo-link">
-          <span className="w-9 h-9 rounded-md bg-[#0F2C24] grid place-items-center text-white font-bold tracking-tight group-hover:bg-[#143b30] transition-colors">SH</span>
+          <span className="w-9 h-9 rounded-md bg-[#073A16] grid place-items-center text-white font-bold tracking-tight group-hover:bg-[#0B5222] transition-colors">SH</span>
           <span className="flex flex-col leading-none">
-            <span className="font-bold text-[15px] text-[#0F2C24] tracking-tight">SaloneHCM</span>
+            <span className="font-bold text-[15px] text-[#073A16] tracking-tight">SaloneHCM</span>
             <span className="text-[10px] text-[#525860] uppercase tracking-[0.14em]">HR · Payroll · Compliance</span>
           </span>
         </Link>
@@ -105,7 +105,7 @@ export default function MarketingNav() {
             >
               <button
                 type="button"
-                className={`flex items-center gap-1 px-3 h-[44px] text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719] transition-colors border-b-2 ${open === m.label ? "border-[#C02719]" : "border-transparent"}`}
+                className={`flex items-center gap-1 px-3 h-[44px] text-[14px] font-medium text-[#073A16] hover:text-[#0072C6] transition-colors border-b-2 ${open === m.label ? "border-[#0072C6]" : "border-transparent"}`}
                 data-testid={`nav-menu-${m.label.replace(/\s+/g, "-").toLowerCase()}`}
               >
                 {m.label}
@@ -121,7 +121,7 @@ export default function MarketingNav() {
                       onClick={() => setOpen(false)}
                       data-testid={`menu-item-${it.label.split(" ")[0].toLowerCase()}`}
                     >
-                      <div className="text-[13px] font-semibold text-[#0F2C24] group-hover:text-[#C02719]">{it.label}</div>
+                      <div className="text-[13px] font-semibold text-[#073A16] group-hover:text-[#0072C6]">{it.label}</div>
                       <div className="text-[12px] text-[#525860] leading-snug">{it.desc}</div>
                     </Link>
                   ))}
@@ -129,19 +129,19 @@ export default function MarketingNav() {
               )}
             </div>
           ))}
-          <Link to="/pricing" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-pricing">
+          <Link to="/pricing" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#073A16] hover:text-[#0072C6]" data-testid="nav-pricing">
             Pricing
           </Link>
-          <Link to="/demo" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-demo">
+          <Link to="/demo" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#073A16] hover:text-[#0072C6]" data-testid="nav-demo">
             Get a demo
           </Link>
-          <Link to="/tour" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-tour">
+          <Link to="/tour" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#073A16] hover:text-[#0072C6]" data-testid="nav-tour">
             Tour the product
           </Link>
-          <Link to="/videos" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-videos">
+          <Link to="/videos" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#073A16] hover:text-[#0072C6]" data-testid="nav-videos">
             Videos
           </Link>
-          <Link to="/training" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#0F2C24] hover:text-[#C02719]" data-testid="nav-training">
+          <Link to="/training" className="px-3 h-[44px] flex items-center text-[14px] font-medium text-[#073A16] hover:text-[#0072C6]" data-testid="nav-training">
             Training
           </Link>
         </nav>
@@ -150,7 +150,7 @@ export default function MarketingNav() {
         <div className="flex items-center gap-2.5">
           <Link
             to={user ? "/dashboard" : "/login"}
-            className="hidden sm:inline-flex items-center px-4 h-9 text-[13px] font-semibold text-[#0F2C24] border border-[#0F2C24] rounded-full hover:bg-[#0F2C24] hover:text-white transition-colors"
+            className="hidden sm:inline-flex items-center px-4 h-9 text-[13px] font-semibold text-[#073A16] border border-[#073A16] rounded-full hover:bg-[#073A16] hover:text-white transition-colors"
             data-testid="nav-signin-button"
           >
             {user ? "Dashboard" : "Sign in"}
@@ -158,7 +158,7 @@ export default function MarketingNav() {
           <button
             type="button"
             onClick={goCta}
-            className="inline-flex items-center px-4 h-9 text-[13px] font-semibold text-white bg-[#C02719] rounded-full hover:bg-[#9c1f14] transition-colors"
+            className="inline-flex items-center px-4 h-9 text-[13px] font-semibold text-white bg-[#0072C6] rounded-full hover:bg-[#005A9C] transition-colors"
             data-testid="nav-get-pricing-button"
           >
             Get pricing
@@ -171,17 +171,17 @@ export default function MarketingNav() {
         <div className="fixed inset-0 z-50 bg-white lg:hidden overflow-y-auto" data-testid="nav-mobile-drawer">
           <div className="flex items-center justify-between px-4 h-[64px] border-b border-[#EAE7DF]">
             <Link to="/" className="flex items-center gap-2.5" onClick={() => setMobileOpen(false)}>
-              <span className="w-9 h-9 rounded-md bg-[#0F2C24] grid place-items-center text-white font-bold">SH</span>
-              <span className="font-bold text-[#0F2C24]">SaloneHCM</span>
+              <span className="w-9 h-9 rounded-md bg-[#073A16] grid place-items-center text-white font-bold">SH</span>
+              <span className="font-bold text-[#073A16]">SaloneHCM</span>
             </Link>
             <button type="button" aria-label="Close" onClick={() => setMobileOpen(false)} data-testid="nav-mobile-close">
-              <X className="w-6 h-6 text-[#0F2C24]" />
+              <X className="w-6 h-6 text-[#073A16]" />
             </button>
           </div>
           <div className="px-4 py-6 space-y-4">
             {MENU.map((m) => (
               <details key={m.label} className="border-b border-[#EAE7DF] pb-3">
-                <summary className="flex items-center justify-between py-2 cursor-pointer text-[15px] font-semibold text-[#0F2C24]">
+                <summary className="flex items-center justify-between py-2 cursor-pointer text-[15px] font-semibold text-[#073A16]">
                   {m.label}
                   <ChevronDown className="w-4 h-4" />
                 </summary>
@@ -191,7 +191,7 @@ export default function MarketingNav() {
                       key={it.label}
                       to={it.to}
                       onClick={() => setMobileOpen(false)}
-                      className="block text-[13px] text-[#525860] hover:text-[#C02719]"
+                      className="block text-[13px] text-[#525860] hover:text-[#0072C6]"
                     >
                       {it.label}
                     </Link>
@@ -202,33 +202,33 @@ export default function MarketingNav() {
             <Link
               to="/pricing"
               onClick={() => setMobileOpen(false)}
-              className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
+              className="block py-2 text-[15px] font-semibold text-[#073A16]"
             >Pricing</Link>
             <Link
               to="/demo"
               onClick={() => setMobileOpen(false)}
-              className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
+              className="block py-2 text-[15px] font-semibold text-[#073A16]"
             >Get a demo</Link>
             <Link
               to="/tour"
               onClick={() => setMobileOpen(false)}
-              className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
+              className="block py-2 text-[15px] font-semibold text-[#073A16]"
             >Tour the product</Link>
             <Link
               to="/videos"
               onClick={() => setMobileOpen(false)}
-              className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
+              className="block py-2 text-[15px] font-semibold text-[#073A16]"
             >Videos</Link>
             <Link
               to="/training"
               onClick={() => setMobileOpen(false)}
-              className="block py-2 text-[15px] font-semibold text-[#0F2C24]"
+              className="block py-2 text-[15px] font-semibold text-[#073A16]"
             >Training</Link>
             <div className="pt-4 flex flex-col gap-2">
-              <Link to={user ? "/dashboard" : "/login"} className="text-center px-4 h-11 inline-flex items-center justify-center text-[14px] font-semibold text-[#0F2C24] border border-[#0F2C24] rounded-full">
+              <Link to={user ? "/dashboard" : "/login"} className="text-center px-4 h-11 inline-flex items-center justify-center text-[14px] font-semibold text-[#073A16] border border-[#073A16] rounded-full">
                 {user ? "Dashboard" : "Sign in"}
               </Link>
-              <button type="button" onClick={() => { setMobileOpen(false); goCta(); }} className="px-4 h-11 text-[14px] font-semibold text-white bg-[#C02719] rounded-full">
+              <button type="button" onClick={() => { setMobileOpen(false); goCta(); }} className="px-4 h-11 text-[14px] font-semibold text-white bg-[#0072C6] rounded-full">
                 Get pricing
               </button>
             </div>

@@ -115,11 +115,11 @@ export default function TourPage() {
   }, [moduleIdx, stepIdx, showCongrats]);
 
   return (
-    <div className="min-h-screen bg-[#0F2C24] flex flex-col" data-testid="tour-page">
+    <div className="min-h-screen bg-[#073A16] flex flex-col" data-testid="tour-page">
       {/* Top toolbar — ADP-style */}
-      <header className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-[60px] bg-[#0F2C24] text-white border-b border-white/10">
+      <header className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-[60px] bg-[#073A16] text-white border-b border-white/10">
         <Link to="/" className="flex items-center gap-2.5 group" data-testid="tour-logo">
-          <span className="w-9 h-9 rounded-md bg-white grid place-items-center text-[#0F2C24] font-bold tracking-tight">SH</span>
+          <span className="w-9 h-9 rounded-md bg-white grid place-items-center text-[#073A16] font-bold tracking-tight">SH</span>
           <div className="leading-none">
             <div className="font-bold text-[14px]">SaloneHCM <span className="text-[#E07B4A]">Demo</span></div>
             <div className="text-[10px] text-white/60 uppercase tracking-[0.14em]">Interactive product tour</div>
@@ -130,7 +130,7 @@ export default function TourPage() {
           <button
             type="button"
             onClick={() => setAutoplay((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-4 h-9 text-[12px] font-bold rounded-full transition-colors ${autoplay ? "bg-[#E07B4A] text-white" : "bg-white text-[#0F2C24] hover:bg-[#FAF8F2]"}`}
+            className={`inline-flex items-center gap-1.5 px-4 h-9 text-[12px] font-bold rounded-full transition-colors ${autoplay ? "bg-[#E07B4A] text-white" : "bg-white text-[#073A16] hover:bg-[#FAF8F2]"}`}
             data-testid="tour-autoplay-toggle"
           >
             {autoplay ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />} {autoplay ? "Pause" : "Autoplay"}
@@ -138,7 +138,7 @@ export default function TourPage() {
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 h-9 text-[12px] font-bold border border-white text-white rounded-full hover:bg-white hover:text-[#0F2C24] transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 h-9 text-[12px] font-bold border border-white text-white rounded-full hover:bg-white hover:text-[#073A16] transition-colors"
             data-testid="tour-menu-open"
           >
             <MenuIcon className="w-3.5 h-3.5" /> Demo menu
@@ -156,7 +156,7 @@ export default function TourPage() {
       </header>
 
       {/* Module title strip */}
-      <div className="px-4 sm:px-6 lg:px-8 py-3 bg-[#0F2C24] text-white flex items-center justify-between gap-3 border-b border-white/10">
+      <div className="px-4 sm:px-6 lg:px-8 py-3 bg-[#073A16] text-white flex items-center justify-between gap-3 border-b border-white/10">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#E07B4A]">Module {moduleIdx + 1} of {TOUR_MODULES.length}</div>
           <div className="text-[18px] font-extrabold" data-testid="tour-module-title">{current.title}: <span className="text-white/70 font-medium">{current.subtitle}</span></div>
@@ -222,18 +222,18 @@ function TourPopup({ pos, stepIdx, totalSteps, body, onBack, onNext, isFirst, is
       data-testid="tour-popup"
     >
       <div className="flex items-center justify-between">
-        <span className="inline-flex items-center px-2 h-5 text-[9px] font-bold uppercase tracking-[0.14em] bg-[#0F2C24] text-white rounded-full">
+        <span className="inline-flex items-center px-2 h-5 text-[9px] font-bold uppercase tracking-[0.14em] bg-[#073A16] text-white rounded-full">
           <Sparkles className="w-2.5 h-2.5 mr-1" /> Tour step
         </span>
         <span className="text-[10px] text-[#525860] font-mono" data-testid="tour-step-counter">{stepIdx + 1} OF {totalSteps}</span>
       </div>
-      <p className="mt-3 text-[14px] text-[#0F2C24] leading-relaxed" data-testid="tour-popup-body">{body}</p>
+      <p className="mt-3 text-[14px] text-[#073A16] leading-relaxed" data-testid="tour-popup-body">{body}</p>
       <div className="mt-4 flex items-center justify-between">
         <button
           type="button"
           onClick={onBack}
           disabled={isFirst}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#0F2C24] disabled:opacity-30"
+          className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#073A16] disabled:opacity-30"
           data-testid="tour-popup-back"
         >
           <ChevronLeft className="w-3.5 h-3.5" /> Back
@@ -241,7 +241,7 @@ function TourPopup({ pos, stepIdx, totalSteps, body, onBack, onNext, isFirst, is
         <button
           type="button"
           onClick={onNext}
-          className="inline-flex items-center gap-1 px-4 h-8 text-[12px] font-bold bg-[#C02719] text-white rounded-full hover:bg-[#9c1f14]"
+          className="inline-flex items-center gap-1 px-4 h-8 text-[12px] font-bold bg-[#0072C6] text-white rounded-full hover:bg-[#005A9C]"
           data-testid="tour-popup-next"
         >
           {isLast ? "Finish module" : "Next"} <ChevronRight className="w-3.5 h-3.5" />
@@ -255,14 +255,14 @@ function CongratsOverlay({ moduleTitle, isLastModule, onContinue, onBookDemo }) 
   return (
     <div className="absolute inset-0 bg-white grid place-items-center p-8" data-testid="tour-congrats">
       <div className="max-w-[680px] text-center">
-        <div className="w-20 h-20 rounded-full bg-[#E6F2EC] grid place-items-center mx-auto">
-          <CheckCircle2 className="w-10 h-10 text-[#1f6f55]" />
+        <div className="w-20 h-20 rounded-full bg-[#E2F5E5] grid place-items-center mx-auto">
+          <CheckCircle2 className="w-10 h-10 text-[#128A2C]" />
         </div>
-        <p className="mt-5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#C02719]">{isLastModule ? "Tour complete" : "Module complete"}</p>
-        <h2 className="mt-1.5 text-[28px] sm:text-[36px] font-extrabold text-[#0F2C24] leading-tight">
+        <p className="mt-5 text-[12px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">{isLastModule ? "Tour complete" : "Module complete"}</p>
+        <h2 className="mt-1.5 text-[28px] sm:text-[36px] font-extrabold text-[#073A16] leading-tight">
           {isLastModule
             ? <>You&rsquo;ve seen the full SaloneHCM picture.</>
-            : <>Nicely done. <span className="text-[#C02719]">{moduleTitle}</span> is in the bag.</>}
+            : <>Nicely done. <span className="text-[#0072C6]">{moduleTitle}</span> is in the bag.</>}
         </h2>
         <p className="mt-3 text-[15px] text-[#525860] max-w-[520px] mx-auto leading-relaxed">
           {isLastModule
@@ -275,12 +275,12 @@ function CongratsOverlay({ moduleTitle, isLastModule, onContinue, onBookDemo }) 
               <button
                 type="button"
                 onClick={onBookDemo}
-                className="px-5 h-12 text-[14px] font-bold bg-[#C02719] text-white rounded-full hover:bg-[#9c1f14] inline-flex items-center gap-1.5"
+                className="px-5 h-12 text-[14px] font-bold bg-[#0072C6] text-white rounded-full hover:bg-[#005A9C] inline-flex items-center gap-1.5"
                 data-testid="tour-congrats-book"
               >
                 Book my real demo <ArrowRight className="w-4 h-4" />
               </button>
-              <Link to="/pricing" className="px-5 h-12 text-[14px] font-bold border border-[#0F2C24] text-[#0F2C24] rounded-full hover:bg-[#0F2C24] hover:text-white inline-flex items-center" data-testid="tour-congrats-pricing">
+              <Link to="/pricing" className="px-5 h-12 text-[14px] font-bold border border-[#073A16] text-[#073A16] rounded-full hover:bg-[#073A16] hover:text-white inline-flex items-center" data-testid="tour-congrats-pricing">
                 See pricing
               </Link>
             </>
@@ -288,7 +288,7 @@ function CongratsOverlay({ moduleTitle, isLastModule, onContinue, onBookDemo }) 
             <button
               type="button"
               onClick={onContinue}
-              className="px-5 h-12 text-[14px] font-bold bg-[#C02719] text-white rounded-full hover:bg-[#9c1f14] inline-flex items-center gap-1.5"
+              className="px-5 h-12 text-[14px] font-bold bg-[#0072C6] text-white rounded-full hover:bg-[#005A9C] inline-flex items-center gap-1.5"
               data-testid="tour-congrats-continue"
             >
               Continue the tour <ArrowRight className="w-4 h-4" />
@@ -309,8 +309,8 @@ function DemoMenu({ modules, currentIdx, onClose, onJump }) {
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C02719]">Demo menu</p>
-            <h3 className="text-[22px] font-extrabold text-[#0F2C24]">Pick a module to jump to.</h3>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">Demo menu</p>
+            <h3 className="text-[22px] font-extrabold text-[#073A16]">Pick a module to jump to.</h3>
           </div>
           <button type="button" onClick={onClose} aria-label="Close menu" className="w-9 h-9 grid place-items-center rounded-full border border-[#EAE7DF] hover:bg-[#FAF8F2]" data-testid="tour-menu-close">
             <X className="w-4 h-4" />
@@ -326,23 +326,23 @@ function DemoMenu({ modules, currentIdx, onClose, onJump }) {
                 onClick={() => onJump(i)}
                 className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-3 ${
                   active
-                    ? "border-[#C02719] bg-[#FFE9E5] ring-2 ring-[#C02719]/15"
-                    : "border-[#EAE7DF] bg-white hover:border-[#0F2C24]"
+                    ? "border-[#0072C6] bg-[#E5F1FD] ring-2 ring-[#0072C6]/15"
+                    : "border-[#EAE7DF] bg-white hover:border-[#073A16]"
                 }`}
                 data-testid={`tour-menu-jump-${m.id}`}
               >
-                <span className={`w-8 h-8 rounded-full grid place-items-center text-[12px] font-extrabold flex-none ${active ? "bg-[#C02719] text-white" : "bg-[#FAF8F2] text-[#0F2C24]"}`}>{i + 1}</span>
+                <span className={`w-8 h-8 rounded-full grid place-items-center text-[12px] font-extrabold flex-none ${active ? "bg-[#0072C6] text-white" : "bg-[#FAF8F2] text-[#073A16]"}`}>{i + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <div className={`text-[14px] font-extrabold ${active ? "text-[#C02719]" : "text-[#0F2C24]"}`}>{m.title}</div>
+                  <div className={`text-[14px] font-extrabold ${active ? "text-[#0072C6]" : "text-[#073A16]"}`}>{m.title}</div>
                   <div className="text-[11.5px] text-[#525860] leading-snug">{m.subtitle} &middot; {m.steps.length} steps</div>
                 </div>
-                {active && <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#C02719] text-white px-2 py-0.5 rounded-full">Active</span>}
+                {active && <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#0072C6] text-white px-2 py-0.5 rounded-full">Active</span>}
               </button>
             );
           })}
         </div>
         <div className="mt-6 pt-4 border-t border-[#F1EEE6] text-center">
-          <Link to="/demo" className="text-[12.5px] font-bold text-[#C02719] hover:underline" onClick={onClose} data-testid="tour-menu-book-demo">
+          <Link to="/demo" className="text-[12.5px] font-bold text-[#0072C6] hover:underline" onClick={onClose} data-testid="tour-menu-book-demo">
             Skip the tour &mdash; book a live demo instead &rarr;
           </Link>
         </div>

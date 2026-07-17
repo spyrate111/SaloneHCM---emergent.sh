@@ -46,7 +46,7 @@ export default function Documents() {
           <button
             data-testid="documents-upload-open"
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+            className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
           >
             <Upload className="w-4 h-4" strokeWidth={1.5} /> Upload document
           </button>

@@ -56,7 +56,7 @@ export default function DigestPrefsCard() {
             data-testid="digest-prefs-save"
             disabled={!dirty || busy}
             onClick={save}
-            className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2 rounded-md disabled:opacity-50"
+            className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2 rounded-md disabled:opacity-50"
           >
             <Save className="w-4 h-4" /> Save preferences
           </button>
@@ -78,7 +78,7 @@ function PrefRow({ icon: Icon, label, desc, checked, onChange, testId }) {
           <div className="text-xs text-[#686D76] mt-0.5">{desc}</div>
         </div>
       </div>
-      <input data-testid={testId} type="checkbox" checked={checked} onChange={onChange} className="w-4 h-4 mt-2.5 accent-[#133326]" />
+      <input data-testid={testId} type="checkbox" checked={checked} onChange={onChange} className="w-4 h-4 mt-2.5 accent-[#0A4A1E]" />
     </label>
   );
 }

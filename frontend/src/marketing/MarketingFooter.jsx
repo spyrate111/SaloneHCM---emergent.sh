@@ -42,7 +42,7 @@ const FOOTER = {
 
 export default function MarketingFooter() {
   return (
-    <footer id="footer" data-testid="marketing-footer" className="bg-[#0F2C24] text-white">
+    <footer id="footer" data-testid="marketing-footer" className="bg-[#073A16] text-white">
       {/* Top: Talk-to-sales bar */}
       <div className="border-b border-white/10">
         <div className="max-w-[1280px] mx-auto px-6 lg:px-10 py-10 grid md:grid-cols-2 gap-6 items-center">
@@ -51,10 +51,10 @@ export default function MarketingFooter() {
             <p className="text-white/70 text-[14px] mt-1.5">Speak to a SaloneHCM specialist — quote in 24 hours, onboarding in 7 days.</p>
           </div>
           <div className="flex flex-wrap gap-3 md:justify-end">
-            <a href="tel:+23230000000" className="px-5 h-11 inline-flex items-center text-[14px] font-semibold bg-[#C02719] rounded-full hover:bg-[#9c1f14]" data-testid="footer-call-sales">
+            <a href="tel:+23230000000" className="px-5 h-11 inline-flex items-center text-[14px] font-semibold bg-[#0072C6] rounded-full hover:bg-[#005A9C]" data-testid="footer-call-sales">
               Call sales: +232 30 000 000
             </a>
-            <Link to="/#contact" className="px-5 h-11 inline-flex items-center text-[14px] font-semibold border border-white rounded-full hover:bg-white hover:text-[#0F2C24]" data-testid="footer-contact-us">
+            <Link to="/#contact" className="px-5 h-11 inline-flex items-center text-[14px] font-semibold border border-white rounded-full hover:bg-white hover:text-[#073A16]" data-testid="footer-contact-us">
               Contact us
             </Link>
           </div>
@@ -81,7 +81,7 @@ export default function MarketingFooter() {
       <div className="border-t border-white/10">
         <div className="max-w-[1280px] mx-auto px-6 lg:px-10 py-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-md bg-white grid place-items-center text-[#0F2C24] font-bold tracking-tight">SH</span>
+            <span className="w-9 h-9 rounded-md bg-white grid place-items-center text-[#073A16] font-bold tracking-tight">SH</span>
             <div className="leading-none">
               <div className="font-bold text-[13px]">SaloneHCM</div>
               <div className="text-[11px] text-white/60">© {new Date().getFullYear()} SaloneHCM Ltd. — Freetown, Sierra Leone</div>

@@ -12,4 +12,4 @@ export const AREA_MARGIN = { top: 10, right: 10, left: 0, bottom: 10 };
 export const BAR_MARGIN = { top: 10, right: 10, left: 0, bottom: 10 };
 export const LINE_MARGIN = { top: 10, right: 30, left: 0, bottom: 10 };
 
-export const CHART_PALETTE = ["#26547C", "#D1603D", "#2D7A5D", "#8B6A14", "#9A2A52", "#525860"];
+export const CHART_PALETTE = ["#26547C", "#D1603D", "#17A035", "#8B6A14", "#2A5C9C", "#525860"];

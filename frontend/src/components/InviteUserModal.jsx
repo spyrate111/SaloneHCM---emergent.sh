@@ -10,10 +10,10 @@ export const InviteUserModal = ({ inviteMode, setInviteMode, unlinked, onInvite,
         </button>
       </div>
       <div className="flex gap-2 p-1 bg-[#F7F6F2] border border-[#E2DFD6] rounded-md" data-testid="invite-mode-toggle">
-        <button type="button" onClick={() => setInviteMode("magic")} data-testid="invite-mode-magic" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "magic" ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
+        <button type="button" onClick={() => setInviteMode("magic")} data-testid="invite-mode-magic" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "magic" ? "bg-white text-[#0A4A1E] shadow-sm" : "text-[#686D76]"}`}>
           <Mail className="w-3.5 h-3.5" /> Magic link
         </button>
-        <button type="button" onClick={() => setInviteMode("password")} data-testid="invite-mode-password" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "password" ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
+        <button type="button" onClick={() => setInviteMode("password")} data-testid="invite-mode-password" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "password" ? "bg-white text-[#0A4A1E] shadow-sm" : "text-[#686D76]"}`}>
           <KeyRound className="w-3.5 h-3.5" /> Set password
         </button>
       </div>
@@ -54,7 +54,7 @@ export const InviteUserModal = ({ inviteMode, setInviteMode, unlinked, onInvite,
       )}
       <div className="flex items-center justify-end gap-2 pt-2">
         <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6] hover:bg-[#F7F6F2]">Cancel</button>
-        <button type="submit" data-testid="invite-submit" className="inline-flex items-center gap-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md">
+        <button type="submit" data-testid="invite-submit" className="inline-flex items-center gap-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2 rounded-md">
           {inviteMode === "magic" ? <Mail className="w-4 h-4" strokeWidth={1.5} /> : <UserPlus className="w-4 h-4" strokeWidth={1.5} />}
           {inviteMode === "magic" ? "Send magic link" : "Create account"}
         </button>

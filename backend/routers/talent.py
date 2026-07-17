@@ -348,7 +348,7 @@ async def _maybe_trigger_perf_review(employee_id: str, program_id: str, program:
 def _cert_border(c, W: float, H: float, cm: float) -> None:
     """Draw the ornamental double-line border on the certificate."""
     from reportlab.lib import colors
-    c.setStrokeColor(colors.HexColor("#133326"))
+    c.setStrokeColor(colors.HexColor("#0A4A1E"))
     c.setLineWidth(4)
     c.rect(1.2 * cm, 1.2 * cm, W - 2.4 * cm, H - 2.4 * cm)
     c.setLineWidth(0.8)
@@ -358,7 +358,7 @@ def _cert_border(c, W: float, H: float, cm: float) -> None:
 def _cert_body(c, W: float, H: float, cm: float, *, company_name: str, full_name: str, program: dict, completion: dict) -> None:
     """Render the textual content of the certificate."""
     from reportlab.lib import colors
-    c.setFillColor(colors.HexColor("#133326"))
+    c.setFillColor(colors.HexColor("#0A4A1E"))
     c.setFont("Helvetica-Bold", 11)
     c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · " + company_name)
 
@@ -389,7 +389,7 @@ def _cert_body(c, W: float, H: float, cm: float, *, company_name: str, full_name
 
     if completion.get("score") is not None:
         c.setFont("Helvetica-Bold", 14)
-        c.setFillColor(colors.HexColor("#2D7A5D"))
+        c.setFillColor(colors.HexColor("#17A035"))
         c.drawCentredString(W / 2, H - 14.2 * cm, f"Final score: {completion['score']}%")
 
 
@@ -414,7 +414,7 @@ def _cert_qr(c, W: float, cm: float, cid: str) -> None:
         q = _qr.QRCode(border=1, box_size=4)
         q.add_data(verify_url)
         q.make(fit=True)
-        img = q.make_image(fill_color="#133326", back_color="#FFFFFF").convert("RGB")
+        img = q.make_image(fill_color="#0A4A1E", back_color="#FFFFFF").convert("RGB")
         b = _io2.BytesIO()
         img.save(b, format="PNG")
         b.seek(0)

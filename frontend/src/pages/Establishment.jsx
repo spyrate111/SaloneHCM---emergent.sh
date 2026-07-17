@@ -54,7 +54,7 @@ export default function Establishment() {
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center" data-testid="establishment-empty">
           <Building2 className="w-10 h-10 text-[#A1A5AB] mx-auto mb-3" strokeWidth={1.4} />
           <p className="text-sm text-[#525860]">No positions yet. Create your first establishment position to start tracking approved vs. filled headcount.</p>
-          <button onClick={() => setEditing({})} className="mt-4 inline-flex items-center gap-1.5 bg-[#133326] text-white text-sm px-4 py-2 rounded-md">
+          <button onClick={() => setEditing({})} className="mt-4 inline-flex items-center gap-1.5 bg-[#0A4A1E] text-white text-sm px-4 py-2 rounded-md">
             <Plus className="w-4 h-4" /> New position
           </button>
         </div>
@@ -106,16 +106,16 @@ function Header({ totalApproved, totalFilled, totalVacancy, ministries, overruns
             overruns are an audit red flag for ghost-worker exposure.
           </p>
         </div>
-        <button data-testid="establishment-new" onClick={onNew} className="inline-flex items-center gap-1.5 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md">
+        <button data-testid="establishment-new" onClick={onNew} className="inline-flex items-center gap-1.5 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md">
           <Plus className="w-4 h-4" /> New position
         </button>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
         <KPI label="Ministries" value={ministries} />
         <KPI label="Approved" value={totalApproved} color="text-[#26547C]" />
-        <KPI label="Filled" value={totalFilled} color="text-[#2D7A5D]" />
+        <KPI label="Filled" value={totalFilled} color="text-[#17A035]" />
         <KPI label="Vacant" value={totalVacancy} color="text-[#8B6A14]" />
-        <KPI label="Overruns" value={overruns} color={overruns > 0 ? "text-[#B83A3A]" : "text-[#2D7A5D]"} />
+        <KPI label="Overruns" value={overruns} color={overruns > 0 ? "text-[#3A7CB8]" : "text-[#17A035]"} />
       </div>
     </div>
   );
@@ -132,15 +132,15 @@ function KPI({ label, value, color = "text-[#1A1C1E]" }) {
 
 function OverrunBanner({ overruns }) {
   return (
-    <div data-testid="establishment-overrun-banner" className="bg-[#FBEAEA] border border-[#E8A29C] rounded-md p-4 flex items-start gap-3">
-      <AlertTriangle className="w-5 h-5 text-[#B83A3A] flex-shrink-0 mt-0.5" />
+    <div data-testid="establishment-overrun-banner" className="bg-[#E9F2FB] border border-[#9CC4E8] rounded-md p-4 flex items-start gap-3">
+      <AlertTriangle className="w-5 h-5 text-[#3A7CB8] flex-shrink-0 mt-0.5" />
       <div className="text-sm">
-        <div className="font-semibold text-[#8B2418]">{overruns.length} position(s) over-filled</div>
-        <div className="text-[#7A2F26] text-xs mt-1">
+        <div className="font-semibold text-[#00568F]">{overruns.length} position(s) over-filled</div>
+        <div className="text-[#245683] text-xs mt-1">
           More employees are assigned than approved headcount allows. Investigate immediately —
           common causes: stale terminations, double-counting, or ghost workers.
         </div>
-        <ul className="text-xs text-[#7A2F26] mt-2 space-y-0.5">
+        <ul className="text-xs text-[#245683] mt-2 space-y-0.5">
           {overruns.slice(0, 5).map((p) => (
             <li key={p.id} className="font-data">• {p.ministry} → {p.position_title}: <strong>{p.filled_count}/{p.approved_count}</strong> ({p.overrun_count} over)</li>
           ))}
@@ -161,7 +161,7 @@ function MinistryCard({ ministry, expanded, setExpanded, onEdit, onRefresh }) {
       >
         <div className="flex items-center gap-3">
           {open ? <ChevronDown className="w-4 h-4 text-[#525860]" /> : <ChevronRight className="w-4 h-4 text-[#525860]" />}
-          <Building2 className="w-5 h-5 text-[#133326]" strokeWidth={1.5} />
+          <Building2 className="w-5 h-5 text-[#0A4A1E]" strokeWidth={1.5} />
           <div className="text-left">
             <h3 className="font-heading text-lg font-semibold">{ministry.name}</h3>
             <p className="text-xs text-[#525860]">
@@ -246,24 +246,24 @@ function PositionRow({ position, onEdit, onRefresh }) {
       <td className="py-2 font-data">{position.grade_code || "—"}</td>
       <td className="py-2 font-data">{position.budget_code || "—"}</td>
       <td className="py-2 font-data">
-        <span className={position.overrun_count > 0 ? "text-[#B83A3A] font-semibold" : ""}>
+        <span className={position.overrun_count > 0 ? "text-[#3A7CB8] font-semibold" : ""}>
           {position.filled_count}
         </span>
         <span className="text-[#A1A5AB]"> / {position.approved_count}</span>
         {position.overrun_count > 0 && (
-          <span className="ml-2 text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#FBEAEA] text-[#B83A3A]">+{position.overrun_count} OVER</span>
+          <span className="ml-2 text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#E9F2FB] text-[#3A7CB8]">+{position.overrun_count} OVER</span>
         )}
       </td>
       <td className="py-2">
         {position.status === "active" ? (
-          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#2D7A5D]"><Unlock className="w-3 h-3" /> Active</span>
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#17A035]"><Unlock className="w-3 h-3" /> Active</span>
         ) : (
           <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#525860]"><Lock className="w-3 h-3" /> Frozen</span>
         )}
       </td>
       <td className="py-2 text-right">
         <button onClick={() => onEdit(position)} className="p-1 hover:bg-[#F1EEE6] rounded" title="Edit"><Pencil className="w-3.5 h-3.5 text-[#525860]" /></button>
-        <button onClick={onDelete} className="p-1 hover:bg-[#FBEAEA] rounded" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[#B83A3A]" /></button>
+        <button onClick={onDelete} className="p-1 hover:bg-[#E9F2FB] rounded" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[#3A7CB8]" /></button>
       </td>
     </tr>
   );
@@ -272,7 +272,7 @@ function PositionRow({ position, onEdit, onRefresh }) {
 function FillPill({ filled, approved, small }) {
   const pct = approved ? filled / approved : 0;
   let color;
-  if (pct >= 1) color = "bg-[#E6F4EC] text-[#2D7A5D]";
+  if (pct >= 1) color = "bg-[#E4F7E7] text-[#17A035]";
   else if (pct >= 0.7) color = "bg-[#E5EEF6] text-[#26547C]";
   else color = "bg-[#FBF1DE] text-[#8B6A14]";
   return (
@@ -350,7 +350,7 @@ function PositionModal({ initial, onClose, onSaved }) {
         </div>
         <div className="flex justify-end gap-2 pt-3">
           <button type="button" onClick={onClose} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
-          <button data-testid="pos-save" type="submit" disabled={busy} className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-60">
+          <button data-testid="pos-save" type="submit" disabled={busy} className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-60">
             {busy ? "Saving…" : isNew ? "Create" : "Save"}
           </button>
         </div>
@@ -362,7 +362,7 @@ function PositionModal({ initial, onClose, onSaved }) {
 function Field({ label, value, onChange, required, type, testid }) {
   return (
     <div>
-      <label className="text-[10px] uppercase tracking-wider text-[#525860] block mb-1">{label}{required && <span className="text-[#B83A3A] ml-0.5">*</span>}</label>
+      <label className="text-[10px] uppercase tracking-wider text-[#525860] block mb-1">{label}{required && <span className="text-[#3A7CB8] ml-0.5">*</span>}</label>
       <input
         data-testid={testid}
         required={required}

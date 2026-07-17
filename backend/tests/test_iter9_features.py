@@ -290,7 +290,7 @@ class TestPWA:
         d = r.json()
         assert d.get("name", "").startswith("SaloneHCM")
         assert "short_name" in d or "name" in d
-        assert d.get("theme_color") == "#133326"
+        assert d.get("theme_color") == "#0A4A1E"
 
     def test_service_worker(self):
         r = requests.get(f"{BASE_URL}/sw.js", timeout=15)

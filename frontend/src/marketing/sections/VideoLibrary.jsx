@@ -57,15 +57,15 @@ export default function VideoLibrary() {
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-10">
           <div className="max-w-[680px]">
-            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#C02719]">See it in action</p>
-            <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#0F2C24] leading-tight">
+            <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">See it in action</p>
+            <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#073A16] leading-tight">
               Watch how Sierra Leone employers use SaloneHCM.
             </h2>
             <p className="mt-3 text-[15px] text-[#374049]">
               Short product walkthroughs by use case &mdash; from a small Freetown business running its first payroll to a ministry filing PAYE for 5,000+ employees.
             </p>
           </div>
-          <Link to="/videos" className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0F2C24] hover:text-[#C02719]" data-testid="video-library-see-all">
+          <Link to="/videos" className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[#073A16] hover:text-[#0072C6]" data-testid="video-library-see-all">
             Browse the full library <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
@@ -77,15 +77,15 @@ export default function VideoLibrary() {
             {featured && (
               <div className="mt-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#0F2C24] text-white px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#073A16] text-white px-2 py-0.5 rounded-full">
                     {CATEGORY_LABELS[featured.category] || featured.category}
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#FFE9E5] text-[#C02719] px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#E5F1FD] text-[#0072C6] px-2 py-0.5 rounded-full">
                     {PERSONA_LABELS[featured.persona] || featured.persona}
                   </span>
                   <span className="text-[11px] text-[#525860] flex items-center gap-1"><Clock className="w-3 h-3" /> {fmt(featured.duration_s)}</span>
                 </div>
-                <h3 className="mt-3 text-[20px] font-extrabold text-[#0F2C24]">{featured.title}</h3>
+                <h3 className="mt-3 text-[20px] font-extrabold text-[#073A16]">{featured.title}</h3>
                 <p className="mt-1.5 text-[14px] text-[#525860] leading-relaxed">{featured.summary}</p>
               </div>
             )}
@@ -100,10 +100,10 @@ export default function VideoLibrary() {
                   <button
                     type="button"
                     onClick={() => onPick(v)}
-                    className={`w-full text-left flex gap-3 p-2.5 rounded-lg transition-colors ${activeId === v.id ? "bg-[#FFE9E5] ring-2 ring-[#C02719]/15" : "bg-white hover:bg-[#FAF8F2]"}`}
+                    className={`w-full text-left flex gap-3 p-2.5 rounded-lg transition-colors ${activeId === v.id ? "bg-[#E5F1FD] ring-2 ring-[#0072C6]/15" : "bg-white hover:bg-[#FAF8F2]"}`}
                     data-testid={`video-playlist-item-${v.id}`}
                   >
-                    <div className="relative w-[120px] aspect-video bg-[#0F2C24] rounded-md overflow-hidden flex-none">
+                    <div className="relative w-[120px] aspect-video bg-[#073A16] rounded-md overflow-hidden flex-none">
                       {v.poster ? (
                         <img src={v.poster} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                       ) : null}
@@ -115,7 +115,7 @@ export default function VideoLibrary() {
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-[12.5px] font-bold leading-snug line-clamp-2 ${activeId === v.id ? "text-[#C02719]" : "text-[#0F2C24]"}`}>{v.title}</div>
+                      <div className={`text-[12.5px] font-bold leading-snug line-clamp-2 ${activeId === v.id ? "text-[#0072C6]" : "text-[#073A16]"}`}>{v.title}</div>
                       <div className="text-[10.5px] text-[#525860] mt-0.5">{PERSONA_LABELS[v.persona] || v.persona}</div>
                     </div>
                   </button>

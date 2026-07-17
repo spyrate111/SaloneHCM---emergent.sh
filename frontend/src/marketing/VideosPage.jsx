@@ -50,9 +50,9 @@ export default function VideosPage() {
     <MarketingLayout>
       <section className="bg-gradient-to-b from-[#FAF8F2] to-white py-12 lg:py-16" data-testid="videos-page">
         <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C02719]">Training library</p>
-          <h1 className="mt-2 text-[40px] sm:text-[48px] font-extrabold text-[#0F2C24] leading-[1.05]">
-            SaloneHCM, <span className="text-[#C02719]">on demand</span>.
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">Training library</p>
+          <h1 className="mt-2 text-[40px] sm:text-[48px] font-extrabold text-[#073A16] leading-[1.05]">
+            SaloneHCM, <span className="text-[#0072C6]">on demand</span>.
           </h1>
           <p className="mt-3 text-[16px] text-[#374049] max-w-[680px]">
             Short, focused walkthroughs by client type and use case. Pick what your team needs &mdash; or watch them all back-to-back.
@@ -69,15 +69,15 @@ export default function VideosPage() {
               {active && (
                 <div className="mt-4">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#0F2C24] text-white px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#073A16] text-white px-2 py-0.5 rounded-full">
                       {CATEGORIES.find((c) => c.id === active.category)?.label || active.category}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#FFE9E5] text-[#C02719] px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] bg-[#E5F1FD] text-[#0072C6] px-2 py-0.5 rounded-full">
                       {PERSONA_LABELS[active.persona] || active.persona}
                     </span>
                     <span className="text-[11px] text-[#525860] flex items-center gap-1"><Clock className="w-3 h-3" /> {fmt(active.duration_s)}</span>
                   </div>
-                  <h2 className="mt-3 text-[24px] font-extrabold text-[#0F2C24]">{active.title}</h2>
+                  <h2 className="mt-3 text-[24px] font-extrabold text-[#073A16]">{active.title}</h2>
                   <p className="mt-2 text-[14px] text-[#525860] leading-relaxed">{active.summary}</p>
                 </div>
               )}
@@ -98,7 +98,7 @@ export default function VideosPage() {
                         key={c.id}
                         type="button"
                         onClick={() => setCat(c.id)}
-                        className={`px-2.5 h-7 text-[11px] font-semibold rounded-full transition-colors ${isActive ? "bg-[#C02719] text-white" : "bg-white text-[#0F2C24] hover:bg-[#F1EEE6]"}`}
+                        className={`px-2.5 h-7 text-[11px] font-semibold rounded-full transition-colors ${isActive ? "bg-[#0072C6] text-white" : "bg-white text-[#073A16] hover:bg-[#F1EEE6]"}`}
                         data-testid={`videos-category-${c.id}`}
                       >
                         {c.label}
@@ -113,7 +113,7 @@ export default function VideosPage() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Search videos…"
-                    className="w-full pl-8 pr-3 h-9 text-[12.5px] bg-white border border-[#EAE7DF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F2C24]"
+                    className="w-full pl-8 pr-3 h-9 text-[12.5px] bg-white border border-[#EAE7DF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#073A16]"
                     data-testid="videos-search-input"
                   />
                 </div>
@@ -127,10 +127,10 @@ export default function VideosPage() {
                       <button
                         type="button"
                         onClick={() => setActive(v)}
-                        className={`w-full text-left flex gap-3 p-2.5 rounded-lg transition-colors ${active?.id === v.id ? "bg-[#FFE9E5] ring-2 ring-[#C02719]/15" : "bg-white hover:bg-[#FAF8F2]"}`}
+                        className={`w-full text-left flex gap-3 p-2.5 rounded-lg transition-colors ${active?.id === v.id ? "bg-[#E5F1FD] ring-2 ring-[#0072C6]/15" : "bg-white hover:bg-[#FAF8F2]"}`}
                         data-testid={`videos-item-${v.id}`}
                       >
-                        <div className="relative w-[120px] aspect-video bg-[#0F2C24] rounded-md overflow-hidden flex-none">
+                        <div className="relative w-[120px] aspect-video bg-[#073A16] rounded-md overflow-hidden flex-none">
                           {v.poster ? <img src={v.poster} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" /> : null}
                           <span className="absolute inset-0 grid place-items-center bg-black/30">
                             <Play className="w-5 h-5 text-white" fill="white" />
@@ -138,7 +138,7 @@ export default function VideosPage() {
                           <span className="absolute bottom-1 right-1 px-1 text-[9px] font-mono bg-black/70 text-white rounded">{fmt(v.duration_s)}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className={`text-[12.5px] font-bold leading-snug line-clamp-2 ${active?.id === v.id ? "text-[#C02719]" : "text-[#0F2C24]"}`}>{v.title}</div>
+                          <div className={`text-[12.5px] font-bold leading-snug line-clamp-2 ${active?.id === v.id ? "text-[#0072C6]" : "text-[#073A16]"}`}>{v.title}</div>
                           <div className="text-[10.5px] text-[#525860] mt-0.5">{PERSONA_LABELS[v.persona] || v.persona}</div>
                         </div>
                       </button>

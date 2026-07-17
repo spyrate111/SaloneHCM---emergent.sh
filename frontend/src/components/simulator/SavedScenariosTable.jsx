@@ -3,8 +3,8 @@ import { FolderOpen, Trash, Share2, BarChart3 } from "lucide-react";
 const STATUS_BG = {
   draft: "bg-[#EBE8E0] text-[#525860]",
   pending: "bg-[#FBF1DE] text-[#8B6A14]",
-  approved: "bg-[#E6F4EC] text-[#2D7A5D]",
-  rejected: "bg-[#FBEAEA] text-[#B83A3A]",
+  approved: "bg-[#E4F7E7] text-[#17A035]",
+  rejected: "bg-[#E9F2FB] text-[#3A7CB8]",
 };
 
 const HEADERS = ["", "Title", "Status", "Description", "Rules", "Created by", ""];
@@ -68,8 +68,8 @@ function SavedRow({ s, checked, onToggle, onLoad, onDelete, onShare }) {
       <td className="py-3 px-4 text-right">
         <div className="inline-flex gap-1">
           <button title="Share" onClick={() => onShare(s.id)} className="p-1.5 rounded text-[#26547C] hover:bg-[#E5EEF6]"><Share2 className="w-3.5 h-3.5" /></button>
-          <button title="Load" onClick={() => onLoad(s.id)} className="p-1.5 rounded text-[#2D7A5D] hover:bg-[#E6F4EC]"><FolderOpen className="w-3.5 h-3.5" /></button>
-          <button title="Delete" onClick={() => onDelete(s.id)} className="p-1.5 rounded text-[#B83A3A] hover:bg-[#FBEAEA]"><Trash className="w-3.5 h-3.5" /></button>
+          <button title="Load" onClick={() => onLoad(s.id)} className="p-1.5 rounded text-[#17A035] hover:bg-[#E4F7E7]"><FolderOpen className="w-3.5 h-3.5" /></button>
+          <button title="Delete" onClick={() => onDelete(s.id)} className="p-1.5 rounded text-[#3A7CB8] hover:bg-[#E9F2FB]"><Trash className="w-3.5 h-3.5" /></button>
         </div>
       </td>
     </tr>

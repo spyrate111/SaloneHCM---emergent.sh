@@ -17,9 +17,9 @@ const MOF_PILL = {
   draft: { label: "Draft", color: "bg-[#EBE8E0] text-[#525860]" },
   submitted: { label: "Awaiting MoF", color: "bg-[#FBF1DE] text-[#8B6A14]" },
   partially_signed: { label: "Partially signed", color: "bg-[#FBE9DF] text-[#B84F2F]" },
-  approved: { label: "MoF approved", color: "bg-[#E6F4EC] text-[#2D7A5D]" },
+  approved: { label: "MoF approved", color: "bg-[#E4F7E7] text-[#17A035]" },
   released: { label: "Released", color: "bg-[#E5EEF6] text-[#26547C]" },
-  rejected: { label: "Rejected", color: "bg-[#FBEAEA] text-[#B83A3A]" },
+  rejected: { label: "Rejected", color: "bg-[#E9F2FB] text-[#3A7CB8]" },
 };
 
 export default function Payroll() {
@@ -124,8 +124,8 @@ export default function Payroll() {
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
         <div className="flex items-center gap-2 mb-6">
           {[1, 2, 3].map((n) => (
-            <div key={n} className={`flex items-center gap-2 ${step >= n ? "text-[#133326]" : "text-[#A1A5AB]"}`}>
-              <div className={`w-7 h-7 rounded-full grid place-items-center text-xs font-semibold ${step >= n ? "bg-[#133326] text-white" : "bg-[#EBE8E0]"}`}>{n}</div>
+            <div key={n} className={`flex items-center gap-2 ${step >= n ? "text-[#0A4A1E]" : "text-[#A1A5AB]"}`}>
+              <div className={`w-7 h-7 rounded-full grid place-items-center text-xs font-semibold ${step >= n ? "bg-[#0A4A1E] text-white" : "bg-[#EBE8E0]"}`}>{n}</div>
               <span className="text-xs uppercase tracking-wider">{["Period", "Review", "Confirm"][n - 1]}</span>
               {n < 3 && <div className="w-8 h-px bg-[#E2DFD6] mx-2" />}
             </div>
@@ -144,7 +144,7 @@ export default function Payroll() {
               <label className="block text-xs uppercase tracking-wider text-[#525860] mb-1.5">Year</label>
               <input data-testid="payroll-year" type="number" value={year} onChange={(e) => setYear(e.target.value)} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
             </div>
-            <button data-testid="payroll-preview-button" onClick={doPreview} className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2.5 rounded-md text-sm font-medium">
+            <button data-testid="payroll-preview-button" onClick={doPreview} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2.5 rounded-md text-sm font-medium">
               <Calculator className="w-4 h-4" strokeWidth={1.5} /> Preview calculations
             </button>
           </div>
@@ -176,8 +176,8 @@ export default function Payroll() {
                     <tr key={s.employee_id} className="border-t border-[#E2DFD6]">
                       <td className="py-2.5 px-4 text-[#1A1C1E]">{s.employee_name}</td>
                       <td className="py-2.5 px-4 font-data">{fmtSLE(s.gross)}</td>
-                      <td className="py-2.5 px-4 font-data text-[#B83A3A]">− {fmtSLE(s.nassit_employee)}</td>
-                      <td className="py-2.5 px-4 font-data text-[#B83A3A]">− {fmtSLE(s.paye)}</td>
+                      <td className="py-2.5 px-4 font-data text-[#3A7CB8]">− {fmtSLE(s.nassit_employee)}</td>
+                      <td className="py-2.5 px-4 font-data text-[#3A7CB8]">− {fmtSLE(s.paye)}</td>
                       <td className="py-2.5 px-4 font-data font-semibold">{fmtSLE(s.net)}</td>
                     </tr>
                   ))}
@@ -195,8 +195,8 @@ export default function Payroll() {
 
         {step === 3 && (
           <div className="text-center py-10" data-testid="payroll-success">
-            <div className="w-14 h-14 rounded-full bg-[#E6F4EC] grid place-items-center mx-auto mb-4">
-              <Check className="w-6 h-6 text-[#2D7A5D]" strokeWidth={2} />
+            <div className="w-14 h-14 rounded-full bg-[#E4F7E7] grid place-items-center mx-auto mb-4">
+              <Check className="w-6 h-6 text-[#17A035]" strokeWidth={2} />
             </div>
             <h3 className="font-heading text-2xl font-bold">Payroll completed</h3>
             <p className="text-[#525860] text-sm mt-2">Run for {months[month - 1]} {year} has been recorded.</p>
@@ -270,10 +270,10 @@ export default function Payroll() {
                     )}
                     {has("mof_approval") && r.mof_status === "submitted" && user?.mof_approver && (
                       <>
-                        <button data-testid={`mof-approve-${r.id}`} onClick={() => approveMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-[#2D7A5D] hover:bg-[#256449] text-white px-2.5 py-1.5 rounded">
+                        <button data-testid={`mof-approve-${r.id}`} onClick={() => approveMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-[#17A035] hover:bg-[#148231] text-white px-2.5 py-1.5 rounded">
                           <ShieldCheck className="w-3.5 h-3.5" /> Approve
                         </button>
-                        <button data-testid={`mof-reject-${r.id}`} onClick={() => rejectMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#B83A3A] text-[#B83A3A] hover:bg-[#FBEAEA] px-2.5 py-1.5 rounded">
+                        <button data-testid={`mof-reject-${r.id}`} onClick={() => rejectMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#3A7CB8] text-[#3A7CB8] hover:bg-[#E9F2FB] px-2.5 py-1.5 rounded">
                           <AlertTriangle className="w-3.5 h-3.5" /> Reject
                         </button>
                       </>

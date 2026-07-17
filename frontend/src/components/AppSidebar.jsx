@@ -6,7 +6,7 @@ export default function AppSidebar({ items, user, mobileOpen, onClose, onLogout 
   return (
     <aside
       data-testid="sidebar"
-      className={`w-64 shrink-0 bg-[#133326] text-white flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-200
+      className={`w-64 shrink-0 bg-[#0A4A1E] text-white flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-200
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
     >
       <div className="px-6 pt-7 pb-6 flex items-center justify-between">
@@ -55,7 +55,7 @@ export default function AppSidebar({ items, user, mobileOpen, onClose, onLogout 
       </nav>
       <div className="p-3 border-t border-white/10">
         <div className="px-3 py-2 rounded-md flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#1F4A38] grid place-items-center font-medium text-sm">
+          <div className="w-9 h-9 rounded-full bg-[#0F6428] grid place-items-center font-medium text-sm">
             {user.name?.[0] || "U"}
           </div>
           <div className="flex-1 min-w-0">

@@ -4,9 +4,9 @@ import { toast } from "sonner";
 import { MessageSquare, X, Check, AlertCircle, SkipForward, Send } from "lucide-react";
 
 const STATUS_PILL = {
-  sent: { color: "bg-[#E6F4EC] text-[#2D7A5D]", icon: Check, label: "Sent" },
+  sent: { color: "bg-[#E4F7E7] text-[#17A035]", icon: Check, label: "Sent" },
   would_send: { color: "bg-[#E5EEF6] text-[#26547C]", icon: Send, label: "Would send" },
-  failed: { color: "bg-[#FBEAEA] text-[#B83A3A]", icon: AlertCircle, label: "Failed" },
+  failed: { color: "bg-[#E9F2FB] text-[#3A7CB8]", icon: AlertCircle, label: "Failed" },
   skipped: { color: "bg-[#FBF1DE] text-[#8B6A14]", icon: SkipForward, label: "Skipped" },
 };
 
@@ -46,7 +46,7 @@ export default function SmsPayslipButton({ run }) {
       <button
         data-testid={`sms-btn-${run.id}`}
         onClick={openModal}
-        className="inline-flex items-center gap-1 text-xs bg-[#133326] hover:bg-[#0F281E] text-white px-2.5 py-1.5 rounded"
+        className="inline-flex items-center gap-1 text-xs bg-[#0A4A1E] hover:bg-[#063514] text-white px-2.5 py-1.5 rounded"
         title="Send payslip SMS to all employees in this run"
       >
         <MessageSquare className="w-3.5 h-3.5" /> SMS payslips
@@ -131,8 +131,8 @@ function SmsResultPanel({ result, onReset, onClose }) {
   return (
     <div data-testid="sms-result" className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <KPI label={result.dry_run ? "Would send" : "Sent"} value={result.dry_run ? result.would_send : result.sent} color="text-[#2D7A5D]" />
-        <KPI label="Failed" value={result.failed} color="text-[#B83A3A]" />
+        <KPI label={result.dry_run ? "Would send" : "Sent"} value={result.dry_run ? result.would_send : result.sent} color="text-[#17A035]" />
+        <KPI label="Failed" value={result.failed} color="text-[#3A7CB8]" />
         <KPI label="Skipped" value={result.skipped} color="text-[#8B6A14]" />
         <KPI label="Total" value={result.total} color="text-[#1A1C1E]" />
       </div>
@@ -144,7 +144,7 @@ function SmsResultPanel({ result, onReset, onClose }) {
       <SmsResultTable results={result.results} />
       <div className="flex justify-end gap-2 pt-2">
         <button onClick={onReset} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Run again</button>
-        <button onClick={onClose} className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md">Close</button>
+        <button onClick={onClose} className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md">Close</button>
       </div>
     </div>
   );

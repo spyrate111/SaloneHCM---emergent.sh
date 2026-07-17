@@ -6,7 +6,7 @@ import { Globe, Copy, Check, Eye, AlertCircle, ExternalLink } from "lucide-react
 function PortalBadge({ enabled }) {
   if (enabled) {
     return (
-      <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#E6F4EC] text-[#2D7A5D] inline-flex items-center gap-1">
+      <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#E4F7E7] text-[#17A035] inline-flex items-center gap-1">
         <Globe className="w-3 h-3" /> Live
       </span>
     );
@@ -148,7 +148,7 @@ export default function TransparencyCard() {
               data-testid="transparency-publish"
               disabled={busy || !slug}
               onClick={() => toggle(true)}
-              className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60"
+              className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60"
             >
               <Globe className="w-4 h-4" /> Publish portal
             </button>
@@ -157,7 +157,7 @@ export default function TransparencyCard() {
               data-testid="transparency-unpublish"
               disabled={busy}
               onClick={() => toggle(false)}
-              className="text-sm text-[#B83A3A] hover:bg-[#FBEAEA] border border-[#E2DFD6] rounded-md px-3 py-2 disabled:opacity-60"
+              className="text-sm text-[#3A7CB8] hover:bg-[#E9F2FB] border border-[#E2DFD6] rounded-md px-3 py-2 disabled:opacity-60"
             >
               Unpublish portal
             </button>

@@ -59,7 +59,7 @@ export default function Settings() {
       {/* Mission */}
       <section
         data-testid="mission-statement"
-        className="relative overflow-hidden rounded-xl border border-[#E2DFD6] bg-gradient-to-br from-[#133326] via-[#0F281E] to-[#133326] text-white"
+        className="relative overflow-hidden rounded-xl border border-[#E2DFD6] bg-gradient-to-br from-[#0A4A1E] via-[#063514] to-[#0A4A1E] text-white"
       >
         <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[#D1603D]/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-12 -left-12 w-56 h-56 rounded-full bg-[#26547C]/25 blur-3xl pointer-events-none" />
@@ -116,11 +116,11 @@ export default function Settings() {
                   key={f}
                   data-testid={`feature-${f}`}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-md border text-sm ${
-                    enabled ? "border-[#9CC8B1] bg-[#E6F4EC] text-[#133326]" : "border-[#E2DFD6] bg-[#F7F6F2] text-[#A1A5AB]"
+                    enabled ? "border-[#90D8A0] bg-[#E4F7E7] text-[#0A4A1E]" : "border-[#E2DFD6] bg-[#F7F6F2] text-[#A1A5AB]"
                   }`}
                 >
                   {enabled
-                    ? <Check className="w-4 h-4 text-[#2D7A5D] shrink-0" strokeWidth={2} />
+                    ? <Check className="w-4 h-4 text-[#17A035] shrink-0" strokeWidth={2} />
                     : <Lock className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />}
                   <span className="text-[13px]">{FEATURE_LABELS[f]}</span>
                 </div>
@@ -140,10 +140,10 @@ export default function Settings() {
               <div
                 key={t.id}
                 data-testid={`tier-card-${t.id}`}
-                className={`relative bg-white border rounded-xl p-5 ${isCurrent ? "border-[#133326] shadow-md" : "border-[#E2DFD6]"}`}
+                className={`relative bg-white border rounded-xl p-5 ${isCurrent ? "border-[#0A4A1E] shadow-md" : "border-[#E2DFD6]"}`}
               >
                 {isCurrent && (
-                  <span className="absolute -top-2.5 right-4 text-[9px] uppercase tracking-widest font-semibold bg-[#133326] text-white px-2 py-1 rounded-full">
+                  <span className="absolute -top-2.5 right-4 text-[9px] uppercase tracking-widest font-semibold bg-[#0A4A1E] text-white px-2 py-1 rounded-full">
                     Current
                   </span>
                 )}

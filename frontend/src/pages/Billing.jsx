@@ -108,9 +108,9 @@ function CurrentPlanCard({ me }) {
   const sub = me.subscription;
   const STATUS_PILL = {
     trialing: { bg: "bg-[#E5EEF6]", fg: "text-[#26547C]", label: "Trialing" },
-    active: { bg: "bg-[#E6F4EC]", fg: "text-[#2D7A5D]", label: "Active" },
+    active: { bg: "bg-[#E4F7E7]", fg: "text-[#17A035]", label: "Active" },
     past_due: { bg: "bg-[#FBF1DE]", fg: "text-[#8B6A14]", label: "Past due" },
-    suspended: { bg: "bg-[#FBEAEA]", fg: "text-[#B83A3A]", label: "Suspended" },
+    suspended: { bg: "bg-[#E9F2FB]", fg: "text-[#3A7CB8]", label: "Suspended" },
   };
   const p = STATUS_PILL[sub.status] || STATUS_PILL.trialing;
   return (
@@ -171,11 +171,11 @@ function OpenInvoiceCard({ invoice }) {
           <BankField label="Account number" value={bank.account_number} copyable onCopy={() => copy(bank.account_number, "acct")} copied={copied === "acct"} />
           <BankField label="Branch / SWIFT" value={`${bank.branch_code} · ${bank.swift}`} />
           <BankField label="Currency" value={bank.currency} />
-          <div className="sm:col-span-2 bg-[#E6F4EC] border border-[#C2E5D2] rounded-md p-3">
-            <div className="text-[10px] uppercase tracking-wider text-[#2D7A5D] mb-1">Payment reference (REQUIRED)</div>
+          <div className="sm:col-span-2 bg-[#E4F7E7] border border-[#B8E9C2] rounded-md p-3">
+            <div className="text-[10px] uppercase tracking-wider text-[#17A035] mb-1">Payment reference (REQUIRED)</div>
             <div className="flex items-center justify-between gap-2">
-              <code className="font-data text-base font-bold text-[#1A3A2A]" data-testid="invoice-reference">{invoice.reference}</code>
-              <button onClick={() => copy(invoice.reference, "ref")} className="text-xs inline-flex items-center gap-1 text-[#2D7A5D] hover:bg-[#D6EBE0] px-2 py-1 rounded">
+              <code className="font-data text-base font-bold text-[#0C4F20]" data-testid="invoice-reference">{invoice.reference}</code>
+              <button onClick={() => copy(invoice.reference, "ref")} className="text-xs inline-flex items-center gap-1 text-[#17A035] hover:bg-[#CDF0D4] px-2 py-1 rounded">
                 {copied === "ref" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied === "ref" ? "Copied" : "Copy"}
               </button>
             </div>
@@ -218,7 +218,7 @@ function PlansGrid({ plans, currentPlanId, selected, onSelect }) {
               onClick={() => !isCurrent && onSelect(p.id)}
               disabled={isCurrent}
               className={`text-left border rounded-md p-4 transition relative ${
-                isCurrent ? "border-[#2D7A5D] bg-[#F1F8F4] cursor-default"
+                isCurrent ? "border-[#17A035] bg-[#EFF9F0] cursor-default"
                 : isSelected ? "border-[#26547C] bg-[#E5EEF6] ring-2 ring-[#26547C]"
                 : "border-[#E2DFD6] hover:bg-[#F7F6F2]"
               }`}
@@ -229,7 +229,7 @@ function PlansGrid({ plans, currentPlanId, selected, onSelect }) {
               <p className="text-xs text-[#525860] mt-2">{p.description}</p>
               <p className="text-[10px] text-[#686D76] mt-2">{p.included_employees} employees included · SLE {p.extra_employee_sle} per extra</p>
               {isCurrent && (
-                <span className="absolute top-3 right-3 text-[9px] uppercase tracking-widest font-semibold bg-[#2D7A5D] text-white px-1.5 py-0.5 rounded-full">Current</span>
+                <span className="absolute top-3 right-3 text-[9px] uppercase tracking-widest font-semibold bg-[#17A035] text-white px-1.5 py-0.5 rounded-full">Current</span>
               )}
             </button>
           );
@@ -268,7 +268,7 @@ function PaymentMethodCard({ plans, selectedPlan, method, setMethod, busy, onBan
       </div>
       <div className="flex justify-end mt-4">
         {method === "bank_transfer" ? (
-          <button data-testid="bank-invoice-btn" disabled={busy} onClick={onBank} className="inline-flex items-center gap-1.5 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60">
+          <button data-testid="bank-invoice-btn" disabled={busy} onClick={onBank} className="inline-flex items-center gap-1.5 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60">
             <Receipt className="w-4 h-4" /> {busy ? "Creating…" : "Generate bank invoice"}
           </button>
         ) : (
@@ -285,11 +285,11 @@ function PaymentOption({ active, onClick, icon: Icon, label, subtitle, badge, te
   return (
     <button data-testid={testid} onClick={onClick} className={`text-left border rounded-md p-3 transition ${active ? "border-[#26547C] bg-[#E5EEF6] ring-2 ring-[#26547C]" : "border-[#E2DFD6] hover:bg-[#F7F6F2]"}`}>
       <div className="flex items-center gap-2">
-        <Icon className="w-5 h-5 text-[#133326]" strokeWidth={1.5} />
+        <Icon className="w-5 h-5 text-[#0A4A1E]" strokeWidth={1.5} />
         <div className="font-medium">{label}</div>
       </div>
       <div className="text-xs text-[#525860] mt-1">{subtitle}</div>
-      {badge && <span className="inline-block text-[9px] uppercase tracking-wider text-[#2D7A5D] mt-2">{badge}</span>}
+      {badge && <span className="inline-block text-[9px] uppercase tracking-wider text-[#17A035] mt-2">{badge}</span>}
     </button>
   );
 }
@@ -328,7 +328,7 @@ function InvoicesTable({ invoices }) {
 function StatusPill({ status }) {
   const map = {
     open: { bg: "bg-[#FBF1DE]", fg: "text-[#8B6A14]", icon: Clock, label: "Open" },
-    paid: { bg: "bg-[#E6F4EC]", fg: "text-[#2D7A5D]", icon: Check, label: "Paid" },
+    paid: { bg: "bg-[#E4F7E7]", fg: "text-[#17A035]", icon: Check, label: "Paid" },
     cancelled: { bg: "bg-[#EBE8E0]", fg: "text-[#525860]", icon: X, label: "Cancelled" },
   };
   const p = map[status] || map.open;

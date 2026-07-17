@@ -54,7 +54,7 @@ export default function PushSetupCard() {
           <h2 className="font-heading text-2xl font-bold mt-1 flex items-center gap-2">
             Push notifications
             {active
-              ? <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#E6F4EC] text-[#2D7A5D]">Enabled</span>
+              ? <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#E4F7E7] text-[#17A035]">Enabled</span>
               : <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded-full bg-[#EBE8E0] text-[#525860]">Off</span>}
           </h2>
           <p className="text-sm text-[#525860] mt-2 max-w-2xl">
@@ -71,7 +71,7 @@ export default function PushSetupCard() {
         {supported && (
           <div className="flex items-center gap-2 flex-wrap">
             {!active ? (
-              <button data-testid="push-enable" disabled={busy} onClick={enable} className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60">
+              <button data-testid="push-enable" disabled={busy} onClick={enable} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60">
                 <Bell className="w-4 h-4" /> Enable on this device
               </button>
             ) : (
@@ -79,7 +79,7 @@ export default function PushSetupCard() {
                 <button data-testid="push-test" disabled={busy} onClick={test} className="inline-flex items-center gap-2 bg-[#26547C] hover:bg-[#1D4363] text-white text-sm px-4 py-2.5 rounded-md disabled:opacity-60">
                   <Send className="w-4 h-4" /> Send test
                 </button>
-                <button data-testid="push-disable" disabled={busy} onClick={disable} className="inline-flex items-center gap-2 bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#B83A3A] text-sm px-3 py-2.5 rounded-md disabled:opacity-60">
+                <button data-testid="push-disable" disabled={busy} onClick={disable} className="inline-flex items-center gap-2 bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#3A7CB8] text-sm px-3 py-2.5 rounded-md disabled:opacity-60">
                   <BellOff className="w-4 h-4" /> Disable
                 </button>
               </>

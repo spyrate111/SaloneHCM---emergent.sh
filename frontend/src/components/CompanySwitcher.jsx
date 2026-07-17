@@ -63,14 +63,14 @@ function CompanyRow({ c, active, busy, onClick }) {
       disabled={busy}
       onClick={onClick}
       data-testid={`switcher-item-${c.id}`}
-      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F7F6F2] flex items-center justify-between gap-2 ${active ? "bg-[#E6F4EC]" : ""}`}
+      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[#F7F6F2] flex items-center justify-between gap-2 ${active ? "bg-[#E4F7E7]" : ""}`}
     >
       <div className="min-w-0">
         <div className="font-medium truncate">{c.name}</div>
         <div className="text-[10px] uppercase tracking-wider text-[#686D76]">{c.tier} · {c.active_headcount} active</div>
       </div>
       {active && (
-        <span className="text-[9px] uppercase tracking-widest font-semibold bg-[#133326] text-white px-1.5 py-0.5 rounded-full">
+        <span className="text-[9px] uppercase tracking-widest font-semibold bg-[#0A4A1E] text-white px-1.5 py-0.5 rounded-full">
           Active
         </span>
       )}

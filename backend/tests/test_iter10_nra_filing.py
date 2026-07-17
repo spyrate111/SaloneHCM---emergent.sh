@@ -210,4 +210,4 @@ class TestPWAIcons:
         srcs = [i["src"] for i in m.get("icons", [])]
         assert "/icon-192.png" in srcs
         assert "/icon-512.png" in srcs
-        assert m.get("theme_color") == "#133326"
+        assert m.get("theme_color") == "#0A4A1E"

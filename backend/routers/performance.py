@@ -302,7 +302,7 @@ def _pdf_styles():
     base = getSampleStyleSheet()
     return {
         "h1": ParagraphStyle("h1", parent=base["Title"], fontName="Helvetica-Bold", fontSize=20,
-                             textColor=colors.HexColor("#133326"), spaceAfter=8, alignment=TA_LEFT),
+                             textColor=colors.HexColor("#0A4A1E"), spaceAfter=8, alignment=TA_LEFT),
         "h2": ParagraphStyle("h2", parent=base["Heading2"], fontName="Helvetica-Bold", fontSize=13,
                              textColor=colors.HexColor("#26547C"), spaceBefore=12, spaceAfter=6),
         "small": ParagraphStyle("small", parent=base["BodyText"], fontName="Helvetica", fontSize=9,

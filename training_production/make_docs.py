@@ -18,7 +18,7 @@ from reportlab.platypus import (  # noqa: E402
 OUT = Path("/app/backend/static/training/docs")
 OUT.mkdir(parents=True, exist_ok=True)
 
-GREEN, BLUE, INK, GREY = "#133326", "#26547C", "#1A1C1E", "#525860"
+GREEN, BLUE, INK, GREY = "#0A4A1E", "#26547C", "#1A1C1E", "#525860"
 
 H1 = ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=20, textColor=colors.HexColor(GREEN), spaceAfter=4)
 SUB = ParagraphStyle("sub", fontName="Helvetica", fontSize=10, textColor=colors.HexColor(GREY), spaceAfter=14)

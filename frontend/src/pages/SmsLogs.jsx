@@ -7,9 +7,9 @@ import {
 } from "lucide-react";
 
 const STATUS_PILL = {
-  sent: { color: "bg-[#E6F4EC] text-[#2D7A5D]", icon: Check, label: "Sent" },
+  sent: { color: "bg-[#E4F7E7] text-[#17A035]", icon: Check, label: "Sent" },
   would_send: { color: "bg-[#E5EEF6] text-[#26547C]", icon: Send, label: "Would send" },
-  failed: { color: "bg-[#FBEAEA] text-[#B83A3A]", icon: AlertCircle, label: "Failed" },
+  failed: { color: "bg-[#E9F2FB] text-[#3A7CB8]", icon: AlertCircle, label: "Failed" },
   skipped: { color: "bg-[#FBF1DE] text-[#8B6A14]", icon: SkipForward, label: "Skipped" },
 };
 
@@ -115,7 +115,7 @@ export default function SmsLogs() {
             <button
               data-testid="email-csv"
               onClick={emailCsv}
-              className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+              className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
               title="Email the filtered audit CSV to your inbox"
             >
               <Mail className="w-4 h-4" strokeWidth={1.5} /> Email me the CSV
@@ -123,7 +123,7 @@ export default function SmsLogs() {
             <button
               data-testid="export-csv"
               onClick={downloadCsv}
-              className="inline-flex items-center gap-2 bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] text-sm px-4 py-2.5 rounded-md transition"
+              className="inline-flex items-center gap-2 bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] text-sm px-4 py-2.5 rounded-md transition"
             >
               <Download className="w-4 h-4" strokeWidth={1.5} /> Export CSV
             </button>
@@ -134,8 +134,8 @@ export default function SmsLogs() {
       {summary && summary.total_messages > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="sms-summary-kpis">
           <KPI icon={MessageSquare} label="Total messages" value={summary.total_messages} accent="bg-[#26547C]" />
-          <KPI icon={Check} label="Delivered" value={summary.by_status.sent || 0} accent="bg-[#2D7A5D]" />
-          <KPI icon={AlertCircle} label="Failed" value={summary.by_status.failed || 0} accent="bg-[#B83A3A]" />
+          <KPI icon={Check} label="Delivered" value={summary.by_status.sent || 0} accent="bg-[#17A035]" />
+          <KPI icon={AlertCircle} label="Failed" value={summary.by_status.failed || 0} accent="bg-[#3A7CB8]" />
           <KPI icon={Clock} label="Batches" value={summary.batch_count} accent="bg-[#D1603D]"
                sub={summary.last_sent_at ? `Last: ${new Date(summary.last_sent_at).toLocaleString()}` : ""} />
         </div>
@@ -253,7 +253,7 @@ function BatchRow({ b, onSelect, active }) {
     <tr
       data-testid={`batch-row-${b.batch_id}`}
       onClick={onSelect}
-      className={`border-t border-[#E2DFD6] cursor-pointer hover:bg-[#FDFCFB] ${active ? "bg-[#F4FBF5]" : ""}`}
+      className={`border-t border-[#E2DFD6] cursor-pointer hover:bg-[#FDFCFB] ${active ? "bg-[#F2FBF3]" : ""}`}
     >
       <td className="py-3 px-4">
         <div className="font-data text-[13px]">{new Date(b.sent_at).toLocaleString()}</div>
@@ -264,11 +264,11 @@ function BatchRow({ b, onSelect, active }) {
       <td className="py-3 px-4">
         {b.dry_run
           ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#FBF1DE] text-[#8B6A14]"><FlaskConical className="w-3 h-3" /> Dry run</span>
-          : <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#E6F4EC] text-[#2D7A5D]"><Send className="w-3 h-3" /> Live</span>}
+          : <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]"><Send className="w-3 h-3" /> Live</span>}
       </td>
-      <td className="py-3 px-4 font-data text-[#2D7A5D] font-semibold">{b.sent}</td>
+      <td className="py-3 px-4 font-data text-[#17A035] font-semibold">{b.sent}</td>
       <td className="py-3 px-4 font-data text-[#26547C]">{b.would_send}</td>
-      <td className="py-3 px-4 font-data text-[#B83A3A]">{b.failed}</td>
+      <td className="py-3 px-4 font-data text-[#3A7CB8]">{b.failed}</td>
       <td className="py-3 px-4 font-data text-[#8B6A14]">{b.skipped}</td>
       <td className="py-3 px-4 font-data text-[#1A1C1E] font-semibold">{b.total}</td>
     </tr>

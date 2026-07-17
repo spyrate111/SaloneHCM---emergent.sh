@@ -58,7 +58,7 @@ export default function UploadModal({ employees, submitting, onClose, onSubmit }
             type="file"
             accept={ACCEPT}
             data-testid="upload-file-input"
-            className="w-full text-sm file:bg-[#F7F6F2] file:border-0 file:rounded-md file:px-3 file:py-2 file:mr-3 file:text-xs file:font-medium file:text-[#133326]"
+            className="w-full text-sm file:bg-[#F7F6F2] file:border-0 file:rounded-md file:px-3 file:py-2 file:mr-3 file:text-xs file:font-medium file:text-[#0A4A1E]"
           />
         </div>
 
@@ -68,7 +68,7 @@ export default function UploadModal({ employees, submitting, onClose, onSubmit }
             type="submit"
             disabled={submitting}
             data-testid="upload-submit"
-            className="inline-flex items-center gap-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2 rounded-md disabled:opacity-60"
           >
             <Upload className="w-4 h-4" strokeWidth={1.5} /> {submitting ? "Uploading…" : "Upload"}
           </button>

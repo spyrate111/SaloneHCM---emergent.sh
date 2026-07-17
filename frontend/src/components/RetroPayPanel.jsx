@@ -17,8 +17,8 @@ const SOURCE_LABEL = {
 const STATUS_STYLE = {
   pending: "bg-[#E6EEF6] text-[#26547C]",
   pending_approval: "bg-[#FBF1DE] text-[#8B6A14]",
-  rejected: "bg-[#FBEAEA] text-[#8C2F2F]",
-  settled: "bg-[#E6F4EC] text-[#2D7A5D]",
+  rejected: "bg-[#E9F2FB] text-[#2F6390]",
+  settled: "bg-[#E4F7E7] text-[#17A035]",
 };
 
 /** Retro-pay CRUD panel — Option C UI polish.
@@ -92,7 +92,7 @@ export default function RetroPayPanel() {
         <button
           data-testid="retro-add-btn"
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md"
+          className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md"
         >
           <Plus className="w-4 h-4" strokeWidth={1.7} /> New adjustment
         </button>
@@ -112,7 +112,7 @@ export default function RetroPayPanel() {
             onClick={() => setFilter(f.id)}
             className={`text-xs px-3 py-1.5 rounded-full border transition ${
               filter === f.id
-                ? "bg-[#133326] text-white border-[#133326]"
+                ? "bg-[#0A4A1E] text-white border-[#0A4A1E]"
                 : "bg-white text-[#525860] border-[#E2DFD6] hover:bg-[#F7F6F2]"
             }`}
           >{f.label}</button>
@@ -120,7 +120,7 @@ export default function RetroPayPanel() {
       </div>
 
       {busy ? (
-        <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#133326]" /></div>
+        <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0A4A1E]" /></div>
       ) : filtered.length === 0 ? (
         <div className="bg-white border border-[#E2DFD6] rounded-lg py-12 text-center" data-testid="retro-empty">
           <div className="w-12 h-12 rounded-full bg-[#F1EEE6] grid place-items-center mx-auto"><Wallet className="w-5 h-5 text-[#525860]" /></div>
@@ -143,9 +143,9 @@ export default function RetroPayPanel() {
                   <td className="px-4 py-2.5 font-medium">{r.employee_name}</td>
                   <td className="px-4 py-2.5 text-[#525860] text-[13px]">{SOURCE_LABEL[r.source] || r.source}</td>
                   <td className="px-4 py-2.5 font-data text-[13px]">{r.effective_from} → {r.effective_to} <span className="text-[#686D76]">({r.months}m)</span></td>
-                  <td className={`px-4 py-2.5 font-data ${r.monthly_delta_sle < 0 ? "text-[#8C2F2F]" : "text-[#26547C]"}`}>{r.monthly_delta_sle > 0 && "+"}{fmtSLE(r.monthly_delta_sle)}</td>
+                  <td className={`px-4 py-2.5 font-data ${r.monthly_delta_sle < 0 ? "text-[#2F6390]" : "text-[#26547C]"}`}>{r.monthly_delta_sle > 0 && "+"}{fmtSLE(r.monthly_delta_sle)}</td>
                   <td className="px-4 py-2.5 font-data font-semibold">{fmtSLE(r.total_owed_sle)}</td>
-                  <td className={`px-4 py-2.5 font-data ${r.ratio_pct >= 10 ? "text-[#8C2F2F] font-semibold" : "text-[#525860]"}`}>{r.ratio_pct}%</td>
+                  <td className={`px-4 py-2.5 font-data ${r.ratio_pct >= 10 ? "text-[#2F6390] font-semibold" : "text-[#525860]"}`}>{r.ratio_pct}%</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_STYLE[r.status] || "bg-[#EBE8E0] text-[#525860]"}`}>
                       {r.status.replace("_", " ")}
@@ -162,13 +162,13 @@ export default function RetroPayPanel() {
                             data-testid={`retro-approve-${r.id}`}
                             onClick={() => decide(r.id, true)}
                             title="MoF Approve"
-                            className="text-[#2D7A5D] hover:bg-[#E6F4EC] p-1.5 rounded"
+                            className="text-[#17A035] hover:bg-[#E4F7E7] p-1.5 rounded"
                           ><CheckCircle2 className="w-4 h-4" /></button>
                           <button
                             data-testid={`retro-reject-${r.id}`}
                             onClick={() => decide(r.id, false)}
                             title="Reject"
-                            className="text-[#8C2F2F] hover:bg-[#FBEAEA] p-1.5 rounded"
+                            className="text-[#2F6390] hover:bg-[#E9F2FB] p-1.5 rounded"
                           ><XCircle className="w-4 h-4" /></button>
                         </>
                       )}
@@ -177,7 +177,7 @@ export default function RetroPayPanel() {
                           data-testid={`retro-del-${r.id}`}
                           onClick={() => del(r.id)}
                           title="Delete"
-                          className="text-[#8C2F2F] hover:bg-[#FBEAEA] p-1.5 rounded"
+                          className="text-[#2F6390] hover:bg-[#E9F2FB] p-1.5 rounded"
                         ><Trash2 className="w-4 h-4" /></button>
                       )}
                     </div>
@@ -272,7 +272,7 @@ function RetroPayForm({ employees, onClose, onCreated }) {
         </Field>
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#F1EEE6]">
           <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
-          <button type="submit" disabled={busy} data-testid="retro-submit" className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] disabled:opacity-60 text-white text-sm px-4 py-2 rounded-md">
+          <button type="submit" disabled={busy} data-testid="retro-submit" className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] disabled:opacity-60 text-white text-sm px-4 py-2 rounded-md">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Create
           </button>
         </div>

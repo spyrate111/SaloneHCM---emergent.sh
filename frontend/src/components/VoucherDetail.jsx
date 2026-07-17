@@ -10,9 +10,9 @@ export const STATUS_PILL = {
   pending_supervisor: { label: "Awaiting supervisor", color: "bg-[#FBF3D9] text-[#8B6A14]" },
   submitted: { label: "Submitted", color: "bg-[#E5EEF6] text-[#26547C]" },
   under_review: { label: "Under review", color: "bg-[#E5EEF6] text-[#26547C]" },
-  approved: { label: "Approved", color: "bg-[#E6F4EC] text-[#2D7A5D]" },
-  payment_authorized: { label: "Payment authorized", color: "bg-[#133326] text-white" },
-  returned: { label: "Returned", color: "bg-[#FBEAEA] text-[#B83A3A]" },
+  approved: { label: "Approved", color: "bg-[#E4F7E7] text-[#17A035]" },
+  payment_authorized: { label: "Payment authorized", color: "bg-[#0A4A1E] text-white" },
+  returned: { label: "Returned", color: "bg-[#E9F2FB] text-[#3A7CB8]" },
 };
 
 const errMsg = (e) => {
@@ -120,12 +120,12 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
         </div>
 
         {v.status === "returned" && v.returned_reason && (
-          <div className="mx-6 mt-4 bg-[#FBEAEA] border border-[#B83A3A]/30 rounded-md px-4 py-3 text-sm text-[#B83A3A]" data-testid="voucher-returned-banner">
+          <div className="mx-6 mt-4 bg-[#E9F2FB] border border-[#3A7CB8]/30 rounded-md px-4 py-3 text-sm text-[#3A7CB8]" data-testid="voucher-returned-banner">
             <span className="font-semibold">Returned for correction:</span> {v.returned_reason}
           </div>
         )}
         {v.status === "payment_authorized" && (
-          <div className="mx-6 mt-4 bg-[#E6F4EC] border border-[#2D7A5D]/30 rounded-md px-4 py-3 text-sm text-[#2D7A5D] flex items-center gap-2" data-testid="voucher-authorized-banner">
+          <div className="mx-6 mt-4 bg-[#E4F7E7] border border-[#17A035]/30 rounded-md px-4 py-3 text-sm text-[#17A035] flex items-center gap-2" data-testid="voucher-authorized-banner">
             <Lock className="w-4 h-4" /> Payment authorized by {v.authorized_by} — this voucher is now a permanent, immutable record.
           </div>
         )}
@@ -165,7 +165,7 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
                     <td className="py-2 px-3 font-data font-semibold">{fmtSLE(li.net)}</td>
                   </tr>
                 ))}
-                <tr className="border-t-2 border-[#133326]/30 bg-[#F7F6F2] font-semibold">
+                <tr className="border-t-2 border-[#0A4A1E]/30 bg-[#F7F6F2] font-semibold">
                   <td className="py-2 px-3">TOTAL · {v.totals.employee_count} employees</td>
                   <td className="py-2 px-3 font-data">{fmtSLE(v.totals.gross)}</td>
                   <td className="py-2 px-3 font-data">{fmtSLE(v.totals.paye)}</td>
@@ -180,7 +180,7 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
             <div className="flex justify-end gap-2 mt-3">
               <button onClick={() => { setEditing(false); setItems(v.line_items); }} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
               <button data-testid="voucher-edit-save" disabled={busy} onClick={saveEdits}
-                className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">Save corrections</button>
+                className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">Save corrections</button>
             </div>
           )}
         </div>
@@ -212,27 +212,27 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
               <button onClick={() => setReturning(false)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
               <button data-testid="voucher-return-confirm" disabled={busy || reason.trim().length < 10}
                 onClick={() => act("return", { reason: reason.trim() }, "Voucher returned for correction")}
-                className="text-sm bg-[#B83A3A] text-white px-4 py-2 rounded-md disabled:opacity-50">Return for correction</button>
+                className="text-sm bg-[#3A7CB8] text-white px-4 py-2 rounded-md disabled:opacity-50">Return for correction</button>
             </div>
           </div>
         ) : (
           <div className="px-6 pb-6 border-t border-[#E2DFD6] pt-4 flex flex-wrap items-center justify-end gap-2" data-testid="voucher-actions">
             {v.status === "draft" && (isCreator || canManage) && (
               <button data-testid="voucher-action-delete" onClick={del}
-                className="inline-flex items-center gap-1.5 text-sm text-[#B83A3A] border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#FBEAEA]">
+                className="inline-flex items-center gap-1.5 text-sm text-[#3A7CB8] border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#E9F2FB]">
                 <Trash2 className="w-4 h-4" /> Delete draft
               </button>
             )}
             {editable && !editing && (
               <button data-testid="voucher-action-submit" disabled={busy} onClick={() => act("submit", {}, "Voucher submitted")}
-                className="inline-flex items-center gap-1.5 text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">
                 <Send className="w-4 h-4" /> {v.status === "returned" ? "Resubmit" : "Submit"}
               </button>
             )}
             {v.status === "pending_supervisor" && (isSupervisor || isAdminRole) && (
               <button data-testid="voucher-action-supervisor-approve" disabled={busy}
                 onClick={() => act("supervisor-approve", {}, "Supervisor approval recorded")}
-                className="inline-flex items-center gap-1.5 text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">
                 <BadgeCheck className="w-4 h-4" /> Supervisor approve
               </button>
             )}
@@ -249,7 +249,7 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
               ) : (
                 <button data-testid="voucher-action-approve" disabled={busy}
                   onClick={() => act("approve", {}, "Voucher approved")}
-                  className="inline-flex items-center gap-1.5 text-sm bg-[#2D7A5D] text-white px-4 py-2 rounded-md disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 text-sm bg-[#17A035] text-white px-4 py-2 rounded-md disabled:opacity-50">
                   <CheckCircle2 className="w-4 h-4" /> Approve
                 </button>
               )
@@ -260,7 +260,7 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
               ) : (
                 <button data-testid="voucher-action-authorize" disabled={busy}
                   onClick={() => act("authorize", {}, "Payment authorized")}
-                  className="inline-flex items-center gap-1.5 text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">
                   <Banknote className="w-4 h-4" /> Authorize payment
                 </button>
               )
@@ -268,7 +268,7 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
             {["pending_supervisor", "submitted", "under_review", "approved"].includes(v.status) &&
               (canManage || (isSupervisor && v.status === "pending_supervisor")) && (
               <button data-testid="voucher-action-return" onClick={() => setReturning(true)}
-                className="inline-flex items-center gap-1.5 text-sm text-[#B83A3A] border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#FBEAEA]">
+                className="inline-flex items-center gap-1.5 text-sm text-[#3A7CB8] border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#E9F2FB]">
                 <Undo2 className="w-4 h-4" /> Return for correction
               </button>
             )}

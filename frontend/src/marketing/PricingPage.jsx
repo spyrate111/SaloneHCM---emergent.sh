@@ -109,11 +109,11 @@ export default function PricingPage() {
     <MarketingLayout>
       <section className="bg-gradient-to-b from-[#FAF8F2] to-white py-16 lg:py-20" data-testid="pricing-hero">
         <div className="max-w-[1280px] mx-auto px-6 lg:px-10 text-center">
-          <span className="inline-flex items-center px-3 h-7 text-[11px] font-bold uppercase tracking-[0.14em] rounded-full bg-[#0F2C24] text-white gap-1.5">
+          <span className="inline-flex items-center px-3 h-7 text-[11px] font-bold uppercase tracking-[0.14em] rounded-full bg-[#073A16] text-white gap-1.5">
             <Sparkles className="w-3 h-3" /> Simple, transparent SLE pricing
           </span>
-          <h1 className="mt-5 text-[40px] sm:text-[52px] font-extrabold text-[#0F2C24] leading-[1.05]">
-            One platform. <span className="text-[#C02719]">Four tiers</span>. Built for Sierra Leone.
+          <h1 className="mt-5 text-[40px] sm:text-[52px] font-extrabold text-[#073A16] leading-[1.05]">
+            One platform. <span className="text-[#0072C6]">Four tiers</span>. Built for Sierra Leone.
           </h1>
           <p className="mt-4 text-[16px] sm:text-[18px] text-[#374049] max-w-[680px] mx-auto">
             Pay in SLE. Pay monthly. Cancel anytime. New customers — get up to 3 months free.
@@ -130,16 +130,16 @@ export default function PricingPage() {
                 data-testid={`plan-${p.id}`}
                 className={`relative rounded-2xl p-7 flex flex-col ${
                   p.featured
-                    ? "bg-[#0F2C24] text-white border-2 border-[#0F2C24] shadow-xl scale-[1.02]"
+                    ? "bg-[#073A16] text-white border-2 border-[#073A16] shadow-xl scale-[1.02]"
                     : "bg-white border border-[#EAE7DF] hover:shadow-lg transition-shadow"
                 }`}
               >
                 {p.featured && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center px-3 h-6 text-[10px] font-bold uppercase tracking-[0.14em] bg-[#C02719] text-white rounded-full">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center px-3 h-6 text-[10px] font-bold uppercase tracking-[0.14em] bg-[#0072C6] text-white rounded-full">
                     Most popular
                   </span>
                 )}
-                <h3 className={`text-[22px] font-extrabold ${p.featured ? "text-white" : "text-[#0F2C24]"}`}>{p.name}</h3>
+                <h3 className={`text-[22px] font-extrabold ${p.featured ? "text-white" : "text-[#073A16]"}`}>{p.name}</h3>
                 <p className={`text-[13px] mt-1 ${p.featured ? "text-white/75" : "text-[#525860]"} leading-snug`}>{p.tagline}</p>
 
                 <div className="mt-6">
@@ -147,22 +147,22 @@ export default function PricingPage() {
                     <>
                       <div className="flex items-baseline gap-1">
                         <span className={`text-[12px] font-bold ${p.featured ? "text-white/70" : "text-[#525860]"}`}>SLE</span>
-                        <span className={`text-[42px] font-extrabold leading-none ${p.featured ? "text-white" : "text-[#0F2C24]"}`}>
+                        <span className={`text-[42px] font-extrabold leading-none ${p.featured ? "text-white" : "text-[#073A16]"}`}>
                           {p.price_monthly_sle.toLocaleString()}
                         </span>
                       </div>
                       <div className={`text-[11px] ${p.featured ? "text-white/70" : "text-[#525860]"} mt-1`}>per month · billed monthly</div>
                     </>
                   ) : (
-                    <div className={`text-[22px] font-extrabold ${p.featured ? "text-white" : "text-[#0F2C24]"}`}>Custom</div>
+                    <div className={`text-[22px] font-extrabold ${p.featured ? "text-white" : "text-[#073A16]"}`}>Custom</div>
                   )}
-                  <div className={`mt-2 text-[12px] font-semibold ${p.featured ? "text-[#E07B4A]" : "text-[#1f6f55]"}`}>{p.employees} employees</div>
+                  <div className={`mt-2 text-[12px] font-semibold ${p.featured ? "text-[#E07B4A]" : "text-[#128A2C]"}`}>{p.employees} employees</div>
                 </div>
 
                 <ul className="mt-6 space-y-2.5 flex-1">
                   {p.features.map((f) => (
                     <li key={f} className="flex items-start gap-2">
-                      <Check className={`w-4 h-4 flex-none mt-0.5 ${p.featured ? "text-[#E07B4A]" : "text-[#1f6f55]"}`} />
+                      <Check className={`w-4 h-4 flex-none mt-0.5 ${p.featured ? "text-[#E07B4A]" : "text-[#128A2C]"}`} />
                       <span className={`text-[13px] leading-snug ${p.featured ? "text-white/90" : "text-[#374049]"}`}>{f}</span>
                     </li>
                   ))}
@@ -173,8 +173,8 @@ export default function PricingPage() {
                   onClick={() => goCta(p.id)}
                   className={`mt-7 w-full h-12 text-[14px] font-bold rounded-full inline-flex items-center justify-center gap-1.5 ${
                     p.featured
-                      ? "bg-[#C02719] text-white hover:bg-[#9c1f14]"
-                      : "border border-[#0F2C24] text-[#0F2C24] hover:bg-[#0F2C24] hover:text-white"
+                      ? "bg-[#0072C6] text-white hover:bg-[#005A9C]"
+                      : "border border-[#073A16] text-[#073A16] hover:bg-[#073A16] hover:text-white"
                   } transition-colors`}
                   data-testid={`plan-${p.id}-cta`}
                 >
@@ -186,10 +186,10 @@ export default function PricingPage() {
 
           <div className="mt-12 max-w-[760px] mx-auto text-center" data-testid="pricing-bank-transfer">
             <p className="text-[14px] text-[#525860]">
-              All plans support <strong className="text-[#0F2C24]">Stripe</strong> card billing and{" "}
-              <strong className="text-[#0F2C24]">direct bank transfer</strong> to local SLE accounts (Rokel, SLCB, UBA, Ecobank).
+              All plans support <strong className="text-[#073A16]">Stripe</strong> card billing and{" "}
+              <strong className="text-[#073A16]">direct bank transfer</strong> to local SLE accounts (Rokel, SLCB, UBA, Ecobank).
             </p>
-            <Link to="/#contact" className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#C02719] hover:text-[#9c1f14]">
+            <Link to="/#contact" className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-bold text-[#0072C6] hover:text-[#005A9C]">
               Need a custom quote? Talk to sales <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

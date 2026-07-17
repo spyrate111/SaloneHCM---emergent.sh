@@ -172,8 +172,8 @@ export default function AdminVideos() {
     <div className="p-6 lg:p-8 max-w-[1400px] mx-auto" data-testid="admin-videos-page">
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C02719]">Marketing</div>
-          <h1 className="text-[28px] font-extrabold text-[#0F2C24] flex items-center gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">Marketing</div>
+          <h1 className="text-[28px] font-extrabold text-[#073A16] flex items-center gap-2">
             <Video className="w-6 h-6" /> Video library
           </h1>
           <p className="text-[13px] text-[#525860] mt-1 max-w-[640px]">
@@ -189,14 +189,14 @@ export default function AdminVideos() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search videos…"
-              className="pl-8 pr-3 h-9 w-[220px] border border-[#EAE7DF] rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0F2C24]"
+              className="pl-8 pr-3 h-9 w-[220px] border border-[#EAE7DF] rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#073A16]"
               data-testid="admin-videos-search"
             />
           </div>
           <button
             type="button"
             onClick={startNew}
-            className="inline-flex items-center gap-1.5 px-4 h-9 text-[13px] font-bold bg-[#C02719] text-white rounded-full hover:bg-[#9c1f14]"
+            className="inline-flex items-center gap-1.5 px-4 h-9 text-[13px] font-bold bg-[#0072C6] text-white rounded-full hover:bg-[#005A9C]"
             data-testid="admin-videos-add"
           >
             <Plus className="w-3.5 h-3.5" /> New video
@@ -221,7 +221,7 @@ export default function AdminVideos() {
               </thead>
               <tbody>
                 {visible.length === 0 && (
-                  <tr><td colSpan="6" className="text-center py-12 text-[13px] text-[#525860]">No videos {q ? "match your search" : "yet"}. Click <strong className="text-[#0F2C24]">New video</strong> to add one.</td></tr>
+                  <tr><td colSpan="6" className="text-center py-12 text-[13px] text-[#525860]">No videos {q ? "match your search" : "yet"}. Click <strong className="text-[#073A16]">New video</strong> to add one.</td></tr>
                 )}
                 {visible.map((v) => (
                   <tr
@@ -236,17 +236,17 @@ export default function AdminVideos() {
                   >
                     <td className="py-2.5 pl-3 pr-2 text-[#9aa0a6]"><GripVertical className="w-3.5 h-3.5" /></td>
                     <td className="py-2.5 pr-3">
-                      <div className="font-bold text-[#0F2C24] leading-tight">{v.title}</div>
+                      <div className="font-bold text-[#073A16] leading-tight">{v.title}</div>
                       <div className="text-[11px] text-[#525860] mt-0.5">{fmt(v.duration_s)} · sort {v.sort}</div>
                     </td>
                     <td className="py-2.5 pr-3 text-[11px]">
-                      <span className="px-2 py-0.5 rounded bg-[#FAF8F2] text-[#0F2C24]">{CATEGORIES.find((c) => c.id === v.category)?.label || v.category}</span>
+                      <span className="px-2 py-0.5 rounded bg-[#FAF8F2] text-[#073A16]">{CATEGORIES.find((c) => c.id === v.category)?.label || v.category}</span>
                     </td>
                     <td className="py-2.5 pr-3 text-[11px]">
-                      <span className="px-2 py-0.5 rounded bg-[#FFE9E5] text-[#C02719]">{PERSONAS.find((p) => p.id === v.persona)?.label || v.persona}</span>
+                      <span className="px-2 py-0.5 rounded bg-[#E5F1FD] text-[#0072C6]">{PERSONAS.find((p) => p.id === v.persona)?.label || v.persona}</span>
                     </td>
                     <td className="py-2.5 pr-3 text-[11px]">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${v.published ? "bg-[#E6F2EC] text-[#1f6f55]" : "bg-[#FAF8F2] text-[#9aa0a6]"}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${v.published ? "bg-[#E2F5E5] text-[#128A2C]" : "bg-[#FAF8F2] text-[#9aa0a6]"}`}>
                         {v.published ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                         {v.published ? "Published" : "Draft"}
                       </span>
@@ -255,7 +255,7 @@ export default function AdminVideos() {
                       <button
                         type="button" onClick={() => togglePublish(v)}
                         title={v.published ? "Unpublish" : "Publish"}
-                        className="text-[#525860] hover:text-[#1f6f55] mr-2"
+                        className="text-[#525860] hover:text-[#128A2C] mr-2"
                         data-testid={`admin-video-toggle-${v.id}`}
                       >
                         {v.published ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -263,7 +263,7 @@ export default function AdminVideos() {
                       <button
                         type="button" onClick={() => startEdit(v)}
                         title="Edit"
-                        className="text-[#525860] hover:text-[#0F2C24] mr-2"
+                        className="text-[#525860] hover:text-[#073A16] mr-2"
                         data-testid={`admin-video-edit-${v.id}`}
                       >
                         <Pencil className="w-4 h-4" />
@@ -271,7 +271,7 @@ export default function AdminVideos() {
                       <button
                         type="button" onClick={() => setConfirmDelete(v)}
                         title="Delete"
-                        className="text-[#525860] hover:text-[#C02719]"
+                        className="text-[#525860] hover:text-[#0072C6]"
                         data-testid={`admin-video-delete-${v.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -304,11 +304,11 @@ export default function AdminVideos() {
           ) : (
             <div className="bg-white border border-[#EAE7DF] rounded-xl p-8 text-center" data-testid="admin-videos-empty-side">
               <div className="w-12 h-12 rounded-full bg-[#FAF8F2] grid place-items-center mx-auto">
-                <Sparkles className="w-6 h-6 text-[#C02719]" />
+                <Sparkles className="w-6 h-6 text-[#0072C6]" />
               </div>
-              <p className="mt-3 text-[14px] font-bold text-[#0F2C24]">Pick a video to edit</p>
+              <p className="mt-3 text-[14px] font-bold text-[#073A16]">Pick a video to edit</p>
               <p className="mt-1 text-[12.5px] text-[#525860] max-w-[320px] mx-auto leading-snug">
-                Click <strong className="text-[#0F2C24]">Edit</strong> on any row, or <strong className="text-[#0F2C24]">New video</strong> to paste a YouTube / Vimeo / MP4 URL.
+                Click <strong className="text-[#073A16]">Edit</strong> on any row, or <strong className="text-[#073A16]">New video</strong> to paste a YouTube / Vimeo / MP4 URL.
               </p>
             </div>
           )}
@@ -320,21 +320,21 @@ export default function AdminVideos() {
         <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4" onClick={() => setConfirmDelete(null)} data-testid="admin-videos-delete-modal">
           <div className="bg-white rounded-2xl max-w-[440px] w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#FFE9E5] grid place-items-center flex-none">
-                <AlertTriangle className="w-5 h-5 text-[#C02719]" />
+              <div className="w-10 h-10 rounded-full bg-[#E5F1FD] grid place-items-center flex-none">
+                <AlertTriangle className="w-5 h-5 text-[#0072C6]" />
               </div>
               <div>
-                <h3 className="text-[18px] font-extrabold text-[#0F2C24]">Delete this video?</h3>
+                <h3 className="text-[18px] font-extrabold text-[#073A16]">Delete this video?</h3>
                 <p className="mt-1.5 text-[13px] text-[#525860]">
                   &ldquo;{confirmDelete.title}&rdquo; will be removed from the public site immediately. This can&rsquo;t be undone.
                 </p>
               </div>
             </div>
             <div className="mt-5 flex items-center justify-end gap-2">
-              <button type="button" onClick={() => setConfirmDelete(null)} className="px-4 h-9 text-[13px] font-semibold text-[#0F2C24] border border-[#EAE7DF] rounded-full hover:bg-[#FAF8F2]" data-testid="admin-videos-delete-cancel">
+              <button type="button" onClick={() => setConfirmDelete(null)} className="px-4 h-9 text-[13px] font-semibold text-[#073A16] border border-[#EAE7DF] rounded-full hover:bg-[#FAF8F2]" data-testid="admin-videos-delete-cancel">
                 Cancel
               </button>
-              <button type="button" onClick={doDelete} className="px-4 h-9 text-[13px] font-bold text-white bg-[#C02719] rounded-full hover:bg-[#9c1f14]" data-testid="admin-videos-delete-confirm">
+              <button type="button" onClick={doDelete} className="px-4 h-9 text-[13px] font-bold text-white bg-[#0072C6] rounded-full hover:bg-[#005A9C]" data-testid="admin-videos-delete-confirm">
                 Delete video
               </button>
             </div>
@@ -351,10 +351,10 @@ function FormPanel({ form, isNew, onChange, onSave, onCancel, saving, addChapter
     <div className="bg-white border border-[#EAE7DF] rounded-xl overflow-hidden" data-testid="admin-videos-form-panel">
       <div className="px-5 py-3 border-b border-[#F1EEE6] flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#C02719]">{isNew ? "Create" : "Edit"}</p>
-          <h3 className="text-[15px] font-extrabold text-[#0F2C24]">{isNew ? "Add a new video" : "Edit video"}</h3>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0072C6]">{isNew ? "Create" : "Edit"}</p>
+          <h3 className="text-[15px] font-extrabold text-[#073A16]">{isNew ? "Add a new video" : "Edit video"}</h3>
         </div>
-        <button type="button" onClick={onCancel} aria-label="Close" className="w-8 h-8 grid place-items-center text-[#525860] hover:text-[#0F2C24]" data-testid="admin-videos-form-close">
+        <button type="button" onClick={onCancel} aria-label="Close" className="w-8 h-8 grid place-items-center text-[#525860] hover:text-[#073A16]" data-testid="admin-videos-form-close">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -365,7 +365,7 @@ function FormPanel({ form, isNew, onChange, onSave, onCancel, saving, addChapter
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-[0.1em] text-[#525860] mb-1.5">Live preview</label>
             <VideoPlayer video={previewVideo} />
-            <a href={form.src} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[#525860] hover:text-[#C02719]">
+            <a href={form.src} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-[#525860] hover:text-[#0072C6]">
               <ExternalLink className="w-3 h-3" /> Open source URL
             </a>
           </div>
@@ -373,40 +373,40 @@ function FormPanel({ form, isNew, onChange, onSave, onCancel, saving, addChapter
 
         <Field label="Title (required)">
           <input value={form.title} onChange={onChange("title")} placeholder="e.g. First payroll run in under 2 hours"
-            className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-input-title" />
+            className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-input-title" />
         </Field>
         <Field label="Source URL — YouTube, Vimeo or MP4 (required)">
           <input value={form.src} onChange={onChange("src")} placeholder="https://youtu.be/… or https://yourcdn.com/file.mp4"
-            className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-input-src" />
+            className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-input-src" />
         </Field>
         <Field label="Summary (required)">
           <textarea value={form.summary} onChange={onChange("summary")} rows={3} placeholder="One or two sentences shown below the video card."
-            className="w-full px-3 py-2 border border-[#EAE7DF] rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-input-summary" />
+            className="w-full px-3 py-2 border border-[#EAE7DF] rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-input-summary" />
         </Field>
         <Field label="Poster image URL (optional)">
           <input value={form.poster || ""} onChange={onChange("poster")} placeholder="https://…/poster.jpg (defaults to a placeholder)"
-            className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-input-poster" />
+            className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-input-poster" />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Duration (seconds)">
             <input type="number" min="10" max="14400" value={form.duration_s} onChange={onChange("duration_s")}
-              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-input-duration" />
+              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-input-duration" />
           </Field>
           <Field label="Sort order">
             <input type="number" value={form.sort} onChange={onChange("sort")}
-              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-input-sort" />
+              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-input-sort" />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Category">
             <select value={form.category} onChange={onChange("category")}
-              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-select-category">
+              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-select-category">
               {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </Field>
           <Field label="Persona">
             <select value={form.persona} onChange={onChange("persona")}
-              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" data-testid="admin-videos-select-persona">
+              className="w-full h-10 px-3 border border-[#EAE7DF] rounded-lg text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#073A16]" data-testid="admin-videos-select-persona">
               {PERSONAS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </Field>
@@ -416,16 +416,16 @@ function FormPanel({ form, isNew, onChange, onSave, onCancel, saving, addChapter
         <div>
           <div className="flex items-center justify-between">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#525860]">Chapters ({form.chapters.length})</label>
-            <button type="button" onClick={addChapter} className="text-[11px] font-bold text-[#C02719] hover:underline" data-testid="admin-videos-chapter-add">+ Add chapter</button>
+            <button type="button" onClick={addChapter} className="text-[11px] font-bold text-[#0072C6] hover:underline" data-testid="admin-videos-chapter-add">+ Add chapter</button>
           </div>
           <div className="space-y-1.5 mt-2">
             {form.chapters.map((c, i) => (
               <div key={i} className="flex items-center gap-2" data-testid={`admin-videos-chapter-${i}`}>
                 <input type="number" min="0" value={c.t} onChange={(e) => updateChapter(i, "t", e.target.value)}
-                  className="w-[80px] h-8 px-2 border border-[#EAE7DF] rounded-md text-[12px] font-mono focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" placeholder="seconds" />
+                  className="w-[80px] h-8 px-2 border border-[#EAE7DF] rounded-md text-[12px] font-mono focus:outline-none focus:ring-2 focus:ring-[#073A16]" placeholder="seconds" />
                 <input value={c.label} onChange={(e) => updateChapter(i, "label", e.target.value)}
-                  className="flex-1 h-8 px-2 border border-[#EAE7DF] rounded-md text-[12px] focus:outline-none focus:ring-2 focus:ring-[#0F2C24]" placeholder="Chapter label" />
-                <button type="button" onClick={() => removeChapter(i)} aria-label="Remove chapter" className="text-[#9aa0a6] hover:text-[#C02719]"><X className="w-3.5 h-3.5" /></button>
+                  className="flex-1 h-8 px-2 border border-[#EAE7DF] rounded-md text-[12px] focus:outline-none focus:ring-2 focus:ring-[#073A16]" placeholder="Chapter label" />
+                <button type="button" onClick={() => removeChapter(i)} aria-label="Remove chapter" className="text-[#9aa0a6] hover:text-[#0072C6]"><X className="w-3.5 h-3.5" /></button>
               </div>
             ))}
             {form.chapters.length === 0 && (
@@ -435,7 +435,7 @@ function FormPanel({ form, isNew, onChange, onSave, onCancel, saving, addChapter
         </div>
 
         <Field label="Status">
-          <label className="flex items-center gap-2 text-[13px] text-[#0F2C24]">
+          <label className="flex items-center gap-2 text-[13px] text-[#073A16]">
             <input type="checkbox" checked={!!form.published} onChange={(e) => onChange("published")(e.target.checked)} className="w-4 h-4" data-testid="admin-videos-input-published" />
             Published (visible on the public site)
           </label>
@@ -443,10 +443,10 @@ function FormPanel({ form, isNew, onChange, onSave, onCancel, saving, addChapter
       </div>
 
       <div className="px-5 py-3 border-t border-[#F1EEE6] bg-[#FAF8F2] flex items-center justify-end gap-2">
-        <button type="button" onClick={onCancel} className="px-4 h-9 text-[13px] font-semibold text-[#0F2C24] border border-[#EAE7DF] rounded-full hover:bg-white" data-testid="admin-videos-form-cancel">
+        <button type="button" onClick={onCancel} className="px-4 h-9 text-[13px] font-semibold text-[#073A16] border border-[#EAE7DF] rounded-full hover:bg-white" data-testid="admin-videos-form-cancel">
           Cancel
         </button>
-        <button type="button" onClick={onSave} disabled={saving} className="inline-flex items-center gap-1.5 px-4 h-9 text-[13px] font-bold text-white bg-[#C02719] rounded-full hover:bg-[#9c1f14] disabled:opacity-60" data-testid="admin-videos-form-save">
+        <button type="button" onClick={onSave} disabled={saving} className="inline-flex items-center gap-1.5 px-4 h-9 text-[13px] font-bold text-white bg-[#0072C6] rounded-full hover:bg-[#005A9C] disabled:opacity-60" data-testid="admin-videos-form-save">
           <Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : (isNew ? "Create video" : "Save changes")}
         </button>
       </div>

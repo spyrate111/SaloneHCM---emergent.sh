@@ -21,8 +21,8 @@ const PERSONAS = [
     icon: Building2,
     title: "Midsize Business",
     range: "50–999 employees",
-    color: "bg-[#F2F8F5] border-[#1f6f55]/30",
-    accent: "text-[#1f6f55]",
+    color: "bg-[#F0F9F1] border-[#128A2C]/30",
+    accent: "text-[#128A2C]",
     bullets: [
       "Multi-department analytics",
       "Performance & talent ATS",
@@ -52,8 +52,8 @@ const PERSONAS = [
     icon: Landmark,
     title: "Government & MDAs",
     range: "Civil Service tier",
-    color: "bg-[#F5F1EC] border-[#0F2C24]/30",
-    accent: "text-[#0F2C24]",
+    color: "bg-[#F5F1EC] border-[#073A16]/30",
+    accent: "text-[#073A16]",
     bullets: [
       "Grade & step civil-service payroll",
       "IFMIS bank disbursement",
@@ -74,8 +74,8 @@ export default function Personas() {
     >
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10">
         <div className="max-w-[760px] mb-12">
-          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#C02719]">Who we serve</p>
-          <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#0F2C24] leading-tight">
+          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#0072C6]">Who we serve</p>
+          <h2 className="mt-2 text-[32px] sm:text-[40px] font-extrabold text-[#073A16] leading-tight">
             One platform. Every business size in Sierra Leone.
           </h2>
           <p className="mt-3 text-[16px] text-[#374049]">
@@ -93,12 +93,12 @@ export default function Personas() {
                 className={`relative border rounded-2xl p-6 ${p.color} hover:shadow-lg transition-shadow group`}
               >
                 {p.featured && (
-                  <span className="absolute -top-3 left-6 inline-flex items-center px-2.5 h-6 text-[10px] font-bold uppercase tracking-[0.12em] bg-[#0F2C24] text-white rounded-full">
+                  <span className="absolute -top-3 left-6 inline-flex items-center px-2.5 h-6 text-[10px] font-bold uppercase tracking-[0.12em] bg-[#073A16] text-white rounded-full">
                     Most popular
                   </span>
                 )}
                 <Icon className={`w-9 h-9 ${p.accent}`} />
-                <h3 className="mt-4 text-[20px] font-extrabold text-[#0F2C24]">{p.title}</h3>
+                <h3 className="mt-4 text-[20px] font-extrabold text-[#073A16]">{p.title}</h3>
                 <p className={`text-[12px] font-semibold ${p.accent} mt-0.5`}>{p.range}</p>
                 <ul className="mt-4 space-y-2">
                   {p.bullets.map((b) => (

@@ -48,7 +48,7 @@ export default function Team() {
                 data-testid={`team-pick-${m.id}`}
                 onClick={() => nav(`/team/${m.id}`)}
                 className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border transition ${
-                  eid === m.id ? "bg-[#133326] text-white border-[#133326]" : "border-[#E2DFD6] hover:border-[#133326] text-[#1A1C1E]"
+                  eid === m.id ? "bg-[#0A4A1E] text-white border-[#0A4A1E]" : "border-[#E2DFD6] hover:border-[#0A4A1E] text-[#1A1C1E]"
                 }`}
               >
                 <UserCircle className="w-3.5 h-3.5" strokeWidth={1.5} /> {m.first_name} {m.last_name}
@@ -60,7 +60,7 @@ export default function Team() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <KPI label="Team size" value={data.team_size} sub={`${data.payroll.headcount_active} active`} icon={Users} accent="bg-[#133326]" />
+        <KPI label="Team size" value={data.team_size} sub={`${data.payroll.headcount_active} active`} icon={Users} accent="bg-[#0A4A1E]" />
         <KPI label="Monthly payroll" value={fmtSLE(data.payroll.gross)} sub={`Net: ${fmtSLE(data.payroll.net)}`} icon={Wallet} accent="bg-[#26547C]" />
         <KPI label="Pending leave" value={data.pending_leaves} sub="Awaiting approval" icon={CalendarClock} accent="bg-[#D1603D]" />
       </div>
@@ -91,7 +91,7 @@ export default function Team() {
                   <td className="py-3 px-4 text-[#525860]">{r.job_title}</td>
                   <td className="py-3 px-4">
                     <span className={`text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                      r.status === "active" ? "bg-[#E6F4EC] text-[#2D7A5D]" : r.status === "on_leave" ? "bg-[#FBF1DE] text-[#8B6A14]" : "bg-[#FBEAEA] text-[#B83A3A]"
+                      r.status === "active" ? "bg-[#E4F7E7] text-[#17A035]" : r.status === "on_leave" ? "bg-[#FBF1DE] text-[#8B6A14]" : "bg-[#E9F2FB] text-[#3A7CB8]"
                     }`}>{r.status.replace("_", " ")}</span>
                   </td>
                   <td className="py-3 px-4 text-right">

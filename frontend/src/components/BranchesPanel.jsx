@@ -31,7 +31,7 @@ export default function BranchesPanel({ branches, onChanged }) {
           <h3 className="font-heading text-sm font-semibold">Branches & Offices · {branches.length}</h3>
         </div>
         <button data-testid="branch-new" onClick={() => setEditing({})}
-          className="inline-flex items-center gap-1.5 text-sm bg-[#133326] text-white px-3 py-1.5 rounded-md">
+          className="inline-flex items-center gap-1.5 text-sm bg-[#0A4A1E] text-white px-3 py-1.5 rounded-md">
           <Plus className="w-4 h-4" /> New branch
         </button>
       </div>
@@ -50,7 +50,7 @@ export default function BranchesPanel({ branches, onChanged }) {
               <td className="py-3 px-4">{b.name}</td>
               <td className="py-3 px-4 text-[#525860]">{b.region || "—"}</td>
               <td className="py-3 px-4 text-[#525860]">{b.ministry || "—"}</td>
-              <td className="py-3 px-4 text-[#525860]">{b.supervisor_name || <span className="text-[#B83A3A] text-xs">No supervisor</span>}</td>
+              <td className="py-3 px-4 text-[#525860]">{b.supervisor_name || <span className="text-[#3A7CB8] text-xs">No supervisor</span>}</td>
               <td className="py-3 px-4 font-data">{b.employee_count}</td>
               <td className="py-3 px-4 text-right">
                 <div className="inline-flex items-center gap-1">
@@ -59,7 +59,7 @@ export default function BranchesPanel({ branches, onChanged }) {
                   <button data-testid={`branch-edit-${b.id}`} onClick={() => setEditing(b)} title="Edit"
                     className="p-1.5 rounded hover:bg-[#F1EEE6] text-[#26547C]"><Pencil className="w-4 h-4" /></button>
                   <button data-testid={`branch-delete-${b.id}`} onClick={() => del(b)} title="Delete"
-                    className="p-1.5 rounded hover:bg-[#FBEAEA] text-[#B83A3A]"><Trash2 className="w-4 h-4" /></button>
+                    className="p-1.5 rounded hover:bg-[#E9F2FB] text-[#3A7CB8]"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </td>
             </tr>
@@ -140,7 +140,7 @@ function BranchModal({ branch, onClose, onSaved }) {
         </Field>
         <div className="flex items-center justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
-          <button type="submit" data-testid="branch-save" disabled={busy} className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">Save</button>
+          <button type="submit" data-testid="branch-save" disabled={busy} className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">Save</button>
         </div>
       </form>
     </div>
@@ -193,7 +193,7 @@ function AssignModal({ branch, onClose, onSaved }) {
           {employees.map((e) => (
             <label key={e.id} data-testid={`assign-emp-${e.id}`}
               className="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer hover:bg-[#FDFCFB]">
-              <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} className="accent-[#133326]" />
+              <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} className="accent-[#0A4A1E]" />
               <span className="flex-1">{e.first_name} {e.last_name}</span>
               <span className="text-xs text-[#686D76]">{e.department}</span>
               {e.branch_id && e.branch_id !== branch.id && (
@@ -206,7 +206,7 @@ function AssignModal({ branch, onClose, onSaved }) {
           <span className="text-xs text-[#686D76] font-data">{selected.size} selected</span>
           <div className="flex gap-2">
             <button onClick={onClose} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
-            <button data-testid="assign-save" disabled={busy} onClick={save} className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-50">Save</button>
+            <button data-testid="assign-save" disabled={busy} onClick={save} className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50">Save</button>
           </div>
         </div>
       </div>

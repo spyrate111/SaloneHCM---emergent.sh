@@ -50,7 +50,7 @@ export default function DocumentsTable({ docs, isAdmin, onDownload, onDelete, ha
               <button
                 data-testid={`doc-delete-${d.id}`}
                 onClick={() => onDelete(d)}
-                className="p-1.5 rounded hover:bg-[#FBEAEA] text-[#B83A3A]"
+                className="p-1.5 rounded hover:bg-[#E9F2FB] text-[#3A7CB8]"
                 title="Delete"
               >
                 <Trash2 className="w-4 h-4" strokeWidth={1.5} />

@@ -63,7 +63,7 @@ export default function IfmisActions({ run }) {
         onClick={() => setReconOpen(true)}
         className={`inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded ${
           run.ifmis_reconciled
-            ? "bg-[#E6F4EC] text-[#2D7A5D] border border-[#C2E5D2]"
+            ? "bg-[#E4F7E7] text-[#17A035] border border-[#B8E9C2]"
             : "bg-white border border-[#E2DFD6] text-[#525860] hover:bg-[#F7F6F2]"
         }`}
       >
@@ -128,8 +128,8 @@ function ReconciliationModal({ run, onClose }) {
         {data && (
           <>
             {data.reconciled && (
-              <div className="bg-[#E6F4EC] border border-[#C2E5D2] rounded-md p-3 mb-4 text-xs">
-                <div className="font-semibold text-[#2D7A5D] flex items-center gap-1.5">
+              <div className="bg-[#E4F7E7] border border-[#B8E9C2] rounded-md p-3 mb-4 text-xs">
+                <div className="font-semibold text-[#17A035] flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5" /> Already reconciled
                 </div>
                 <div className="text-[#525860] mt-1">
@@ -187,7 +187,7 @@ function ReconciliationModal({ run, onClose }) {
                     data-testid="ifmis-recon-mark"
                     disabled={busy || !ref.trim()}
                     onClick={mark}
-                    className="inline-flex items-center gap-1.5 text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white px-4 py-2 rounded-md disabled:opacity-60"
                   >
                     <ShieldCheck className="w-3.5 h-3.5" /> Mark reconciled
                   </button>

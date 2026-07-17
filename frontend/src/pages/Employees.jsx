@@ -49,7 +49,7 @@ export default function Employees() {
         <button
           data-testid="add-employee-button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm font-medium px-4 py-2.5 rounded-md transition"
+          className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm font-medium px-4 py-2.5 rounded-md transition"
         >
           <Plus className="w-4 h-4" strokeWidth={1.5} /> Add employee
         </button>
@@ -94,7 +94,7 @@ export default function Employees() {
                   <td className="py-3 px-4 text-[#525860]">{e.location}</td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      e.status === "active" ? "bg-[#E6F4EC] text-[#2D7A5D]" : e.status === "on_leave" ? "bg-[#FBF1DE] text-[#8B6A14]" : "bg-[#FBEAEA] text-[#B83A3A]"
+                      e.status === "active" ? "bg-[#E4F7E7] text-[#17A035]" : e.status === "on_leave" ? "bg-[#FBF1DE] text-[#8B6A14]" : "bg-[#E9F2FB] text-[#3A7CB8]"
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current" /> {e.status.replace("_", " ")}
                     </span>
@@ -161,7 +161,7 @@ export default function Employees() {
             </div>
             <div className="flex items-center justify-end gap-2 mt-6">
               <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button data-testid="emp-submit" disabled={busy} type="submit" className="px-4 py-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white rounded-md disabled:opacity-60">{busy ? "Saving…" : "Save employee"}</button>
+              <button data-testid="emp-submit" disabled={busy} type="submit" className="px-4 py-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md disabled:opacity-60">{busy ? "Saving…" : "Save employee"}</button>
             </div>
           </form>
         </div>

@@ -9,9 +9,9 @@ import {
 
 const STATUS_PILL = {
   active: { color: "bg-[#E5EEF6] text-[#26547C]", icon: Clock, label: "Active" },
-  paid: { color: "bg-[#E6F4EC] text-[#2D7A5D]", icon: CheckCircle2, label: "Paid off" },
+  paid: { color: "bg-[#E4F7E7] text-[#17A035]", icon: CheckCircle2, label: "Paid off" },
   cancelled: { color: "bg-[#EBE8E0] text-[#525860]", icon: XCircle, label: "Cancelled" },
-  defaulted: { color: "bg-[#FBEAEA] text-[#B83A3A]", icon: XCircle, label: "Defaulted" },
+  defaulted: { color: "bg-[#E9F2FB] text-[#3A7CB8]", icon: XCircle, label: "Defaulted" },
 };
 
 export default function Loans() {
@@ -66,7 +66,7 @@ export default function Loans() {
             </p>
           </div>
           {isAdmin && (
-            <button data-testid="loan-new" onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md">
+            <button data-testid="loan-new" onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md">
               <Plus className="w-4 h-4" /> Issue loan
             </button>
           )}
@@ -75,7 +75,7 @@ export default function Loans() {
           <KPI label="Active loans" value={active.length} color="text-[#26547C]" />
           <KPI label="Outstanding" value={fmtSLE(totalOutstanding)} small />
           <KPI label="Monthly deductions" value={fmtSLE(totalMonthly)} small color="text-[#8B6A14]" />
-          <KPI label="Paid off" value={paid.length} color="text-[#2D7A5D]" />
+          <KPI label="Paid off" value={paid.length} color="text-[#17A035]" />
         </div>
       </div>
 
@@ -140,13 +140,13 @@ function LoansTable({ loans, isAdmin, onSchedule, onRefresh }) {
                 <td className="py-2 px-4 font-data">{fmtSLE(l.principal_sle)}</td>
                 <td className="py-2 px-4 font-data">{fmtSLE(l.monthly_deduction_sle)}</td>
                 <td className="py-2 px-4 font-data text-xs">
-                  <span className="text-[#2D7A5D]">{fmtSLE(l.paid_sle)}</span>
+                  <span className="text-[#17A035]">{fmtSLE(l.paid_sle)}</span>
                   <span className="text-[#525860]"> / </span>
                   <span className="font-semibold">{fmtSLE(l.remaining_balance_sle)}</span>
                 </td>
                 <td className="py-2 px-4 w-32">
                   <div className="w-full bg-[#EBE8E0] rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-[#2D7A5D] h-full transition-all" style={{ width: `${Math.round(l.progress * 100)}%` }} />
+                    <div className="bg-[#17A035] h-full transition-all" style={{ width: `${Math.round(l.progress * 100)}%` }} />
                   </div>
                   <div className="text-[10px] text-[#525860] mt-0.5 font-data">{Math.round(l.progress * 100)}%</div>
                 </td>
@@ -161,8 +161,8 @@ function LoansTable({ loans, isAdmin, onSchedule, onRefresh }) {
                     <Calendar className="w-3.5 h-3.5 text-[#26547C]" />
                   </button>
                   {isAdmin && l.status === "active" && (
-                    <button data-testid={`loan-cancel-${l.id}`} onClick={() => cancel(l.id)} title="Cancel" className="p-1 hover:bg-[#FBEAEA] rounded">
-                      <XCircle className="w-3.5 h-3.5 text-[#B83A3A]" />
+                    <button data-testid={`loan-cancel-${l.id}`} onClick={() => cancel(l.id)} title="Cancel" className="p-1 hover:bg-[#E9F2FB] rounded">
+                      <XCircle className="w-3.5 h-3.5 text-[#3A7CB8]" />
                     </button>
                   )}
                 </td>
@@ -239,12 +239,12 @@ function IssueLoanModal({ employees, onClose, onSaved }) {
         </div>
         <div className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-3 text-xs">
           <div className="text-[#525860]">Monthly deduction</div>
-          <div className="font-data font-semibold text-lg text-[#133326]">{fmtSLE(monthly)}</div>
+          <div className="font-data font-semibold text-lg text-[#0A4A1E]">{fmtSLE(monthly)}</div>
           <div className="text-[10px] text-[#686D76] mt-1">Auto-deducted from each payroll run until balance is zero.</div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
-          <button data-testid="loan-submit" type="submit" disabled={busy || !form.employee_id} className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md disabled:opacity-60">
+          <button data-testid="loan-submit" type="submit" disabled={busy || !form.employee_id} className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-60">
             {busy ? "Issuing…" : "Issue loan"}
           </button>
         </div>

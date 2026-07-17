@@ -31,7 +31,7 @@ export default function ShareLinkModal({ url, onClose }) {
         <p className="text-sm text-[#525860] mb-4">Send this URL to anyone with admin access &mdash; they&rsquo;ll see the same scenario re-run against the latest employee data.</p>
         <div className="flex gap-2">
           <input readOnly value={url} onClick={(e) => e.target.select()} className="flex-1 bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-mono text-xs" />
-          <button data-testid="copy-share" onClick={copy} className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md ${copied ? "bg-[#2D7A5D] text-white" : "bg-[#26547C] hover:bg-[#1D4363] text-white"}`}>
+          <button data-testid="copy-share" onClick={copy} className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md ${copied ? "bg-[#17A035] text-white" : "bg-[#26547C] hover:bg-[#1D4363] text-white"}`}>
             {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
           </button>
         </div>

@@ -61,15 +61,15 @@ CURSOR_JS = """
 """
 
 SLIDE = """<!doctype html><html><head><meta charset="utf-8"><style>
-  html,body{{margin:0;height:100%;background:#133326;color:#fff;
+  html,body{{margin:0;height:100%;background:#0A4A1E;color:#fff;
     font-family:Georgia,'Times New Roman',serif;overflow:hidden}}
   .wrap{{height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 110px}}
   .brand{{font-size:20px;letter-spacing:.28em;text-transform:uppercase;color:#D9C58A;font-family:Arial,sans-serif;font-weight:700}}
-  .tag{{margin-top:38px;font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:#8FBCA8;font-family:Arial,sans-serif}}
+  .tag{{margin-top:38px;font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:#83CF95;font-family:Arial,sans-serif}}
   h1{{font-size:58px;margin:16px 0 0;font-weight:700;line-height:1.12;max-width:900px}}
   .sub{{margin-top:20px;font-size:21px;color:#C9D4CE;font-family:Arial,sans-serif;max-width:760px;line-height:1.5}}
   .rule{{width:84px;height:3px;background:#D9C58A;margin-top:34px}}
-  .foot{{position:absolute;bottom:44px;left:110px;font-size:13px;color:#6E8A7C;font-family:Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}}
+  .foot{{position:absolute;bottom:44px;left:110px;font-size:13px;color:#6B9E77;font-family:Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}}
 </style></head><body><div class="wrap">
   <div class="brand">SaloneHCM</div>
   <div class="tag">{tag}</div>

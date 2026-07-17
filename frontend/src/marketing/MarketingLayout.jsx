@@ -21,7 +21,7 @@ export default function MarketingLayout({ children }) {
   }, [loc.pathname, loc.hash]);
 
   return (
-    <div className="min-h-screen bg-white text-[#0F2C24] font-sans">
+    <div className="min-h-screen bg-white text-[#073A16] font-sans">
       <PromoBanner />
       <MarketingNav />
       <main>{children}</main>

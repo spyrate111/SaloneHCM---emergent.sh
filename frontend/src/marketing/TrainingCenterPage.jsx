@@ -26,7 +26,7 @@ export default function TrainingCenterPage() {
 
   return (
     <MarketingLayout>
-      <section className="bg-[#133326] text-white">
+      <section className="bg-[#0A4A1E] text-white">
         <div className="max-w-6xl mx-auto px-6 py-16" data-testid="training-hero">
           <div className="text-[11px] uppercase tracking-[0.24em] text-[#D9C58A] font-semibold">SaloneHCM Academy</div>
           <h1 className="font-heading text-4xl sm:text-5xl font-bold mt-3 max-w-3xl">Training Center</h1>
@@ -45,7 +45,7 @@ export default function TrainingCenterPage() {
         <div className="flex flex-wrap gap-2 border-b border-[#E2DFD6] pb-3">
           {TABS.map((t) => (
             <button key={t.id} data-testid={`training-tab-${t.id}`} onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-md transition ${tab === t.id ? "bg-[#133326] text-white" : "text-[#525860] hover:bg-[#F7F6F2]"}`}>
+              className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-md transition ${tab === t.id ? "bg-[#0A4A1E] text-white" : "text-[#525860] hover:bg-[#F7F6F2]"}`}>
               <t.icon className="w-4 h-4" /> {t.label}
             </button>
           ))}
@@ -80,7 +80,7 @@ function Articles({ articles }) {
         <div className="mt-5 space-y-4">
           {active.body.map((p) =>
             p.startsWith("## ") ? (
-              <h3 key={p} className="font-heading text-lg font-semibold text-[#133326] mt-6">{p.slice(3)}</h3>
+              <h3 key={p} className="font-heading text-lg font-semibold text-[#0A4A1E] mt-6">{p.slice(3)}</h3>
             ) : (
               <p key={p} className="text-[15px] leading-relaxed text-[#33383F]">{p}</p>
             ))}
@@ -92,7 +92,7 @@ function Articles({ articles }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="articles-grid">
       {articles.map((a) => (
         <button key={a.slug} data-testid={`article-card-${a.slug}`} onClick={() => setOpen(a.slug)}
-          className="text-left bg-white border border-[#E2DFD6] rounded-lg p-5 hover:border-[#133326] hover:shadow-sm transition">
+          className="text-left bg-white border border-[#E2DFD6] rounded-lg p-5 hover:border-[#0A4A1E] hover:shadow-sm transition">
           <FileText className="w-5 h-5 text-[#26547C]" strokeWidth={1.6} />
           <h3 className="font-heading text-base font-semibold mt-3">{a.title}</h3>
           <div className="text-[11px] uppercase tracking-wider text-[#8B6A14] mt-2">{a.role} · {a.minutes} min</div>
@@ -132,7 +132,7 @@ function Quizzes({ quizzes }) {
           <div className="text-[11px] uppercase tracking-wider text-[#525860] mt-1.5">{q.role} · {q.questions.length} questions · pass {q.pass_pct}%</div>
           <p className="text-xs text-[#686D76] mt-2 flex-1">Pass to earn a personalised certificate PDF with a verification ID.</p>
           <button data-testid={`quiz-start-${q.id}`} onClick={() => setActive(q)}
-            className="mt-4 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2 rounded-md w-fit">Start quiz</button>
+            className="mt-4 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2 rounded-md w-fit">Start quiz</button>
         </div>
       ))}
     </div>
@@ -162,10 +162,10 @@ function QuizRunner({ quiz, onExit }) {
     return (
       <div className="max-w-2xl" data-testid="quiz-result">
         <button onClick={onExit} className="text-sm text-[#26547C] hover:underline mb-4">← All quizzes</button>
-        <div className={`rounded-lg border p-8 text-center ${result.passed ? "bg-[#E6F4EC] border-[#2D7A5D]/40" : "bg-[#FBEAEA] border-[#B83A3A]/40"}`}>
+        <div className={`rounded-lg border p-8 text-center ${result.passed ? "bg-[#E4F7E7] border-[#17A035]/40" : "bg-[#E9F2FB] border-[#3A7CB8]/40"}`}>
           {result.passed
-            ? <CheckCircle2 className="w-10 h-10 text-[#2D7A5D] mx-auto" />
-            : <XCircle className="w-10 h-10 text-[#B83A3A] mx-auto" />}
+            ? <CheckCircle2 className="w-10 h-10 text-[#17A035] mx-auto" />
+            : <XCircle className="w-10 h-10 text-[#3A7CB8] mx-auto" />}
           <h3 className="font-heading text-2xl font-bold mt-3" data-testid="quiz-score">
             {result.score}% — {result.passed ? "Passed!" : "Not yet"}
           </h3>
@@ -175,13 +175,13 @@ function QuizRunner({ quiz, onExit }) {
           {result.passed && result.certificate_id && (
             <a data-testid="quiz-certificate-link"
               href={`${BACKEND}/api/public/training/certificates/${result.certificate_id}.pdf`}
-              className="inline-flex items-center gap-2 mt-5 bg-[#133326] text-white text-sm px-5 py-2.5 rounded-md">
+              className="inline-flex items-center gap-2 mt-5 bg-[#0A4A1E] text-white text-sm px-5 py-2.5 rounded-md">
               <Download className="w-4 h-4" /> Download your certificate
             </a>
           )}
           {!result.passed && (
             <button onClick={() => { setResult(null); setAnswers(quiz.questions.map(() => null)); }}
-              className="mt-5 border border-[#B83A3A] text-[#B83A3A] text-sm px-5 py-2.5 rounded-md" data-testid="quiz-retry">
+              className="mt-5 border border-[#3A7CB8] text-[#3A7CB8] text-sm px-5 py-2.5 rounded-md" data-testid="quiz-retry">
               Try again
             </button>
           )}
@@ -195,7 +195,7 @@ function QuizRunner({ quiz, onExit }) {
       <button onClick={onExit} className="text-sm text-[#26547C] hover:underline mb-4" data-testid="quiz-exit">← All quizzes</button>
       <h2 className="font-heading text-2xl font-bold">{quiz.title}</h2>
       <p className="text-sm text-[#525860] mt-1">Answer all {quiz.questions.length} questions. Pass mark: {quiz.pass_pct}%.</p>
-      {result?.error && <p className="text-sm text-[#B83A3A] mt-2">{String(result.error)}</p>}
+      {result?.error && <p className="text-sm text-[#3A7CB8] mt-2">{String(result.error)}</p>}
       <div className="space-y-6 mt-6">
         {quiz.questions.map((q, qi) => (
           <div key={q.q} className="bg-white border border-[#E2DFD6] rounded-lg p-5" data-testid={`quiz-question-${qi}`}>
@@ -203,10 +203,10 @@ function QuizRunner({ quiz, onExit }) {
             <div className="mt-3 space-y-2">
               {q.options.map((opt, oi) => (
                 <label key={opt} data-testid={`quiz-q${qi}-opt${oi}`}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-md border cursor-pointer text-sm transition ${answers[qi] === oi ? "border-[#133326] bg-[#F0F5F2]" : "border-[#E2DFD6] hover:bg-[#FDFCFB]"}`}>
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-md border cursor-pointer text-sm transition ${answers[qi] === oi ? "border-[#0A4A1E] bg-[#EEF7EF]" : "border-[#E2DFD6] hover:bg-[#FDFCFB]"}`}>
                   <input type="radio" name={`q${qi}`} checked={answers[qi] === oi}
                     onChange={() => setAnswers((a) => a.map((v, i) => (i === qi ? oi : v)))}
-                    className="accent-[#133326]" />
+                    className="accent-[#0A4A1E]" />
                   {opt}
                 </label>
               ))}
@@ -219,7 +219,7 @@ function QuizRunner({ quiz, onExit }) {
         <input data-testid="quiz-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Fatmata Kamara"
           className="w-full bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
         <button data-testid="quiz-submit" disabled={busy || !complete || name.trim().length < 2} onClick={submit}
-          className="mt-4 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-6 py-2.5 rounded-md disabled:opacity-40">
+          className="mt-4 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-6 py-2.5 rounded-md disabled:opacity-40">
           Submit answers
         </button>
         {!complete && <span className="ml-3 text-xs text-[#8B6A14]">Answer every question to submit.</span>}
@@ -241,9 +241,9 @@ function Downloads({ resources }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {items.map((r) => (
                 <a key={r.file} data-testid={`download-${r.file}`} href={`${BACKEND}${r.url}`} download
-                  className="bg-white border border-[#E2DFD6] rounded-lg p-5 hover:border-[#133326] hover:shadow-sm transition block">
+                  className="bg-white border border-[#E2DFD6] rounded-lg p-5 hover:border-[#0A4A1E] hover:shadow-sm transition block">
                   <div className="flex items-center justify-between">
-                    <GraduationCap className="w-5 h-5 text-[#2D7A5D]" strokeWidth={1.6} />
+                    <GraduationCap className="w-5 h-5 text-[#17A035]" strokeWidth={1.6} />
                     <Download className="w-4 h-4 text-[#26547C]" />
                   </div>
                   <h4 className="font-heading text-sm font-semibold mt-3">{r.title}</h4>
