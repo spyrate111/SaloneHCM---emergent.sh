@@ -70,14 +70,14 @@ export function OverviewMock() {
         </div>
         <ul className="space-y-2 text-[13px]">
           {[
-            "NRA PAYE June return &mdash; ready to file",
-            "NASSIT remittance &mdash; submitted Jun 12",
-            "MoF approval &mdash; signed by Permanent Secretary",
-            "Ghost-worker audit &mdash; 0 exceptions",
+            "NRA PAYE June return — ready to file",
+            "NASSIT remittance — submitted Jun 12",
+            "MoF approval — signed by Permanent Secretary",
+            "Ghost-worker audit — 0 exceptions",
           ].map((t) => (
             <li key={t} className="flex items-center gap-2 text-[#0F2C24]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#1f6f55]" />
-              <span dangerouslySetInnerHTML={{ __html: t }} />
+              <span>{t}</span>
             </li>
           ))}
         </ul>
@@ -101,7 +101,7 @@ export function RunPayrollMock() {
 
       <div className="mt-6 bg-white border border-[#EAE7DF] rounded-xl p-5" data-tour-anchor="period-picker">
         <div className="grid sm:grid-cols-3 gap-3">
-          <Stat label="Pay period" value="01 Jun &mdash; 30 Jun 2026" />
+          <Stat label="Pay period" value="01 Jun — 30 Jun 2026" />
           <Stat label="Pay date" value="Fri 28 Jun 2026" />
           <Stat label="Frequency" value="Monthly" />
         </div>
@@ -240,7 +240,7 @@ function Stat({ label, value }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-[0.12em] text-[#525860]">{label}</div>
-      <div className="text-[15px] font-extrabold text-[#0F2C24] mt-0.5" dangerouslySetInnerHTML={{ __html: value }} />
+      <div className="text-[15px] font-extrabold text-[#0F2C24] mt-0.5">{value}</div>
     </div>
   );
 }
@@ -267,7 +267,7 @@ function Row({ k, v, tone = "text-[#0F2C24]" }) {
   return (
     <div className="flex items-center justify-between text-[11.5px]">
       <span className="text-[#525860]">{k}</span>
-      <span className={`font-mono ${tone}`} dangerouslySetInnerHTML={{ __html: v }} />
+      <span className={`font-mono ${tone}`}>{v}</span>
     </div>
   );
 }

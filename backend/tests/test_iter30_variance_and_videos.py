@@ -123,5 +123,5 @@ class TestDemoVideosCdn:
             # Guard: no broken CDN
             assert "commondatastorage.googleapis.com/gtv-videos-bucket" not in src, \
                 f"video still points at retired Google gtv-videos-bucket: {v['title']}"
-            # Sanity: HTTPS media source
-            assert src.startswith("https://"), f"insecure src: {src}"
+            # Sanity: HTTPS media source, or same-origin static training media
+            assert src.startswith("https://") or src.startswith("/api/static/"), f"insecure src: {src}"

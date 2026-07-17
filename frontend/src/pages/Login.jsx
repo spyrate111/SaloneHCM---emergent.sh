@@ -43,7 +43,10 @@ export default function Login() {
       nav("/dashboard");
     } catch (er) {
       const d = er?.response?.data?.detail;
-      setErr((d && typeof d === "object") ? d.message : (typeof d === "string" ? d : "Could not accept invitation"));
+      let msg = "Could not accept invitation";
+      if (d && typeof d === "object") msg = d.message;
+      else if (typeof d === "string") msg = d;
+      setErr(msg);
     } finally { setLoading(false); }
   };
 
@@ -65,6 +68,11 @@ export default function Login() {
         setNeedsTotp(false);
       }
     } finally { setLoading(false); }
+  };
+
+  const acceptHeading = () => {
+    if (mode !== "accept") return "Sign in to your workspace";
+    return invite ? `Join ${invite.company?.name || "your team"}` : "Accept your invitation";
   };
 
   return (
@@ -112,7 +120,7 @@ export default function Login() {
             {mode === "accept" ? "You've been invited" : "Welcome back"}
           </div>
           <h2 className="font-heading text-3xl sm:text-4xl font-bold text-[#1A1C1E] mb-2">
-            {mode === "accept" ? (invite ? `Join ${invite.company?.name || "your team"}` : "Accept your invitation") : "Sign in to your workspace"}
+            {acceptHeading()}
           </h2>
           <p className="text-[#525860] text-sm mb-8">
             {mode === "accept"

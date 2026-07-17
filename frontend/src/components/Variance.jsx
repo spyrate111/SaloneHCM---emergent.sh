@@ -128,7 +128,7 @@ function AnomaliesList({ anomalies, summary }) {
       <ul className="space-y-1.5">
         {anomalies.map((a, i) => (
           <li
-            key={i}
+            key={`${a.kind}-${a.employee_id || a.label || ""}-${i}`}
             data-testid={`variance-anomaly-${a.kind}-${i}`}
             className={`text-xs rounded-md border px-3 py-2.5 ${
               a.severity === "high"

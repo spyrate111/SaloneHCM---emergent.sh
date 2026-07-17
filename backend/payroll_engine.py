@@ -8,7 +8,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-from core import db, audit, now_utc, iso
+from core import db, audit, now_utc, iso, logger
 
 # NRA PAYE bands (monthly SLE, post-2022 redenomination)
 PAYE_BANDS = [
@@ -73,6 +73,50 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
     }
 
 
+async def _compute_slips(emps: list, company_id: str, period: str) -> tuple[list, list]:
+    """Payslips with allowance breakdown + loan deductions; falls back to plain calc."""
+    from loans_engine import compute_loan_deduction_for_period
+    try:
+        from routers.civil_service import get_active_allowance_amounts
+        slips, applied_loan_rows = [], []
+        for e in emps:
+            breakdown = await get_active_allowance_amounts(e, company_id, period)
+            loan_due, loan_rows = await compute_loan_deduction_for_period(e["id"], company_id, period)
+            slips.append(calc_payslip(e, allowance_breakdown=breakdown, loan_deduction=loan_due))
+            applied_loan_rows.extend(loan_rows)
+        return slips, applied_loan_rows
+    except Exception:
+        return [calc_payslip(e) for e in emps], []
+
+
+def _run_totals(slips: list) -> dict:
+    return {
+        "employee_count": len(slips),
+        "gross": round(sum(s["gross"] for s in slips), 2),
+        "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
+        "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
+        "paye": round(sum(s["paye"] for s in slips), 2),
+        "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
+        "net": round(sum(s["net"] for s in slips), 2),
+    }
+
+
+async def _settle_retros(rid: str, period: str, company_id: str, doc: dict) -> None:
+    """Apply pending retro-pay adjustments falling within this period (best-effort)."""
+    try:
+        from routers.payroll_rails import settle_pending_retros_for_run
+        settled = await settle_pending_retros_for_run(rid, period, company_id)
+        if settled["settled"]:
+            updates = {
+                "retro_settled_count": settled["settled"],
+                "retro_settled_total_sle": settled["total_sle"],
+            }
+            await db.payroll_runs.update_one({"id": rid}, {"$set": updates})
+            doc.update(updates)
+    except Exception as e:
+        logger.warning("retro settlement failed for run %s: %s", rid, e)
+
+
 async def run_payroll(year: int, month: int, user: dict, audit_action: str = "payroll_run") -> dict:
     """Shared runner used by both POST /payroll/run and AI action plan executor."""
     emps = await db.employees.find(
@@ -81,20 +125,7 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     ).to_list(2000)
     period = f"{year}-{month:02d}"
 
-    # Pull allowance breakdown + active loan deduction per employee.
-    from loans_engine import compute_loan_deduction_for_period, apply_loan_deductions_for_run
-    try:
-        from routers.civil_service import get_active_allowance_amounts
-        slips = []
-        applied_loan_rows: list[dict] = []
-        for e in emps:
-            breakdown = await get_active_allowance_amounts(e, user["company_id"], period)
-            loan_due, loan_rows = await compute_loan_deduction_for_period(e["id"], user["company_id"], period)
-            slips.append(calc_payslip(e, allowance_breakdown=breakdown, loan_deduction=loan_due))
-            applied_loan_rows.extend(loan_rows)
-    except Exception:
-        slips = [calc_payslip(e) for e in emps]
-        applied_loan_rows = []
+    slips, applied_loan_rows = await _compute_slips(emps, user["company_id"], period)
 
     rid = str(uuid.uuid4())
     doc = {
@@ -104,42 +135,20 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         "period_year": year,
         "period_month": month,
         "slips": slips,
-        "totals": {
-            "employee_count": len(slips),
-            "gross": round(sum(s["gross"] for s in slips), 2),
-            "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
-            "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
-            "paye": round(sum(s["paye"] for s in slips), 2),
-            "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
-            "net": round(sum(s["net"] for s in slips), 2),
-        },
+        "totals": _run_totals(slips),
         "status": "completed",
         "mof_status": "draft",
         "created_at": iso(now_utc()),
     }
     await db.payroll_runs.insert_one(doc)
-    # Now persist the loan deductions against each affected loan, idempotent by (loan_id, period).
+    # Persist loan deductions against each affected loan, idempotent by (loan_id, period).
     if applied_loan_rows:
+        from loans_engine import apply_loan_deductions_for_run
         await apply_loan_deductions_for_run(rid, period, applied_loan_rows)
     doc.pop("_id", None)
     await audit(audit_action, f"payroll_runs/{rid}", user,
                 {"period": period, "net": doc["totals"]["net"]})
-    # Settle any pending retro-pay adjustments that fall within this period.
-    try:
-        from routers.payroll_rails import settle_pending_retros_for_run
-        settled = await settle_pending_retros_for_run(rid, period, user["company_id"])
-        if settled["settled"]:
-            await db.payroll_runs.update_one(
-                {"id": rid},
-                {"$set": {
-                    "retro_settled_count": settled["settled"],
-                    "retro_settled_total_sle": settled["total_sle"],
-                }},
-            )
-            doc["retro_settled_count"] = settled["settled"]
-            doc["retro_settled_total_sle"] = settled["total_sle"]
-    except Exception as e:
-        logger.warning("retro settlement failed for run %s: %s", rid, e) if 'logger' in globals() else None
+    await _settle_retros(rid, period, user["company_id"], doc)
     return doc
 
 

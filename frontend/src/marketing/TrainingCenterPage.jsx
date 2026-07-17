@@ -78,11 +78,11 @@ function Articles({ articles }) {
         <div className="text-[11px] uppercase tracking-wider text-[#8B6A14]">{active.role} · {active.minutes} min read</div>
         <h2 className="font-heading text-3xl font-bold mt-1">{active.title}</h2>
         <div className="mt-5 space-y-4">
-          {active.body.map((p, i) =>
+          {active.body.map((p) =>
             p.startsWith("## ") ? (
-              <h3 key={i} className="font-heading text-lg font-semibold text-[#133326] mt-6">{p.slice(3)}</h3>
+              <h3 key={p} className="font-heading text-lg font-semibold text-[#133326] mt-6">{p.slice(3)}</h3>
             ) : (
-              <p key={i} className="text-[15px] leading-relaxed text-[#33383F]">{p}</p>
+              <p key={p} className="text-[15px] leading-relaxed text-[#33383F]">{p}</p>
             ))}
         </div>
       </div>
@@ -107,7 +107,7 @@ function Faq({ faqs }) {
   return (
     <div className="max-w-3xl divide-y divide-[#E2DFD6] border border-[#E2DFD6] rounded-lg bg-white" data-testid="faq-list">
       {faqs.map((f, i) => (
-        <div key={i}>
+        <div key={f.q}>
           <button data-testid={`faq-q-${i}`} onClick={() => setOpen(open === i ? null : i)}
             className="w-full flex items-center justify-between text-left px-5 py-4 hover:bg-[#FDFCFB]">
             <span className="font-medium text-[15px] pr-4">{f.q}</span>
@@ -198,11 +198,11 @@ function QuizRunner({ quiz, onExit }) {
       {result?.error && <p className="text-sm text-[#B83A3A] mt-2">{String(result.error)}</p>}
       <div className="space-y-6 mt-6">
         {quiz.questions.map((q, qi) => (
-          <div key={qi} className="bg-white border border-[#E2DFD6] rounded-lg p-5" data-testid={`quiz-question-${qi}`}>
+          <div key={q.q} className="bg-white border border-[#E2DFD6] rounded-lg p-5" data-testid={`quiz-question-${qi}`}>
             <p className="font-medium text-[15px]">{qi + 1}. {q.q}</p>
             <div className="mt-3 space-y-2">
               {q.options.map((opt, oi) => (
-                <label key={oi} data-testid={`quiz-q${qi}-opt${oi}`}
+                <label key={opt} data-testid={`quiz-q${qi}-opt${oi}`}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-md border cursor-pointer text-sm transition ${answers[qi] === oi ? "border-[#133326] bg-[#F0F5F2]" : "border-[#E2DFD6] hover:bg-[#FDFCFB]"}`}>
                   <input type="radio" name={`q${qi}`} checked={answers[qi] === oi}
                     onChange={() => setAnswers((a) => a.map((v, i) => (i === qi ? oi : v)))}

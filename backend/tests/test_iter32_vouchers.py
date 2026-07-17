@@ -1,6 +1,6 @@
 """iter32 — Centralized Payroll Voucher Repository (branches + workflow + anti-fraud rails)."""
 import os
-import random
+import secrets
 
 import pytest
 import requests
@@ -23,7 +23,7 @@ def _h(t):
 
 
 def _rand_period():
-    return f"20{random.randint(40, 99)}-{random.randint(1, 12):02d}"
+    return f"20{40 + secrets.randbelow(60)}-{1 + secrets.randbelow(12):02d}"
 
 
 @pytest.fixture(scope="module")
@@ -55,12 +55,17 @@ def mof_employee(gov_token, mof_branch):
 
 
 def _make_voucher(token, branch, emp, period=None, gross=5000):
-    r = requests.post(f"{API}/vouchers", headers=_h(token), json={
-        "branch_id": branch["id"], "period": period or _rand_period(),
-        "line_items": [{"employee_id": emp["id"], "gross": gross, "paye": 700, "nassit_employee": 250}],
-    }, timeout=15)
-    assert r.status_code == 200, r.text
-    return r.json()
+    for _ in range(4):  # retry on rare random-period collision with residue vouchers
+        r = requests.post(f"{API}/vouchers", headers=_h(token), json={
+            "branch_id": branch["id"], "period": period or _rand_period(),
+            "line_items": [{"employee_id": emp["id"], "gross": gross, "paye": 700, "nassit_employee": 250}],
+        }, timeout=15)
+        if r.status_code == 200:
+            return r.json()
+        if r.status_code in (409, 422) and period is None:
+            continue
+        break
+    raise AssertionError(f"voucher create failed: {r.status_code} {r.text}")
 
 
 class TestBranches:
@@ -73,7 +78,7 @@ class TestBranches:
         assert mof["employee_count"] >= 1
 
     def test_branch_crud_and_duplicate_code(self, gov_token):
-        code = f"TST-{random.randint(100, 999)}"
+        code = f"TST-{100 + secrets.randbelow(900)}"
         r = requests.post(f"{API}/branches", headers=_h(gov_token),
                           json={"name": "Iter32 Test Branch", "code": code, "region": "Kenema"}, timeout=15)
         assert r.status_code == 200, r.text

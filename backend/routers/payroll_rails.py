@@ -232,24 +232,46 @@ class SignAction(BaseModel):
     note: Optional[str] = Field(default="", max_length=500)
 
 
-@signatures_router.post("/runs/{run_id}/sign")
-async def sign_run(run_id: str, body: SignAction, user: dict = Depends(require_admin)):
-    """Record one signature. When count of approves ≥ signatures_required → run flips to 'approved'.
-    Any reject immediately flips to 'rejected'. An approver cannot sign the same run twice."""
+async def _validate_signing(run_id: str, user: dict) -> dict:
+    """Permission + state checks; returns the run or raises."""
     if user["role"] != "superadmin" and not user.get("mof_approver"):
         raise HTTPException(403, "Only MoF approvers can sign")
-    tf = tenant_filter(user)
-    run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
+    run = await db.payroll_runs.find_one({"id": run_id, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Run not found")
     if run.get("mof_status") not in ("submitted", "partially_signed"):
         raise HTTPException(409, f"Run must be 'submitted' — current status: {run.get('mof_status', 'draft')}")
+    if any(s["signer_email"] == user["email"] for s in run.get("mof_signatures", [])):
+        raise HTTPException(409, "You have already signed this run")
+    return run
+
+
+def _resolve_sign_status(sigs: list, required: int, user: dict) -> tuple[str, dict]:
+    """Derive the new mof_status + status-stamp fields from the signature set."""
+    approves = sum(1 for s in sigs if s["action"] == "approve")
+    rejects = sum(1 for s in sigs if s["action"] == "reject")
+    if rejects > 0:
+        new_status = "rejected"
+    elif approves >= required:
+        new_status = "approved"
+    else:
+        new_status = "partially_signed"
+    stamps = {}
+    if new_status == "approved":
+        stamps = {"mof_approved_by": user["email"], "mof_approved_at": iso(now_utc())}
+    elif new_status == "rejected":
+        stamps = {"mof_rejected_by": user["email"], "mof_rejected_at": iso(now_utc())}
+    return new_status, {"approves": approves, "rejects": rejects, **stamps}
+
+
+@signatures_router.post("/runs/{run_id}/sign")
+async def sign_run(run_id: str, body: SignAction, user: dict = Depends(require_admin)):
+    """Record one signature. When count of approves ≥ signatures_required → run flips to 'approved'.
+    Any reject immediately flips to 'rejected'. An approver cannot sign the same run twice."""
+    run = await _validate_signing(run_id, user)
 
     sigs = list(run.get("mof_signatures", []))
-    if any(s["signer_email"] == user["email"] for s in sigs):
-        raise HTTPException(409, "You have already signed this run")
-
-    sig = {
+    sigs.append({
         "id": str(uuid.uuid4()),
         "signer_email": user["email"],
         "signer_role": user.get("role"),
@@ -257,30 +279,16 @@ async def sign_run(run_id: str, body: SignAction, user: dict = Depends(require_a
         "action": body.action,
         "note": body.note,
         "signed_at": iso(now_utc()),
-    }
-    sigs.append(sig)
+    })
 
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "mof_signatures_required": 1})
     required = (company or {}).get("mof_signatures_required", 1)
-    approves = sum(1 for s in sigs if s["action"] == "approve")
-    rejects = sum(1 for s in sigs if s["action"] == "reject")
+    new_status, meta = _resolve_sign_status(sigs, required, user)
+    approves, rejects = meta.pop("approves"), meta.pop("rejects")
 
-    if rejects > 0:
-        new_status = "rejected"
-    elif approves >= required:
-        new_status = "approved"
-    else:
-        new_status = "partially_signed"
-
-    update = {"mof_signatures": sigs, "mof_status": new_status}
-    if new_status == "approved":
-        update["mof_approved_by"] = user["email"]
-        update["mof_approved_at"] = iso(now_utc())
-    if new_status == "rejected":
-        update["mof_rejected_by"] = user["email"]
-        update["mof_rejected_at"] = iso(now_utc())
-
-    await db.payroll_runs.update_one({"id": run_id, **tf}, {"$set": update})
+    await db.payroll_runs.update_one(
+        {"id": run_id, **tenant_filter(user)},
+        {"$set": {"mof_signatures": sigs, "mof_status": new_status, **meta}})
     await audit(f"mof_sign_{body.action}", f"payroll_runs/{run_id}", user,
                 {"period": run["period"], "approves": approves, "required": required, "new_status": new_status})
     return {

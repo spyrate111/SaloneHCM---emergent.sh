@@ -151,21 +151,19 @@ function ProgressBar({ approves, rejects, required, mofStatus }) {
   const showRejected = rejects > 0 || mofStatus === "rejected";
   const complete = approves >= required && !showRejected;
   const pct = Math.min(100, (approves / required) * 100);
+  let tone = { text: "text-[#8B6A14]", bar: "bg-[#D1603D]", label: `${approves} of ${required}`, width: pct };
+  if (showRejected) tone = { text: "text-[#8C2F2F]", bar: "bg-[#B83A3A]", label: "Rejected", width: 100 };
+  else if (complete) tone = { text: "text-[#2D7A5D]", bar: "bg-[#2D7A5D]", label: "Approved", width: pct };
   return (
     <div data-testid="mof-sig-progress">
       <div className="flex items-center justify-between mb-2">
         <div className="text-[11px] uppercase tracking-wider text-[#525860]">
           {required} signature{required === 1 ? "" : "s"} required
         </div>
-        <div className={`text-sm font-semibold ${showRejected ? "text-[#8C2F2F]" : complete ? "text-[#2D7A5D]" : "text-[#8B6A14]"}`}>
-          {showRejected ? "Rejected" : complete ? "Approved" : `${approves} of ${required}`}
-        </div>
+        <div className={`text-sm font-semibold ${tone.text}`}>{tone.label}</div>
       </div>
       <div className="h-2.5 bg-[#F1EEE6] rounded-full overflow-hidden">
-        <div
-          className={`h-full transition-all ${showRejected ? "bg-[#B83A3A]" : complete ? "bg-[#2D7A5D]" : "bg-[#D1603D]"}`}
-          style={{ width: `${showRejected ? 100 : pct}%` }}
-        />
+        <div className={`h-full transition-all ${tone.bar}`} style={{ width: `${tone.width}%` }} />
       </div>
     </div>
   );

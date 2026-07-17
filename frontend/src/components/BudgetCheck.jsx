@@ -48,6 +48,9 @@ export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose, cu
   const isBlocked = ["over", "unallocated_employees"].includes(verdict);
   const isOverridden = !!check?.override;
   const canProceed = isSafe || (isBlocked && isOverridden) || verdict === "warn";
+  let proceed = { cls: "bg-[#B83A3A] hover:bg-[#8C2F2F]", label: "Blocked" };
+  if (isSafe) proceed = { cls: "bg-[#2D7A5D] hover:bg-[#215D46]", label: "Confirm & run payroll" };
+  else if (isOverridden) proceed = { cls: "bg-[#D1603D] hover:bg-[#B84F2F]", label: "Override & run payroll" };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" data-testid="budget-check-modal">
@@ -95,12 +98,9 @@ export function BudgetCheckModal({ period, isMofApprover, onConfirm, onClose, cu
             onClick={() => onConfirm(check)}
             disabled={!canProceed || busy}
             data-testid="budget-check-proceed"
-            className={`inline-flex items-center gap-2 text-sm px-5 py-2 rounded-md text-white transition ${
-              isSafe ? "bg-[#2D7A5D] hover:bg-[#215D46]"
-                : (isOverridden ? "bg-[#D1603D] hover:bg-[#B84F2F]" : "bg-[#B83A3A] hover:bg-[#8C2F2F]")
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`inline-flex items-center gap-2 text-sm px-5 py-2 rounded-md text-white transition ${proceed.cls} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            <Play className="w-4 h-4" /> {isOverridden ? "Override & run payroll" : (isSafe ? "Confirm & run payroll" : "Blocked")}
+            <Play className="w-4 h-4" /> {proceed.label}
           </button>
         </div>
       </div>

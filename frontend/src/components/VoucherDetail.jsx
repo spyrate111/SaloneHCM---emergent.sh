@@ -189,7 +189,7 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
           <h4 className="text-[11px] uppercase tracking-wider text-[#525860] mb-2">Audit trail</h4>
           <ol className="space-y-2" data-testid="voucher-timeline">
             {(v.status_history || []).map((h, i) => (
-              <li key={i} className="flex items-start gap-3 text-xs">
+              <li key={`${h.at}-${h.action}-${i}`} className="flex items-start gap-3 text-xs">
                 <span className="mt-1 w-2 h-2 rounded-full bg-[#26547C] shrink-0" />
                 <div>
                   <span className="font-medium capitalize">{h.action.replace(/_/g, " ")}</span>

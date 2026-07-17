@@ -100,20 +100,15 @@ async def _hire_date_map(company_id: str) -> dict[str, str]:
     return {e["id"]: e for e in emps}
 
 
-def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict]:
-    """Return a list of {severity, kind, subject, before, after, delta, delta_pct, message}."""
-    anomalies: list[dict] = []
-    prev_by_id = {s["employee_id"]: s for s in prev_slips}
-    cur_by_id = {s["employee_id"]: s for s in cur_slips}
-
-    # ---- Individual raises ----
+def _raise_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
+    out = []
     for eid, cur in cur_by_id.items():
         prev = prev_by_id.get(eid)
         if not prev:
             continue
         delta_pct = _pct(cur.get("net", 0), prev.get("net", 0))
         if delta_pct is not None and delta_pct >= RAISE_PCT:
-            anomalies.append({
+            out.append({
                 "severity": "high" if delta_pct >= 25 else "warn",
                 "kind": "raise",
                 "subject": cur.get("employee_name") or eid,
@@ -123,12 +118,15 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
                 "delta_pct": delta_pct,
                 "message": f"Net pay jumped {delta_pct}% — verify grade change, promotion, or acting allowance is approved.",
             })
+    return out
 
-    # ---- New starters ----
+
+def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, cur_period: str) -> list[dict]:
     try:
         cur_date = datetime.strptime(cur_period + "-01", "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except Exception:
         cur_date = datetime.now(timezone.utc)
+    out = []
     for eid, cur in cur_by_id.items():
         if eid in prev_by_id:
             continue
@@ -142,7 +140,7 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
             continue
         days_before = (cur_date - hire).days
         if days_before > NEW_STARTER_STALE_DAYS:
-            anomalies.append({
+            out.append({
                 "severity": "warn",
                 "kind": "new_starter",
                 "subject": cur.get("employee_name") or eid,
@@ -152,12 +150,15 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
                 "delta_pct": None,
                 "message": f"First payslip in ≥ {days_before} days since hire — possible late-add or ghost worker.",
             })
+    return out
 
-    # ---- Terminated but paid ----
+
+def _terminated_paid_anomalies(cur_by_id: dict, emp_index: dict) -> list[dict]:
+    out = []
     for eid, cur in cur_by_id.items():
         emp = emp_index.get(eid) or {}
         if emp.get("status") == "terminated" and (cur.get("net") or 0) > 0:
-            anomalies.append({
+            out.append({
                 "severity": "high",
                 "kind": "terminated_paid",
                 "subject": cur.get("employee_name") or eid,
@@ -167,7 +168,18 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
                 "delta_pct": None,
                 "message": "Employee is terminated but still receiving net pay this run.",
             })
-    return anomalies
+    return out
+
+
+def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict]:
+    """Return a list of {severity, kind, subject, before, after, delta, delta_pct, message}."""
+    prev_by_id = {s["employee_id"]: s for s in prev_slips}
+    cur_by_id = {s["employee_id"]: s for s in cur_slips}
+    return (
+        _raise_anomalies(cur_by_id, prev_by_id)
+        + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
+        + _terminated_paid_anomalies(cur_by_id, emp_index)
+    )
 
 
 @router.get("/runs/{rid}/variance")
