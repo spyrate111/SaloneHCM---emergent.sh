@@ -492,3 +492,7 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Frontend**: extracted `components/InviteUserModal.jsx` from Users.jsx (347→287 lines); nested ternaries flattened in Login (`acceptHeading`), Assistant (`byMode` helper), MoFSignatures (`ProgressBar` tone object), BudgetCheck (proceed button vars). Content-derived React keys in TrainingCenterPage/VoucherDetail/Variance. Index keys deliberately KEPT in admin/Videos chapters editor (editable positional inputs — content keys would remount mid-typing).
 - **Tests**: `random` → `secrets` in test_iter32; `_make_voucher` hardened with 409-retry (random-period residue collisions); iter30 CDN test updated to allow same-origin `/api/static/` video sources.
 - **Verified**: backend 438 passed/0 failed; UI regression via browser automation — login heading, invite modal + mode toggle, voucher timeline, assistant byMode copy, quiz answers persist 6/6 + pass + certificate link. BudgetCheck/MoF progress mappings verified by construction + API tests.
+
+## v1.22.2 (Jun 2026) — Deployment readiness: PASS
+- Fixed 2 deploy blockers: frontend/.env line 3 malformed concatenation (ENABLE_HEALTH_CHECK + REACT_APP_VAPID_PUBLIC_KEY merged on one line — split); removed 24 `.env`/`.env.*`/`*.env` blocking entries from .gitignore (credentials.json/token.json exclusions kept).
+- Re-run verdict: DEPLOYABLE. Non-blocking perf recommendations logged as backlog: add projections/pagination to employees/dashboard/analytics/leave/payroll list queries + compound indexes on (company_id, status/created_at).
