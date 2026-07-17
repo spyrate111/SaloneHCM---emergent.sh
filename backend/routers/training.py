@@ -96,9 +96,13 @@ async def certificate_pdf(cid: str):
     c.setLineWidth(0.8)
     c.rect(1.6 * cm, 1.6 * cm, W - 3.2 * cm, H - 3.2 * cm)
 
+    for i, stripe in enumerate(["#1EB53A", "#FFFFFF", "#0072C6"]):
+        c.setFillColor(colors.HexColor(stripe))
+        c.rect(1.6 * cm, H - 1.6 * cm - (i + 1) * 0.22 * cm, W - 3.2 * cm, 0.22 * cm, fill=1, stroke=0)
+
     c.setFillColor(colors.HexColor("#0A4A1E"))
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · Training Center")
+    c.drawString(2.4 * cm, H - 3.1 * cm, "SaloneHCM · Training Center")
     c.setFont("Helvetica-Bold", 34)
     c.drawCentredString(W / 2, H - 5.4 * cm, "CERTIFICATE OF ACHIEVEMENT")
     c.setFont("Helvetica", 14)

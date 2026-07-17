@@ -16,11 +16,13 @@ Anti-fraud rails:
   * payment_authorized vouchers are terminal — no edits, no returns
 """
 from __future__ import annotations
+import io
 import uuid
 import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from core import (
@@ -405,6 +407,161 @@ async def voucher_audit(vid: str, user: dict = Depends(get_current_user)):
     return await db.audit_logs.find(
         {**tenant_filter(user), "resource": f"payroll_vouchers/{vid}"},
         {"_id": 0}).sort("ts", 1).to_list(500)
+
+
+FLAG_STRIPES = ["#1EB53A", "#FFFFFF", "#0072C6"]
+ACTION_LABEL = {
+    "created": "Prepared", "edited": "Corrected", "submit": "Submitted",
+    "supervisor_approve": "Supervisor approved", "start_review": "Review started",
+    "approve": "Finance approved", "return": "Returned for correction",
+    "authorize": "Payment authorized",
+}
+
+
+def _flag_page(cnv, doc):
+    from reportlab.lib import colors as rc
+    from reportlab.lib.units import cm
+    w, h = doc.pagesize
+    cnv.saveState()
+    for i, col in enumerate(FLAG_STRIPES):
+        cnv.setFillColor(rc.HexColor(col))
+        cnv.rect(0, h - (i + 1) * 4, w, 4, fill=1, stroke=0)
+    cnv.setFont("Helvetica", 7.5)
+    cnv.setFillColor(rc.HexColor("#686D76"))
+    cnv.drawString(1.6 * cm, 1.0 * cm, "SaloneHCM — Centralized Payroll Voucher Repository")
+    cnv.drawRightString(w - 1.6 * cm, 1.0 * cm, f"Page {cnv.getPageNumber()}")
+    cnv.restoreState()
+
+
+def _money(x) -> str:
+    return f"{(x or 0):,.2f}"
+
+
+def _sig_block(label: str, name: str, email: str, at: str) -> list:
+    done = bool(email)
+    return [label, (name or email or "—"), (at or "")[:10] if done else "pending",
+            "_________________" if done else ""]
+
+
+def _voucher_pdf(v: dict, branch: dict) -> bytes:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors as rc
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    green, blue, ink, grey, line = "#0A4A1E", "#0072C6", "#1A1C1E", "#525860", "#E2DFD6"
+    h1 = ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=18, textColor=rc.HexColor(green))
+    sub = ParagraphStyle("sub", fontName="Helvetica", fontSize=9.5, textColor=rc.HexColor(grey), leading=13)
+    h2 = ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=11, textColor=rc.HexColor(blue),
+                        spaceBefore=14, spaceAfter=5)
+    small = ParagraphStyle("small", fontName="Helvetica", fontSize=8, textColor=rc.HexColor(ink), leading=10.5)
+
+    names = {h.get("by_email"): h.get("by_name") for h in v.get("status_history", []) if h.get("by_name")}
+    status = v["status"].replace("_", " ").upper()
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.6 * cm, rightMargin=1.6 * cm,
+                            topMargin=1.6 * cm, bottomMargin=1.8 * cm,
+                            title=f"Payroll Voucher {v['voucher_ref']}")
+    story = [
+        Paragraph(f"PAYROLL VOUCHER · <font color='{ink}'>{v['voucher_ref']}</font>", h1),
+        Spacer(1, 4),
+        Paragraph(
+            f"{v['branch_name']} ({v['branch_code']})"
+            + (f" · {branch.get('ministry')}" if branch.get("ministry") else "")
+            + f" · Period <b>{v['period']}</b> · Status <b>{status}</b>"
+            + f" · Revision {v.get('revision', 1)}"
+            + (" · Generated from payroll run" if v.get("source") == "auto_run" else " · Manual submission"),
+            sub),
+    ]
+    if v.get("note"):
+        story.append(Paragraph(f"Note: {v['note']}", sub))
+
+    story.append(Paragraph("Line items", h2))
+    rows = [["Employee", "Gross", "PAYE", "NASSIT", "Loan", "Net"]]
+    for li in v["line_items"]:
+        rows.append([li["employee_name"], _money(li["gross"]), _money(li["paye"]),
+                     _money(li["nassit_employee"]), _money(li["loan_deduction"]), _money(li["net"])])
+    t = v["totals"]
+    rows.append([f"TOTAL · {t['employee_count']} employees", _money(t["gross"]), _money(t["paye"]),
+                 _money(t["nassit_employee"]), _money(t["loan_deductions"]), _money(t["net"])])
+    lt = Table(rows, colWidths=[6.2 * cm] + [2.35 * cm] * 5, repeatRows=1)
+    lt.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), rc.HexColor(green)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), rc.white),
+        ("BACKGROUND", (0, -1), (-1, -1), rc.HexColor("#E4F7E7")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -2), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.4, rc.HexColor(line)),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(lt)
+
+    story.append(Paragraph("Signature approval chain", h2))
+    srows = [["#", "Action", "Officer", "Role", "Date & time", "Note"]]
+    for i, h in enumerate(v.get("status_history", []), start=1):
+        srows.append([str(i), ACTION_LABEL.get(h["action"], h["action"].replace("_", " ").title()),
+                      Paragraph(h.get("by_name") or h.get("by_email") or "", small),
+                      (h.get("by_role") or "").replace("_", " "),
+                      (h.get("at") or "").replace("T", " ")[:16],
+                      Paragraph(h.get("note") or "", small)])
+    st = Table(srows, colWidths=[0.8 * cm, 3.6 * cm, 3.6 * cm, 2.2 * cm, 2.8 * cm, 4.9 * cm], repeatRows=1)
+    st.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), rc.HexColor(blue)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), rc.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.4, rc.HexColor(line)),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(st)
+
+    story.append(Paragraph("Certification", h2))
+    sig_rows = [["Stage", "Officer", "Date", "Signature"]]
+    sig_rows.append(_sig_block("Prepared by", v.get("created_by_name"), v.get("created_by"), v.get("created_at")))
+    if v.get("supervisor_approved_by") or branch.get("supervisor_name"):
+        sig_rows.append(_sig_block("Branch supervisor", names.get(v.get("supervisor_approved_by")) or branch.get("supervisor_name"),
+                                   v.get("supervisor_approved_by"), v.get("supervisor_approved_at")))
+    sig_rows.append(_sig_block("Finance approval", names.get(v.get("approved_by")), v.get("approved_by"), v.get("approved_at")))
+    sig_rows.append(_sig_block("Payment authorization (MoF)", names.get(v.get("authorized_by")), v.get("authorized_by"), v.get("authorized_at")))
+    gt = Table(sig_rows, colWidths=[5.2 * cm, 5.2 * cm, 2.6 * cm, 4.9 * cm])
+    gt.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), rc.HexColor("#F7F6F2")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("GRID", (0, 0), (-1, -1), 0.4, rc.HexColor(line)),
+        ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    story.append(gt)
+
+    if v["status"] == "payment_authorized":
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(
+            "This voucher is payment-authorized and constitutes a permanent, immutable record. "
+            "Any alteration after authorization is invalid.", sub))
+
+    doc.build(story, onFirstPage=_flag_page, onLaterPages=_flag_page)
+    return buf.getvalue()
+
+
+@vouchers_router.get("/{vid}/export.pdf")
+async def export_voucher_pdf(vid: str, user: dict = Depends(get_current_user)):
+    v = await _get_voucher(vid, user)
+    branch = await db.branches.find_one(
+        {"id": v["branch_id"], **tenant_filter(user)},
+        {"_id": 0, "supervisor_name": 1, "ministry": 1, "region": 1}) or {}
+    pdf = _voucher_pdf(v, branch)
+    await audit("voucher_export_pdf", f"payroll_vouchers/{vid}", user, {"voucher_ref": v["voucher_ref"]})
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{v["voucher_ref"]}.pdf"'})
 
 
 @vouchers_router.patch("/{vid}")

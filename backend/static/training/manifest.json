@@ -5,7 +5,7 @@
     "summary": "Sign in, learn the dashboard, master the navigation, and discover every module with the Feature Directory. The essential first video for every new user.",
     "persona": "general",
     "sort": 10,
-    "duration_s": 107,
+    "duration_s": 106,
     "chapters": [
       {
         "t": 0,
@@ -42,7 +42,7 @@
     "summary": "For system administrators: inviting users, granting Finance and MoF approval powers, organisation settings, plan tiers, and managing branches and offices.",
     "persona": "government",
     "sort": 20,
-    "duration_s": 139,
+    "duration_s": 141,
     "chapters": [
       {
         "t": 0,
@@ -65,11 +65,11 @@
         "label": "Branches & offices"
       },
       {
-        "t": 106,
+        "t": 108,
         "label": "Audit log"
       },
       {
-        "t": 121,
+        "t": 124,
         "label": "Wrap-up"
       }
     ],

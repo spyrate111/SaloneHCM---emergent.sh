@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import api, { fmtSLE } from "../lib/api";
+import api, { fmtSLE, downloadBlob } from "../lib/api";
 import { toast } from "sonner";
 import {
-  X, Send, CheckCircle2, Undo2, Search, BadgeCheck, Banknote, Trash2, Pencil, Lock,
+  X, Send, CheckCircle2, Undo2, Search, BadgeCheck, Banknote, Trash2, Pencil, Lock, FileDown,
 } from "lucide-react";
 
 export const STATUS_PILL = {
@@ -116,7 +116,23 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
               {v.source === "auto_run" ? " Generated from payroll run" : " Manual submission"} · Created by {v.created_by_name || v.created_by}
             </div>
           </div>
-          <button data-testid="voucher-detail-close" onClick={onClose} className="text-[#525860] hover:text-[#1A1C1E]"><X className="w-5 h-5" /></button>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              data-testid="voucher-export-pdf"
+              onClick={async () => {
+                try {
+                  await downloadBlob(`/vouchers/${voucherId}/export.pdf`, `${v.voucher_ref}.pdf`);
+                  toast.success("Voucher PDF downloaded");
+                } catch {
+                  toast.error("Could not export PDF");
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#0A4A1E] border border-[#E2DFD6] px-3 py-1.5 rounded-md hover:bg-[#E4F7E7]"
+            >
+              <FileDown className="w-3.5 h-3.5" /> Export PDF
+            </button>
+            <button data-testid="voucher-detail-close" onClick={onClose} className="text-[#525860] hover:text-[#1A1C1E]"><X className="w-5 h-5" /></button>
+          </div>
         </div>
 
         {v.status === "returned" && v.returned_reason && (

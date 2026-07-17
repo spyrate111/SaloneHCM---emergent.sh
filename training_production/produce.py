@@ -36,7 +36,7 @@ CURSOR_JS = """
     const c = document.createElement('div');
     c.id = '__cur';
     Object.assign(c.style, {position:'fixed', width:'22px', height:'22px', borderRadius:'50%',
-      background:'rgba(19,51,38,0.82)', border:'2.5px solid #fff',
+      background:'rgba(10,74,30,0.82)', border:'2.5px solid #fff',
       boxShadow:'0 1px 8px rgba(0,0,0,0.5)', zIndex:2147483647,
       pointerEvents:'none', left:'-60px', top:'-60px',
       transition:'transform 0.09s ease'});

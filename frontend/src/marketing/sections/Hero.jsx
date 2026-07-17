@@ -44,10 +44,20 @@ export default function Hero() {
       data-testid="hero-section"
       className="relative overflow-hidden bg-gradient-to-b from-[#FAF8F2] via-[#FAF8F2] to-white"
     >
+      <div aria-hidden="true" data-testid="hero-flag-ribbon" className="absolute inset-x-0 top-0 flex flex-col">
+        <span className="h-[3px] bg-[#1EB53A]" />
+        <span className="h-[3px] bg-white" />
+        <span className="h-[3px] bg-[#0072C6]" />
+      </div>
       <div className="max-w-[1280px] mx-auto px-6 lg:px-10 py-14 lg:py-20 grid lg:grid-cols-12 gap-10 items-center">
         {/* Left: copy + form */}
         <div className="lg:col-span-7">
-          <span className="inline-flex items-center px-3 h-7 text-[11px] font-bold uppercase tracking-[0.14em] rounded-full bg-[#073A16] text-white">
+          <span className="inline-flex items-center gap-2.5 px-3 h-7 text-[11px] font-bold uppercase tracking-[0.14em] rounded-full bg-[#073A16] text-white">
+            <span className="inline-flex flex-col w-5 rounded-[2px] overflow-hidden ring-1 ring-white/40" aria-label="Sierra Leone flag">
+              <span className="h-[4px] bg-[#1EB53A]" />
+              <span className="h-[4px] bg-white" />
+              <span className="h-[4px] bg-[#0072C6]" />
+            </span>
             HR · Payroll · Compliance for Sierra Leone
           </span>
           <h1 className="mt-5 text-[40px] sm:text-[52px] lg:text-[60px] font-extrabold leading-[1.04] text-[#073A16]">
