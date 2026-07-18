@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize2, Loader2 } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize2, Loader2, Captions } from "lucide-react";
 
 /** Universal video player.
  *  Detects YouTube / Vimeo URLs and renders an iframe; otherwise uses a native
@@ -32,12 +32,22 @@ function NativePlayer({ video, autoPlay, className }) {
   const [muted, setMuted] = useState(true); // autoplay-friendly default
   const [loading, setLoading] = useState(true);
   const [t, setT] = useState(0);
+  const hasCaptions = Array.isArray(video.captions) && video.captions.length > 0;
+  const [subsOn, setSubsOn] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     setPlaying(false);
     setT(0);
   }, [video?.src]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    Array.from(el.textTracks || []).forEach((tr) => {
+      tr.mode = subsOn ? "showing" : "hidden";
+    });
+  }, [subsOn, loading, video?.src]);
 
   useEffect(() => {
     const el = ref.current;
@@ -88,7 +98,11 @@ function NativePlayer({ video, autoPlay, className }) {
         onClick={toggle}
         className="absolute inset-0 w-full h-full cursor-pointer"
         data-testid="video-element"
-      />
+      >
+        {hasCaptions && video.captions.map((c) => (
+          <track key={c.src} kind="subtitles" src={c.src} srcLang={c.srclang} label={c.label} default />
+        ))}
+      </video>
 
       {/* Big center play button when paused */}
       {!playing && (
@@ -122,6 +136,18 @@ function NativePlayer({ video, autoPlay, className }) {
             <button type="button" onClick={() => { if (ref.current) { ref.current.muted = !muted; setMuted(!muted); } }} className="hover:text-[#E07B4A]" data-testid="video-mute-toggle" aria-label={muted ? "Unmute" : "Mute"}>
               {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
+            {hasCaptions && (
+              <button
+                type="button"
+                onClick={() => setSubsOn(!subsOn)}
+                className={subsOn ? "text-[#E07B4A]" : "hover:text-[#E07B4A]"}
+                data-testid="video-captions-toggle"
+                aria-label={subsOn ? "Hide captions" : "Show captions"}
+                title={subsOn ? "Hide captions" : "Show captions"}
+              >
+                <Captions className="w-4 h-4" />
+              </button>
+            )}
             <span className="text-[11px] font-mono">{fmt(t)} / {fmt(video.duration_s)}</span>
           </div>
           <button type="button" onClick={goFullscreen} className="hover:text-[#E07B4A]" aria-label="Fullscreen" data-testid="video-fullscreen">

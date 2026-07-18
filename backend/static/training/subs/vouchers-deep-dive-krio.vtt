@@ -1,0 +1,93 @@
+WEBVTT
+
+1
+00:00:00.250 --> 00:00:03.246
+Kusheh en welkom to di payroll voucher deep-dive.
+
+2
+00:00:03.246 --> 00:00:08.994
+Before SaloneHCM, branch dem been de email spreadsheet or carry paper voucher go headquarters.
+
+3
+00:00:08.994 --> 00:00:17.738
+Now, every branch de submit into one central digital repository, en every voucher de pass one strict approval chain before even one leone move.
+
+4
+00:00:17.738 --> 00:00:19.450
+Mek wi waka di full journey.
+
+5
+00:00:20.250 --> 00:00:32.374
+Dis na di central repository. Di indicator card dem de show aw much branch don submit dis period, wetin de wait supervisor sign-off, wetin de na finance review, en wetin don authorize for payment.
+
+6
+00:00:32.374 --> 00:00:36.642
+Di filter dem mek yu able slice by period, branch, en workflow stage.
+
+7
+00:01:06.250 --> 00:01:19.542
+Open any voucher en yu go see di full story: every employee line with gross pay, P A Y E, NASSIT, loan deduction en net pay; di total dem; en di complete audit timeline — who create am, who approve am, en exactly when.
+
+8
+00:01:19.542 --> 00:01:21.798
+Once e submit, di voucher don freeze.
+
+9
+00:01:21.798 --> 00:01:24.298
+Nobody no able quietly change any number.
+
+10
+00:01:26.250 --> 00:01:28.826
+Di workflow de enforce four eyes minimum.
+
+11
+00:01:28.826 --> 00:01:32.093
+Branch officer submit. Di branch supervisor approve.
+
+12
+00:01:32.093 --> 00:01:39.758
+Finance officer review en approve — en di system de physically block anybody from approve voucher wey den den self create.
+
+13
+00:01:39.758 --> 00:01:48.366
+Finally one Ministry of Finance approver de authorize payment — en dat person must different from both di creator en di finance approver.
+
+14
+00:01:48.366 --> 00:01:51.570
+Dual control, wey software de enforce, no be trust.
+
+15
+00:01:52.250 --> 00:02:00.950
+Mistake de happen. Instead of edit in place, reviewer de return di voucher with written reason — at least ten character, e de always record.
+
+16
+00:02:00.950 --> 00:02:05.363
+Di branch correct di figure dem, resubmit, en di revision number go up.
+
+17
+00:02:05.363 --> 00:02:07.538
+Di correction history de permanent.
+
+18
+00:02:09.250 --> 00:02:14.517
+En di quiet protection dem: one voucher per branch per period — duplicate de reject.
+
+19
+00:02:14.517 --> 00:02:20.035
+One employee no able show na two voucher for di same month — dat na di double-pay guard.
+
+20
+00:02:20.035 --> 00:02:24.424
+En once payment authorize, di voucher turn permanent immutable record.
+
+21
+00:02:24.424 --> 00:02:27.058
+Na so payroll fraud loophole dem de close.
+
+22
+00:02:28.250 --> 00:02:33.340
+Submit digital, approve na chain, return with reason, en mek di rails do den work.
+
+23
+00:02:33.340 --> 00:02:37.250
+Di voucher certification quiz de wait yu na di Training Center.

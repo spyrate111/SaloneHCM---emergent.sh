@@ -223,7 +223,7 @@ class ReturnIn(BaseModel):
 
 
 async def _visible_filter(user: dict) -> dict:
-    if _is_finance(user):
+    if _is_finance(user) or user.get("mof_approver"):
         return dict(tenant_filter(user))
     sup = await db.branches.find(
         {**tenant_filter(user), "supervisor_user_id": user["id"]}, {"_id": 0, "id": 1}).to_list(100)
@@ -384,6 +384,35 @@ async def export_voucher_batch_pdf(period: str, user: dict = Depends(get_current
     await audit("voucher_batch_export", "payroll_vouchers", user, {"period": period, "count": len(vs)})
     return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="mof-voucher-pack-{period}.pdf"'})
+
+
+class PackConfigIn(BaseModel):
+    email: Optional[str] = Field(default="", max_length=200)
+
+
+@vouchers_router.get("/pack-config")
+async def get_pack_config(user: dict = Depends(require_admin)):
+    c = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "mof_pack_email": 1})
+    last = await db.mof_pack_emails.find_one(tenant_filter(user), {"_id": 0}, sort=[("sent_at", -1)])
+    return {"email": (c or {}).get("mof_pack_email") or "", "last_sent": last}
+
+
+@vouchers_router.put("/pack-config")
+async def set_pack_config(body: PackConfigIn, user: dict = Depends(require_admin)):
+    email = (body.email or "").strip().lower()
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        raise HTTPException(422, "Invalid email address")
+    await db.companies.update_one({"id": user["company_id"]}, {"$set": {"mof_pack_email": email}})
+    await audit("voucher_pack_config", f"companies/{user['company_id']}", user, {"email": email})
+    return {"ok": True, "email": email}
+
+
+@vouchers_router.post("/pack-config/send-now")
+async def send_pack_now(period: str, user: dict = Depends(require_admin)):
+    result = await _send_period_pack(user, period, force=True)
+    if not result.get("attempted"):
+        raise HTTPException(409, result.get("reason", "Pack not ready to send"))
+    return result
 
 
 @vouchers_router.post("")
@@ -747,6 +776,54 @@ async def return_voucher(vid: str, body: ReturnIn, user: dict = Depends(get_curr
                                     "returned_reason": body.reason})
 
 
+async def _send_period_pack(user: dict, period: str, force: bool = False) -> dict:
+    """Email the combined MoF pack when every branch's voucher for a period is
+    payment-authorized. `force=True` (manual send-now) bypasses the once-only guard."""
+    tf = tenant_filter(user)
+    company = await db.companies.find_one(
+        {"id": user["company_id"]}, {"_id": 0, "mof_pack_email": 1, "name": 1})
+    to = (company or {}).get("mof_pack_email")
+    if not to:
+        return {"attempted": False, "reason": "No MoF pack email configured"}
+    branches = await db.branches.find(tf, {"_id": 0}).to_list(200)
+    vs = await db.payroll_vouchers.find({**tf, "period": period}, {"_id": 0}).sort("branch_name", 1).to_list(500)
+    if not branches or not vs:
+        return {"attempted": False, "reason": f"No vouchers for {period}"}
+    pending = [x["voucher_ref"] for x in vs if x["status"] != "payment_authorized"]
+    if pending:
+        return {"attempted": False, "reason": f"Not all vouchers authorized yet ({len(pending)} pending)"}
+    covered = {x["branch_id"] for x in vs}
+    missing = [b["name"] for b in branches if b["id"] not in covered]
+    if missing:
+        return {"attempted": False,
+                "reason": f"Period not closed — {len(missing)} branch(es) without a voucher: {', '.join(missing[:5])}"}
+    if not force and await db.mof_pack_emails.find_one({**tf, "period": period, "status": "sent"}, {"_id": 1}):
+        return {"attempted": False, "reason": "Pack already sent for this period"}
+    from email_service import send_mof_pack
+    pdf = _batch_pdf(vs, {b["id"]: b for b in branches}, period)
+    total_net = round(sum(x["totals"]["net"] for x in vs), 2)
+    res = await send_mof_pack(to, period, pdf, len(vs), total_net,
+                              (company or {}).get("name") or "", company_id=user["company_id"])
+    await db.mof_pack_emails.insert_one(with_tenant({
+        "id": str(uuid.uuid4()), "period": period, "to": to,
+        "status": "sent" if res.get("ok") else "failed",
+        "error": res.get("error"), "voucher_count": len(vs),
+        "sent_at": iso(now_utc()),
+    }, user))
+    await audit("voucher_pack_autoemail", "payroll_vouchers", user,
+                {"period": period, "to": to, "ok": bool(res.get("ok"))})
+    return {"attempted": True, "ok": bool(res.get("ok")), "to": to,
+            "voucher_count": len(vs), "error": res.get("error")}
+
+
+async def _maybe_send_period_pack(user: dict, period: str) -> None:
+    try:
+        await _send_period_pack(user, period)
+    except Exception as e:  # never block payment authorization on email problems
+        import logging
+        logging.getLogger("salonehcm.vouchers").warning("MoF pack auto-email failed for %s: %s", period, e)
+
+
 @vouchers_router.post("/{vid}/authorize")
 async def authorize_payment(vid: str, body: ActionIn, user: dict = Depends(get_current_user)):
     v = await _get_voucher(vid, user)
@@ -758,5 +835,7 @@ async def authorize_payment(vid: str, body: ActionIn, user: dict = Depends(get_c
         raise HTTPException(403, "Dual control — the voucher creator cannot authorize its payment")
     if v.get("approved_by") == user["email"]:
         raise HTTPException(403, "Dual control — the finance approver cannot also authorize payment")
-    return await _apply_transition(vid, user, "payment_authorized", "authorize", body.note,
-                                   {"authorized_by": user["email"], "authorized_at": iso(now_utc())})
+    result = await _apply_transition(vid, user, "payment_authorized", "authorize", body.note,
+                                     {"authorized_by": user["email"], "authorized_at": iso(now_utc())})
+    await _maybe_send_period_pack(user, v["period"])
+    return result

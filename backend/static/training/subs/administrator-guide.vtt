@@ -1,0 +1,73 @@
+WEBVTT
+
+1
+00:00:00.250 --> 00:00:03.012
+Welcome to the SaloneHCM administrator guide.
+
+2
+00:00:03.012 --> 00:00:10.809
+As an administrator you control who can access the system, what they're allowed to do, and how your organisation is configured.
+
+3
+00:00:10.809 --> 00:00:18.298
+In the next few minutes we'll cover user management, role flags, organisation settings, branch offices, and the audit log.
+
+4
+00:00:19.250 --> 00:00:21.351
+Let's start with users and access.
+
+5
+00:00:21.351 --> 00:00:27.779
+From here you invite new users by email, reset passwords, and remove accounts that are no longer needed.
+
+6
+00:00:27.779 --> 00:00:33.218
+Notice the role pills next to each name — admin, employee, and special capability flags.
+
+7
+00:00:35.250 --> 00:00:38.229
+Two flags matter greatly for financial control.
+
+8
+00:00:38.229 --> 00:00:42.855
+The Finance Officer flag lets a user review and approve payroll vouchers.
+
+9
+00:00:42.855 --> 00:00:48.115
+The M o F approver flag lets them sign payroll runs and authorise voucher payments.
+
+10
+00:00:48.115 --> 00:00:58.002
+Grant them with one click on the banknote icon — and remember: separation of duties is enforced automatically, so no single person can push money out alone.
+
+11
+00:00:59.250 --> 00:01:13.074
+Under settings you manage your organisation profile, your subscription tier, integrations like S M S and email, security policies including two-factor authentication, and the public transparency portal for government tenants.
+
+12
+00:01:14.250 --> 00:01:22.152
+If your organisation submits payroll vouchers from multiple branches, districts, or ministries, you define those offices here.
+
+13
+00:01:22.152 --> 00:01:32.187
+Each branch gets a unique code, an optional ministry link, and a branch supervisor whose approval is required before that branch's voucher reaches headquarters.
+
+14
+00:01:32.187 --> 00:01:36.138
+You can also assign employees to their branch from this screen.
+
+15
+00:01:48.250 --> 00:01:58.206
+Finally, the audit log. Every sensitive action in SaloneHCM — every approval, every change, every payment authorisation — is recorded here with who did it and when.
+
+16
+00:01:58.206 --> 00:02:02.698
+If a regulator or the Auditor General asks, the answer is one search away.
+
+17
+00:02:04.250 --> 00:02:14.363
+That's the administrator essentials: control access tightly, grant financial powers deliberately, keep your settings current, and let the audit log do the remembering.
+
+18
+00:02:14.363 --> 00:02:19.874
+Take the administrator certification quiz in the Training Center to confirm your knowledge.

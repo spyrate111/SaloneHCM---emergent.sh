@@ -1,0 +1,97 @@
+WEBVTT
+
+1
+00:00:00.250 --> 00:00:02.840
+Welcome to the payroll voucher deep-dive.
+
+2
+00:00:02.840 --> 00:00:08.525
+Before SaloneHCM, branches emailed spreadsheets or carried paper vouchers to headquarters.
+
+3
+00:00:08.525 --> 00:00:17.369
+Now, every branch submits into one central digital repository, and every voucher passes a strict approval chain before a single leone moves.
+
+4
+00:00:17.369 --> 00:00:19.138
+Let's walk the full journey.
+
+5
+00:00:20.250 --> 00:00:22.116
+This is the central repository.
+
+6
+00:00:22.116 --> 00:00:32.527
+The indicator cards show how many branches have submitted this period, what's awaiting supervisor sign-off, what's in finance review, and what's been authorised for payment.
+
+7
+00:00:32.527 --> 00:00:36.138
+Filters let you slice by period, branch, and workflow stage.
+
+8
+00:00:58.250 --> 00:01:11.958
+Open any voucher and you see the full story: every employee line with gross pay, P A Y E, NASSIT, loan deductions and net pay; the totals; and the complete audit timeline — who created it, who approved it, and exactly when.
+
+9
+00:01:11.958 --> 00:01:14.171
+Once submitted, a voucher is frozen.
+
+10
+00:01:14.171 --> 00:01:16.322
+Nobody can quietly change a number.
+
+11
+00:01:18.250 --> 00:01:20.955
+The workflow enforces four eyes at minimum.
+
+12
+00:01:20.955 --> 00:01:24.541
+A branch officer submits. The branch supervisor approves.
+
+13
+00:01:24.541 --> 00:01:32.720
+A finance officer reviews and approves — and the system physically blocks anyone from approving a voucher they created themselves.
+
+14
+00:01:32.720 --> 00:01:41.591
+Finally a Ministry of Finance approver authorises payment — and that person must be different from both the creator and the finance approver.
+
+15
+00:01:41.591 --> 00:01:44.674
+Dual control, enforced by software, not by trust.
+
+16
+00:01:46.250 --> 00:01:55.055
+Mistakes happen. Instead of editing in place, a reviewer returns the voucher with a written reason — at least ten characters, always recorded.
+
+17
+00:01:55.055 --> 00:01:59.954
+The branch corrects the figures, resubmits, and the revision number increments.
+
+18
+00:01:59.954 --> 00:02:02.186
+The correction history is permanent.
+
+19
+00:02:03.250 --> 00:02:08.713
+And the quiet protections: one voucher per branch per period — duplicates are rejected.
+
+20
+00:02:08.713 --> 00:02:14.364
+An employee cannot appear on two vouchers in the same month — that's the double-pay guard.
+
+21
+00:02:14.364 --> 00:02:19.451
+And once payment is authorised, the voucher becomes a permanent immutable record.
+
+22
+00:02:19.451 --> 00:02:22.402
+This is how payroll fraud loopholes get closed.
+
+23
+00:02:23.250 --> 00:02:28.812
+Submit digitally, approve in chain, return with reasons, and let the rails do their work.
+
+24
+00:02:28.812 --> 00:02:32.874
+The voucher certification quiz awaits you in the Training Center.

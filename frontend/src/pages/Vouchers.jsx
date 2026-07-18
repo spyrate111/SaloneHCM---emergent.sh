@@ -4,7 +4,7 @@ import { fmtSLE, downloadBlob } from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../lib/features";
-import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown } from "lucide-react";
+import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown, Mail } from "lucide-react";
 import VoucherDetail, { STATUS_PILL } from "../components/VoucherDetail";
 import BranchesPanel from "../components/BranchesPanel";
 import { CreateVoucherModal, GenerateFromRunModal } from "../components/VoucherCreateModals";
@@ -109,6 +109,8 @@ export default function Vouchers() {
         )}
       </div>
 
+      {isAdminRole && <PackEmailCard />}
+
       {tab === "branches" && isAdminRole ? (
         <BranchesPanel branches={branches} onChanged={refresh} />
       ) : (
@@ -174,6 +176,96 @@ export default function Vouchers() {
       )}
       {generating && (
         <GenerateFromRunModal onClose={() => setGenerating(false)} onDone={refresh} />
+      )}
+    </div>
+  );
+}
+
+function PackEmailCard() {
+  const [email, setEmail] = useState("");
+  const [lastSent, setLastSent] = useState(null);
+  const [sendPeriod, setSendPeriod] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/vouchers/pack-config").then((r) => {
+      setEmail(r.data.email || "");
+      setLastSent(r.data.last_sent);
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api.put("/vouchers/pack-config", { email: email.trim() });
+      toast.success(email.trim() ? "Auto-email enabled" : "Auto-email disabled");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not save");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendNow = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post(`/vouchers/pack-config/send-now?period=${sendPeriod}`);
+      if (r.data.ok) toast.success(`Pack sent to ${r.data.to}`);
+      else toast.error(`Send failed: ${r.data.error || "email provider rejected"}`);
+      const cfg = await api.get("/vouchers/pack-config");
+      setLastSent(cfg.data.last_sent);
+    } catch (e) {
+      toast.error(typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Could not send");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-[#E2DFD6] rounded-lg p-4" data-testid="pack-email-card">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-[220px]">
+          <div className="text-[11px] uppercase tracking-wider text-[#525860] flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5" /> Auto-email MoF pack
+          </div>
+          <p className="text-xs text-[#686D76] mt-0.5">
+            The moment every branch's voucher for a period is payment-authorized, the combined pack is emailed here.
+          </p>
+        </div>
+        <input
+          data-testid="pack-email-input"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="ministry.inbox@mof.gov.sl"
+          className="flex-1 min-w-[220px] bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
+        />
+        <button
+          data-testid="pack-email-save"
+          disabled={busy}
+          onClick={save}
+          className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md disabled:opacity-50"
+        >
+          Save
+        </button>
+        <div className="flex items-center gap-2">
+          <input data-testid="pack-send-period" type="month" value={sendPeriod}
+            onChange={(e) => setSendPeriod(e.target.value)}
+            className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-2 py-2 text-xs" />
+          <button
+            data-testid="pack-send-now"
+            disabled={busy || !sendPeriod || !email.trim()}
+            onClick={sendNow}
+            className="text-sm border border-[#E2DFD6] text-[#0A4A1E] px-3 py-2 rounded-md hover:bg-[#E4F7E7] disabled:opacity-40"
+          >
+            Send now
+          </button>
+        </div>
+      </div>
+      {lastSent && (
+        <div className="text-[11px] text-[#686D76] mt-2" data-testid="pack-last-sent">
+          Last {lastSent.status === "sent" ? "sent" : "attempt (failed)"}: period {lastSent.period} → {lastSent.to} · {new Date(lastSent.sent_at).toLocaleString()}
+        </div>
       )}
     </div>
   );

@@ -34,7 +34,14 @@
     ],
     "src": "/api/static/training/getting-started.mp4",
     "poster": "/api/static/training/getting-started.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/getting-started.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "administrator-guide": {
     "slug": "administrator-guide",
@@ -75,7 +82,14 @@
     ],
     "src": "/api/static/training/administrator-guide.mp4",
     "poster": "/api/static/training/administrator-guide.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/administrator-guide.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "hr-officer-training": {
     "slug": "hr-officer-training",
@@ -112,7 +126,14 @@
     ],
     "src": "/api/static/training/hr-officer-training.mp4",
     "poster": "/api/static/training/hr-officer-training.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/hr-officer-training.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "payroll-officer-training": {
     "slug": "payroll-officer-training",
@@ -149,7 +170,14 @@
     ],
     "src": "/api/static/training/payroll-officer-training.mp4",
     "poster": "/api/static/training/payroll-officer-training.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/payroll-officer-training.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "vouchers-deep-dive": {
     "slug": "vouchers-deep-dive",
@@ -190,7 +218,14 @@
     ],
     "src": "/api/static/training/vouchers-deep-dive.mp4",
     "poster": "/api/static/training/vouchers-deep-dive.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/vouchers-deep-dive.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "employee-self-service": {
     "slug": "employee-self-service",
@@ -227,7 +262,14 @@
     ],
     "src": "/api/static/training/employee-self-service.mp4",
     "poster": "/api/static/training/employee-self-service.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/employee-self-service.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "gov-modules-tour": {
     "slug": "gov-modules-tour",
@@ -264,7 +306,14 @@
     ],
     "src": "/api/static/training/gov-modules-tour.mp4",
     "poster": "/api/static/training/gov-modules-tour.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/gov-modules-tour.vtt",
+        "srclang": "en",
+        "label": "English"
+      }
+    ]
   },
   "getting-started-krio": {
     "slug": "getting-started-krio",
@@ -303,7 +352,14 @@
     ],
     "src": "/api/static/training/getting-started-krio.mp4",
     "poster": "/api/static/training/getting-started-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/getting-started-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   },
   "administrator-guide-krio": {
     "slug": "administrator-guide-krio",
@@ -346,7 +402,14 @@
     ],
     "src": "/api/static/training/administrator-guide-krio.mp4",
     "poster": "/api/static/training/administrator-guide-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/administrator-guide-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   },
   "hr-officer-training-krio": {
     "slug": "hr-officer-training-krio",
@@ -385,7 +448,14 @@
     ],
     "src": "/api/static/training/hr-officer-training-krio.mp4",
     "poster": "/api/static/training/hr-officer-training-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/hr-officer-training-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   },
   "payroll-officer-training-krio": {
     "slug": "payroll-officer-training-krio",
@@ -424,7 +494,14 @@
     ],
     "src": "/api/static/training/payroll-officer-training-krio.mp4",
     "poster": "/api/static/training/payroll-officer-training-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/payroll-officer-training-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   },
   "vouchers-deep-dive-krio": {
     "slug": "vouchers-deep-dive-krio",
@@ -467,7 +544,14 @@
     ],
     "src": "/api/static/training/vouchers-deep-dive-krio.mp4",
     "poster": "/api/static/training/vouchers-deep-dive-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/vouchers-deep-dive-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   },
   "employee-self-service-krio": {
     "slug": "employee-self-service-krio",
@@ -506,7 +590,14 @@
     ],
     "src": "/api/static/training/employee-self-service-krio.mp4",
     "poster": "/api/static/training/employee-self-service-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/employee-self-service-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   },
   "gov-modules-tour-krio": {
     "slug": "gov-modules-tour-krio",
@@ -545,6 +636,13 @@
     ],
     "src": "/api/static/training/gov-modules-tour-krio.mp4",
     "poster": "/api/static/training/gov-modules-tour-krio.jpg",
-    "category": "training"
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/gov-modules-tour-krio.vtt",
+        "srclang": "kri",
+        "label": "Krio"
+      }
+    ]
   }
 }

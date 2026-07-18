@@ -181,6 +181,36 @@ async def send_user_invite(
     return res
 
 
+async def send_mof_pack(
+    to: str,
+    period: str,
+    pdf_bytes: bytes,
+    voucher_count: int,
+    total_net: float,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Auto-email the combined MoF voucher pack when a period fully closes."""
+    import base64 as _b64
+    html = _wrap_html(
+        title=f"MoF voucher pack — {period}",
+        body_html=f"""
+          <p>All branch payroll vouchers for <strong>{period}</strong> at <strong>{company_name}</strong> are now payment-authorized.</p>
+          <p>The combined MoF pack is attached: <strong>{voucher_count}</strong> voucher(s), total net <strong>SLE {total_net:,.2f}</strong>.</p>
+          <p style="color:#525860;font-size:12px;">This email was sent automatically the moment the period closed. Each voucher page carries its full signature approval chain.</p>
+        """,
+    )
+    attachments = [{
+        "filename": f"mof-voucher-pack-{period}.pdf",
+        "content": _b64.b64encode(pdf_bytes).decode(),
+    }]
+    res = await _send(to, f"[SaloneHCM] MoF voucher pack {period} — {voucher_count} voucher(s)", html, attachments=attachments)
+    await _log("mof_pack", to, f"MoF pack {period}", res, {
+        "period": period, "voucher_count": voucher_count, "company_id": company_id,
+    })
+    return res
+
+
 async def send_csv_attachment(
     to: str,
     subject: str,
