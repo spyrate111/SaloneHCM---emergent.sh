@@ -265,5 +265,286 @@
     "src": "/api/static/training/gov-modules-tour.mp4",
     "poster": "/api/static/training/gov-modules-tour.jpg",
     "category": "training"
+  },
+  "getting-started-krio": {
+    "slug": "getting-started-krio",
+    "base_slug": "getting-started",
+    "lang": "krio",
+    "title": "Getting Started & Onboarding \u2014 your first day in SaloneHCM (Krio)",
+    "summary": "Sign in, learn the dashboard, master the navigation, and discover every module with the Feature Directory. The essential first video for every new user.",
+    "persona": "general",
+    "sort": 11,
+    "duration_s": 104,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 17,
+        "label": "Signing in"
+      },
+      {
+        "t": 35,
+        "label": "Dashboard tour"
+      },
+      {
+        "t": 51,
+        "label": "Navigation"
+      },
+      {
+        "t": 67,
+        "label": "Feature Directory"
+      },
+      {
+        "t": 86,
+        "label": "Your profile & help"
+      }
+    ],
+    "src": "/api/static/training/getting-started-krio.mp4",
+    "poster": "/api/static/training/getting-started-krio.jpg",
+    "category": "training"
+  },
+  "administrator-guide-krio": {
+    "slug": "administrator-guide-krio",
+    "base_slug": "administrator-guide",
+    "lang": "krio",
+    "title": "Administrator Guide \u2014 users, access, settings & branches (Krio)",
+    "summary": "For system administrators: inviting users, granting Finance and MoF approval powers, organisation settings, plan tiers, and managing branches and offices.",
+    "persona": "government",
+    "sort": 21,
+    "duration_s": 137,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 19,
+        "label": "Users & access"
+      },
+      {
+        "t": 34,
+        "label": "Finance & MoF flags"
+      },
+      {
+        "t": 58,
+        "label": "Organisation settings"
+      },
+      {
+        "t": 73,
+        "label": "Branches & offices"
+      },
+      {
+        "t": 105,
+        "label": "Audit log"
+      },
+      {
+        "t": 120,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/administrator-guide-krio.mp4",
+    "poster": "/api/static/training/administrator-guide-krio.jpg",
+    "category": "training"
+  },
+  "hr-officer-training-krio": {
+    "slug": "hr-officer-training-krio",
+    "base_slug": "hr-officer-training",
+    "lang": "krio",
+    "title": "HR Officer Training \u2014 employees, leave, attendance & documents (Krio)",
+    "summary": "The complete human resources workflow: maintaining employee records, approving leave, monitoring attendance, and managing the secure document vault.",
+    "persona": "general",
+    "sort": 31,
+    "duration_s": 93,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Employee register"
+      },
+      {
+        "t": 37,
+        "label": "Leave management"
+      },
+      {
+        "t": 53,
+        "label": "Attendance"
+      },
+      {
+        "t": 67,
+        "label": "Document vault"
+      },
+      {
+        "t": 82,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/hr-officer-training-krio.mp4",
+    "poster": "/api/static/training/hr-officer-training-krio.jpg",
+    "category": "training"
+  },
+  "payroll-officer-training-krio": {
+    "slug": "payroll-officer-training-krio",
+    "base_slug": "payroll-officer-training",
+    "lang": "krio",
+    "title": "Payroll Officer Training \u2014 runs, payslips, bank files & compliance (Krio)",
+    "summary": "Run gross-to-net payroll with Sierra Leone PAYE and NASSIT, preview before you commit, export payslips and bank files, and file NRA returns on time.",
+    "persona": "general",
+    "sort": 41,
+    "duration_s": 114,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 17,
+        "label": "The payroll engine"
+      },
+      {
+        "t": 46,
+        "label": "Committing a run"
+      },
+      {
+        "t": 67,
+        "label": "Payslips & bank files"
+      },
+      {
+        "t": 83,
+        "label": "Compliance & filing"
+      },
+      {
+        "t": 101,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/payroll-officer-training-krio.mp4",
+    "poster": "/api/static/training/payroll-officer-training-krio.jpg",
+    "category": "training"
+  },
+  "vouchers-deep-dive-krio": {
+    "slug": "vouchers-deep-dive-krio",
+    "base_slug": "vouchers-deep-dive",
+    "lang": "krio",
+    "title": "Payroll Vouchers Deep-dive \u2014 branch submission to MoF authorization (Krio)",
+    "summary": "The centralized voucher repository end-to-end: branch submission, supervisor approval, finance review, MoF payment authorization \u2014 and the anti-fraud rails at every step.",
+    "persona": "government",
+    "sort": 51,
+    "duration_s": 159,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 20,
+        "label": "The central repository"
+      },
+      {
+        "t": 66,
+        "label": "Inside a voucher"
+      },
+      {
+        "t": 86,
+        "label": "The approval chain"
+      },
+      {
+        "t": 112,
+        "label": "Returns & corrections"
+      },
+      {
+        "t": 129,
+        "label": "Fraud rails"
+      },
+      {
+        "t": 148,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/vouchers-deep-dive-krio.mp4",
+    "poster": "/api/static/training/vouchers-deep-dive-krio.jpg",
+    "category": "training"
+  },
+  "employee-self-service-krio": {
+    "slug": "employee-self-service-krio",
+    "base_slug": "employee-self-service",
+    "lang": "krio",
+    "title": "Employee Self-Service \u2014 payslips, leave & attendance (Krio)",
+    "summary": "For every employee: view and download payslips, request leave, clock attendance, and keep your personal records current \u2014 all from your own portal.",
+    "persona": "general",
+    "sort": 61,
+    "duration_s": 88,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Signing in"
+      },
+      {
+        "t": 28,
+        "label": "Your payslips"
+      },
+      {
+        "t": 46,
+        "label": "Requesting leave"
+      },
+      {
+        "t": 62,
+        "label": "Attendance"
+      },
+      {
+        "t": 75,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/employee-self-service-krio.mp4",
+    "poster": "/api/static/training/employee-self-service-krio.jpg",
+    "category": "training"
+  },
+  "gov-modules-tour-krio": {
+    "slug": "gov-modules-tour-krio",
+    "base_slug": "gov-modules-tour",
+    "lang": "krio",
+    "title": "Government Modules Tour \u2014 civil service, establishment & transparency (Krio)",
+    "summary": "For MDAs and government payroll teams: grade & step salary structure, establishment control, pre-payroll budget checks, and the public transparency portal.",
+    "persona": "government",
+    "sort": 71,
+    "duration_s": 145,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Civil service structure"
+      },
+      {
+        "t": 37,
+        "label": "Establishment control"
+      },
+      {
+        "t": 74,
+        "label": "Budget checks"
+      },
+      {
+        "t": 114,
+        "label": "Transparency portal"
+      },
+      {
+        "t": 132,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/gov-modules-tour-krio.mp4",
+    "poster": "/api/static/training/gov-modules-tour-krio.jpg",
+    "category": "training"
   }
 }

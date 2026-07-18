@@ -31,6 +31,14 @@ async def seed() -> None:
     """Run all seeders idempotently on startup."""
     await db.users.create_index("email", unique=True)
     await db.employees.create_index("email", unique=True)
+    await db.employees.create_index([("company_id", 1), ("status", 1)])
+    await db.employees.create_index([("company_id", 1), ("created_at", -1)])
+    await db.payroll_runs.create_index([("company_id", 1), ("created_at", -1)])
+    await db.leave_requests.create_index([("company_id", 1), ("status", 1)])
+    await db.leave_requests.create_index([("company_id", 1), ("created_at", -1)])
+    await db.audit_logs.create_index([("company_id", 1), ("ts", -1)])
+    await db.payroll_vouchers.create_index([("company_id", 1), ("period", 1)])
+    await db.payroll_vouchers.create_index([("company_id", 1), ("updated_at", -1)])
 
     # Backfill old data first (no company_id), then seed missing.
     demo_id, gov_id = await companies.seed()

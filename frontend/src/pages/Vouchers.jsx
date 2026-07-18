@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
-import { fmtSLE } from "../lib/api";
+import { fmtSLE, downloadBlob } from "../lib/api";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../lib/features";
-import { FileCheck2, Plus, Zap, Building2, Inbox } from "lucide-react";
+import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown } from "lucide-react";
 import VoucherDetail, { STATUS_PILL } from "../components/VoucherDetail";
 import BranchesPanel from "../components/BranchesPanel";
 import { CreateVoucherModal, GenerateFromRunModal } from "../components/VoucherCreateModals";
@@ -130,6 +131,26 @@ export default function Vouchers() {
                 </button>
               ))}
             </div>
+            {canManage && (
+              <button
+                data-testid="voucher-batch-export"
+                disabled={!period}
+                title={period ? "Download every payment-authorized voucher for this period as one PDF pack" : "Pick a period first"}
+                onClick={async () => {
+                  try {
+                    await downloadBlob(`/vouchers/export-batch.pdf?period=${period}`, `mof-voucher-pack-${period}.pdf`);
+                    toast.success("MoF pack downloaded");
+                  } catch (e) {
+                    toast.error(e?.response?.status === 404
+                      ? "No payment-authorized vouchers for this period"
+                      : "Export failed");
+                  }
+                }}
+                className="ml-auto inline-flex items-center gap-1.5 text-sm border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#E4F7E7] text-[#0A4A1E] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <FileDown className="w-4 h-4" /> MoF pack (PDF)
+              </button>
+            )}
           </div>
 
           {vouchers.length === 0 ? (

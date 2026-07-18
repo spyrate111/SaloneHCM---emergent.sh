@@ -87,7 +87,8 @@ async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
 
 @router.get("/runs")
 async def list_runs(user: dict = Depends(get_current_user)):
-    return await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
+    return await db.payroll_runs.find(
+        tenant_filter(user), {"_id": 0, "slips": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.get("/runs/{rid}")

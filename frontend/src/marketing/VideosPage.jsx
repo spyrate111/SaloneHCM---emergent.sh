@@ -40,11 +40,23 @@ export default function VideosPage() {
   const visible = useMemo(() => {
     const term = q.trim().toLowerCase();
     return videos.filter((v) => {
+      if (v.lang === "krio") return false;
       if (cat !== "all" && v.category !== cat) return false;
       if (term && !`${v.title} ${v.summary}`.toLowerCase().includes(term)) return false;
       return true;
     });
   }, [videos, cat, q]);
+
+  const variants = useMemo(() => {
+    const m = {};
+    videos.forEach((v) => {
+      if (!v.base_slug) return;
+      m[v.base_slug] = m[v.base_slug] || {};
+      m[v.base_slug][v.lang || "en"] = v;
+    });
+    return m;
+  }, [videos]);
+  const langSet = active?.base_slug ? variants[active.base_slug] : null;
 
   return (
     <MarketingLayout>
@@ -76,6 +88,21 @@ export default function VideosPage() {
                       {PERSONA_LABELS[active.persona] || active.persona}
                     </span>
                     <span className="text-[11px] text-[#525860] flex items-center gap-1"><Clock className="w-3 h-3" /> {fmt(active.duration_s)}</span>
+                    {langSet?.krio && langSet?.en && (
+                      <span className="inline-flex rounded-full border border-[#EAE7DF] overflow-hidden" data-testid="video-lang-toggle">
+                        {["en", "krio"].map((lng) => (
+                          <button
+                            key={lng}
+                            type="button"
+                            onClick={() => setActive(langSet[lng])}
+                            className={`px-2.5 h-6 text-[10px] font-bold uppercase tracking-wide transition-colors ${(active.lang || "en") === lng ? "bg-[#0072C6] text-white" : "bg-white text-[#073A16] hover:bg-[#F1EEE6]"}`}
+                            data-testid={`video-lang-${lng}`}
+                          >
+                            {lng === "en" ? "English" : "Krio"}
+                          </button>
+                        ))}
+                      </span>
+                    )}
                   </div>
                   <h2 className="mt-3 text-[24px] font-extrabold text-[#073A16]">{active.title}</h2>
                   <p className="mt-2 text-[14px] text-[#525860] leading-relaxed">{active.summary}</p>

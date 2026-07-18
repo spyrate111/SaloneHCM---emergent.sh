@@ -41,7 +41,10 @@ def payroll_run(admin_token):
     """Ensure at least one payroll run exists; reuse latest."""
     runs = requests.get(f"{API}/payroll/runs", headers=H(admin_token), timeout=30).json()
     if runs:
-        return runs[0]
+        # list view is lean (no slips) — fetch the full run
+        r = requests.get(f"{API}/payroll/runs/{runs[0]['id']}", headers=H(admin_token), timeout=30)
+        assert r.status_code == 200
+        return r.json()
     r = requests.post(f"{API}/payroll/run", json={"period_year": 2026, "period_month": 1},
                       headers=H(admin_token), timeout=30)
     assert r.status_code == 200

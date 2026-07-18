@@ -370,6 +370,22 @@ async def list_vouchers(period: Optional[str] = None, branch_id: Optional[str] =
         q, {"_id": 0, "line_items": 0, "status_history": 0}).sort("updated_at", -1).to_list(1000)
 
 
+@vouchers_router.get("/export-batch.pdf")
+async def export_voucher_batch_pdf(period: str, user: dict = Depends(get_current_user)):
+    if not _is_finance(user):
+        raise HTTPException(403, "Finance officers or admins only")
+    vs = await db.payroll_vouchers.find(
+        {**tenant_filter(user), "period": period, "status": "payment_authorized"},
+        {"_id": 0}).sort("branch_name", 1).to_list(500)
+    if not vs:
+        raise HTTPException(404, f"No payment-authorized vouchers for {period}")
+    branches = {b["id"]: b for b in await db.branches.find(tenant_filter(user), {"_id": 0}).to_list(200)}
+    pdf = _batch_pdf(vs, branches, period)
+    await audit("voucher_batch_export", "payroll_vouchers", user, {"period": period, "count": len(vs)})
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="mof-voucher-pack-{period}.pdf"'})
+
+
 @vouchers_router.post("")
 async def create_voucher(body: VoucherIn, user: dict = Depends(get_current_user)):
     branch = await db.branches.find_one({"id": body.branch_id, **tenant_filter(user)}, {"_id": 0})
@@ -443,12 +459,11 @@ def _sig_block(label: str, name: str, email: str, at: str) -> list:
             "_________________" if done else ""]
 
 
-def _voucher_pdf(v: dict, branch: dict) -> bytes:
-    from reportlab.lib.pagesizes import A4
+def _voucher_flowables(v: dict, branch: dict) -> list:
     from reportlab.lib.units import cm
     from reportlab.lib import colors as rc
     from reportlab.lib.styles import ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
     green, blue, ink, grey, line = "#0A4A1E", "#0072C6", "#1A1C1E", "#525860", "#E2DFD6"
     h1 = ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=18, textColor=rc.HexColor(green))
@@ -460,10 +475,6 @@ def _voucher_pdf(v: dict, branch: dict) -> bytes:
     names = {h.get("by_email"): h.get("by_name") for h in v.get("status_history", []) if h.get("by_name")}
     status = v["status"].replace("_", " ").upper()
 
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.6 * cm, rightMargin=1.6 * cm,
-                            topMargin=1.6 * cm, bottomMargin=1.8 * cm,
-                            title=f"Payroll Voucher {v['voucher_ref']}")
     story = [
         Paragraph(f"PAYROLL VOUCHER · <font color='{ink}'>{v['voucher_ref']}</font>", h1),
         Spacer(1, 4),
@@ -548,8 +559,68 @@ def _voucher_pdf(v: dict, branch: dict) -> bytes:
             "This voucher is payment-authorized and constitutes a permanent, immutable record. "
             "Any alteration after authorization is invalid.", sub))
 
+    return story
+
+
+def _build_pdf(story: list, title: str) -> bytes:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.6 * cm, rightMargin=1.6 * cm,
+                            topMargin=1.6 * cm, bottomMargin=1.8 * cm, title=title)
     doc.build(story, onFirstPage=_flag_page, onLaterPages=_flag_page)
     return buf.getvalue()
+
+
+def _voucher_pdf(v: dict, branch: dict) -> bytes:
+    return _build_pdf(_voucher_flowables(v, branch), f"Payroll Voucher {v['voucher_ref']}")
+
+
+def _batch_pdf(vouchers: list, branches: dict, period: str) -> bytes:
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors as rc
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, PageBreak
+
+    green, grey, line = "#0A4A1E", "#525860", "#E2DFD6"
+    h1 = ParagraphStyle("bh1", fontName="Helvetica-Bold", fontSize=20, textColor=rc.HexColor(green))
+    sub = ParagraphStyle("bsub", fontName="Helvetica", fontSize=10, textColor=rc.HexColor(grey), leading=14)
+    story = [
+        Paragraph("MoF PAYMENT PACK", h1),
+        Spacer(1, 4),
+        Paragraph(f"Period <b>{period}</b> · {len(vouchers)} payment-authorized voucher(s) · "
+                  f"Generated {iso(now_utc())[:16].replace('T', ' ')} UTC", sub),
+        Spacer(1, 12),
+    ]
+    rows = [["Voucher", "Branch", "Employees", "Net (SLE)", "Authorized by"]]
+    total_net = 0.0
+    for v in vouchers:
+        total_net += v["totals"]["net"]
+        rows.append([v["voucher_ref"], f"{v['branch_name']} ({v['branch_code']})",
+                     str(v["totals"]["employee_count"]), _money(v["totals"]["net"]),
+                     v.get("authorized_by") or ""])
+    rows.append(["TOTAL", "", str(sum(v["totals"]["employee_count"] for v in vouchers)),
+                 _money(total_net), ""])
+    t = Table(rows, colWidths=[3.6 * cm, 5.4 * cm, 2.2 * cm, 3.0 * cm, 3.7 * cm], repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), rc.HexColor(green)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), rc.white),
+        ("BACKGROUND", (0, -1), (-1, -1), rc.HexColor("#E4F7E7")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -2), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (2, 0), (3, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.4, rc.HexColor(line)),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(t)
+    for v in vouchers:
+        story.append(PageBreak())
+        story.extend(_voucher_flowables(v, branches.get(v["branch_id"], {})))
+    return _build_pdf(story, f"MoF Voucher Pack {period}")
 
 
 @vouchers_router.get("/{vid}/export.pdf")

@@ -21,6 +21,8 @@ async def seed_training_videos() -> None:
             "duration_s": entry["duration_s"], "category": "training",
             "persona": entry["persona"], "sort": entry["sort"],
             "chapters": entry["chapters"], "published": True,
+            "slug": entry["slug"], "lang": entry.get("lang", "en"),
+            "base_slug": entry.get("base_slug", entry["slug"]),
             "updated_at": iso(now_utc()),
         }
         if existing:
