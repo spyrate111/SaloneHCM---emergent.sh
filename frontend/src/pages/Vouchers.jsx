@@ -4,7 +4,7 @@ import { fmtSLE, downloadBlob } from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../lib/features";
-import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown, Mail, CheckCircle2 } from "lucide-react";
+import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown, Mail, CheckCircle2, BellRing } from "lucide-react";
 import VoucherDetail, { STATUS_PILL } from "../components/VoucherDetail";
 import BranchesPanel from "../components/BranchesPanel";
 import { CreateVoucherModal, GenerateFromRunModal } from "../components/VoucherCreateModals";
@@ -122,6 +122,12 @@ export default function Vouchers() {
       </div>
 
       {isAdminRole && <PackEmailCard history={packHistory} onRefresh={refresh} />}
+
+      {isAdminRole && summary?.missing_branches?.length > 0 && (
+        <NudgeCard missingCount={summary.missing_branches.length}
+                   missingBranches={summary.missing_branches}
+                   period={period} />
+      )}
 
       {canManage && closedPack && (
         <div data-testid="period-closed-banner" className="flex flex-wrap items-center gap-3 bg-[#E4F7E7] border border-[#17A035]/50 rounded-lg px-4 py-3">
@@ -339,6 +345,130 @@ function PackEmailCard({ history = [], onRefresh }) {
         </div>
       )}
     </div>
+  );
+}
+
+function NudgeCard({ missingCount, missingBranches = [], period }) {
+  const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const params = period ? `?period=${period}` : "";
+      const r = await api.get(`/vouchers/nudge/history${params}`);
+      setHistory(r.data || []);
+    } catch {
+      // finance-only endpoint; silent
+    }
+  }, [period]);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const sendNow = async () => {
+    setBusy(true);
+    try {
+      const params = period ? `?period=${period}` : "";
+      const r = await api.post(`/vouchers/nudge/send-now${params}`);
+      const sent = r.data?.sent || 0;
+      const total = r.data?.results?.length || 0;
+      if (sent > 0) toast.success(`Reminder sent to ${sent} branch supervisor(s)`);
+      else if (total > 0) toast(`No new nudges — all ${total} missing branch(es) already reminded for this window`);
+      else toast(`No branches missing a voucher for ${r.data?.period || "current period"}`);
+      loadHistory();
+    } catch (e) {
+      toast.error(typeof e?.response?.data?.detail === "string"
+        ? e.response.data.detail : "Could not send reminders");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const preview = missingBranches.slice(0, 3).join(", ") + (missingBranches.length > 3 ? "…" : "");
+
+  return (
+    <div className="bg-white border border-[#E2DFD6] rounded-lg p-4" data-testid="voucher-nudge-card">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-[240px]">
+          <div className="text-[11px] uppercase tracking-wider text-[#525860] flex items-center gap-1.5">
+            <BellRing className="w-3.5 h-3.5 text-[#8B6A14]" /> Voucher reminders
+          </div>
+          <p className="text-xs text-[#686D76] mt-0.5">
+            <b>{missingCount}</b> branch{missingCount === 1 ? "" : "es"} still missing a voucher
+            {period ? ` for ${period}` : " this period"}: <span className="text-[#525860]">{preview}</span>
+          </p>
+          <p className="text-[10px] text-[#A1A5AB] mt-1">
+            Automatic reminders fire 72h and 24h before the payroll cut-off · SMS + email to each branch supervisor
+          </p>
+        </div>
+        <button
+          data-testid="voucher-nudge-send-now"
+          disabled={busy}
+          onClick={sendNow}
+          className="ml-auto text-sm bg-[#8B6A14] text-white px-4 py-2 rounded-md disabled:opacity-50 hover:bg-[#725511]"
+        >
+          {busy ? "Sending…" : "Send reminders now"}
+        </button>
+      </div>
+      {history.length > 0 && (
+        <div className="mt-3">
+          <button
+            data-testid="voucher-nudge-history-toggle"
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-[11px] font-medium text-[#26547C] hover:underline"
+          >
+            {showHistory ? "Hide" : "Show"} reminder history ({history.length})
+          </button>
+          {showHistory && (
+            <table className="w-full text-xs mt-2" data-testid="voucher-nudge-history-table">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-[#525860]">
+                  <th className="text-left py-1.5 pr-3 font-medium">Sent</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">Branch</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">Period</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">Window</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">To</th>
+                  <th className="text-left py-1.5 font-medium">Channels</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.slice(0, 40).map((h, i) => (
+                  <tr key={h.branch_id + h.period + h.window + i} className="border-t border-[#F1EEE6]">
+                    <td className="py-1.5 pr-3 text-[#686D76] font-data">{new Date(h.sent_at).toLocaleString()}</td>
+                    <td className="py-1.5 pr-3">{h.branch_name}</td>
+                    <td className="py-1.5 pr-3 font-data">{h.period}</td>
+                    <td className="py-1.5 pr-3">
+                      <span className="text-[10px] uppercase tracking-wider bg-[#F6EDD8] text-[#8B6A14] px-2 py-0.5 rounded-full">
+                        {h.window}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3 text-[#686D76]">{h.supervisor_email || "—"}</td>
+                    <td className="py-1.5 pr-3">
+                      <ChannelPill kind="SMS" state={h.channels?.sms} />
+                      <ChannelPill kind="Email" state={h.channels?.email} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChannelPill({ kind, state }) {
+  if (!state) return null;
+  const ok = state.ok;
+  const cls = ok
+    ? "bg-[#E4F7E7] text-[#128A2C]"
+    : "bg-[#FBE9E9] text-[#B03A2E]";
+  const title = state.error || (ok ? "delivered" : "");
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full mr-1 ${cls}`} title={title}>
+      {kind} {ok ? "✓" : "✗"}
+    </span>
   );
 }
 

@@ -974,5 +974,335 @@
         "label": "M\u025bnde"
       }
     ]
+  },
+  "getting-started-temne": {
+    "slug": "getting-started-temne",
+    "base_slug": "getting-started",
+    "lang": "temne",
+    "title": "Getting Started & Onboarding \u2014 your first day in SaloneHCM (Temne)",
+    "summary": "Sign in, learn the dashboard, master the navigation, and discover every module with the Feature Directory. The essential first video for every new user.",
+    "persona": "general",
+    "sort": 11,
+    "duration_s": 99,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "Signing in"
+      },
+      {
+        "t": 34,
+        "label": "Dashboard tour"
+      },
+      {
+        "t": 50,
+        "label": "Navigation"
+      },
+      {
+        "t": 65,
+        "label": "Feature Directory"
+      },
+      {
+        "t": 83,
+        "label": "Your profile & help"
+      }
+    ],
+    "src": "/api/static/training/getting-started-temne.mp4",
+    "poster": "/api/static/training/getting-started-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/getting-started-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
+  },
+  "administrator-guide-temne": {
+    "slug": "administrator-guide-temne",
+    "base_slug": "administrator-guide",
+    "lang": "temne",
+    "title": "Administrator Guide \u2014 users, access, settings & branches (Temne)",
+    "summary": "For system administrators: inviting users, granting Finance and MoF approval powers, organisation settings, plan tiers, and managing branches and offices.",
+    "persona": "government",
+    "sort": 21,
+    "duration_s": 133,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "Users & access"
+      },
+      {
+        "t": 33,
+        "label": "Finance & MoF flags"
+      },
+      {
+        "t": 56,
+        "label": "Organisation settings"
+      },
+      {
+        "t": 71,
+        "label": "Branches & offices"
+      },
+      {
+        "t": 102,
+        "label": "Audit log"
+      },
+      {
+        "t": 116,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/administrator-guide-temne.mp4",
+    "poster": "/api/static/training/administrator-guide-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/administrator-guide-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
+  },
+  "hr-officer-training-temne": {
+    "slug": "hr-officer-training-temne",
+    "base_slug": "hr-officer-training",
+    "lang": "temne",
+    "title": "HR Officer Training \u2014 employees, leave, attendance & documents (Temne)",
+    "summary": "The complete human resources workflow: maintaining employee records, approving leave, monitoring attendance, and managing the secure document vault.",
+    "persona": "general",
+    "sort": 31,
+    "duration_s": 87,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 15,
+        "label": "Employee register"
+      },
+      {
+        "t": 33,
+        "label": "Leave management"
+      },
+      {
+        "t": 48,
+        "label": "Attendance"
+      },
+      {
+        "t": 61,
+        "label": "Document vault"
+      },
+      {
+        "t": 76,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/hr-officer-training-temne.mp4",
+    "poster": "/api/static/training/hr-officer-training-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/hr-officer-training-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
+  },
+  "payroll-officer-training-temne": {
+    "slug": "payroll-officer-training-temne",
+    "base_slug": "payroll-officer-training",
+    "lang": "temne",
+    "title": "Payroll Officer Training \u2014 runs, payslips, bank files & compliance (Temne)",
+    "summary": "Run gross-to-net payroll with Sierra Leone PAYE and NASSIT, preview before you commit, export payslips and bank files, and file NRA returns on time.",
+    "persona": "general",
+    "sort": 41,
+    "duration_s": 117,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "The payroll engine"
+      },
+      {
+        "t": 52,
+        "label": "Committing a run"
+      },
+      {
+        "t": 71,
+        "label": "Payslips & bank files"
+      },
+      {
+        "t": 87,
+        "label": "Compliance & filing"
+      },
+      {
+        "t": 105,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/payroll-officer-training-temne.mp4",
+    "poster": "/api/static/training/payroll-officer-training-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/payroll-officer-training-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
+  },
+  "vouchers-deep-dive-temne": {
+    "slug": "vouchers-deep-dive-temne",
+    "base_slug": "vouchers-deep-dive",
+    "lang": "temne",
+    "title": "Payroll Vouchers Deep-dive \u2014 branch submission to MoF authorization (Temne)",
+    "summary": "The centralized voucher repository end-to-end: branch submission, supervisor approval, finance review, MoF payment authorization \u2014 and the anti-fraud rails at every step.",
+    "persona": "government",
+    "sort": 51,
+    "duration_s": 147,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 19,
+        "label": "The central repository"
+      },
+      {
+        "t": 58,
+        "label": "Inside a voucher"
+      },
+      {
+        "t": 76,
+        "label": "The approval chain"
+      },
+      {
+        "t": 101,
+        "label": "Returns & corrections"
+      },
+      {
+        "t": 118,
+        "label": "Fraud rails"
+      },
+      {
+        "t": 136,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/vouchers-deep-dive-temne.mp4",
+    "poster": "/api/static/training/vouchers-deep-dive-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/vouchers-deep-dive-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
+  },
+  "employee-self-service-temne": {
+    "slug": "employee-self-service-temne",
+    "base_slug": "employee-self-service",
+    "lang": "temne",
+    "title": "Employee Self-Service \u2014 payslips, leave & attendance (Temne)",
+    "summary": "For every employee: view and download payslips, request leave, clock attendance, and keep your personal records current \u2014 all from your own portal.",
+    "persona": "general",
+    "sort": 61,
+    "duration_s": 86,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 15,
+        "label": "Signing in"
+      },
+      {
+        "t": 26,
+        "label": "Your payslips"
+      },
+      {
+        "t": 44,
+        "label": "Requesting leave"
+      },
+      {
+        "t": 60,
+        "label": "Attendance"
+      },
+      {
+        "t": 73,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/employee-self-service-temne.mp4",
+    "poster": "/api/static/training/employee-self-service-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/employee-self-service-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
+  },
+  "gov-modules-tour-temne": {
+    "slug": "gov-modules-tour-temne",
+    "base_slug": "gov-modules-tour",
+    "lang": "temne",
+    "title": "Government Modules Tour \u2014 civil service, establishment & transparency (Temne)",
+    "summary": "For MDAs and government payroll teams: grade & step salary structure, establishment control, pre-payroll budget checks, and the public transparency portal.",
+    "persona": "government",
+    "sort": 71,
+    "duration_s": 141,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Civil service structure"
+      },
+      {
+        "t": 36,
+        "label": "Establishment control"
+      },
+      {
+        "t": 73,
+        "label": "Budget checks"
+      },
+      {
+        "t": 113,
+        "label": "Transparency portal"
+      },
+      {
+        "t": 130,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/gov-modules-tour-temne.mp4",
+    "poster": "/api/static/training/gov-modules-tour-temne.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/gov-modules-tour-temne.vtt",
+        "srclang": "tem",
+        "label": "Temne"
+      }
+    ]
   }
 }

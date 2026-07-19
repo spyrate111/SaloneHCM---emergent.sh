@@ -215,3 +215,12 @@ except ImportError:
 for _v in VIDEOS:
     for _sc, _mn in zip(_v["scenes"], MENDE.get(_v["slug"], [])):
         _sc["narration_mende"] = _mn
+
+try:
+    from temne import TEMNE  # noqa: E402
+except ImportError:
+    TEMNE = {}
+
+for _v in VIDEOS:
+    for _sc, _tn in zip(_v["scenes"], TEMNE.get(_v["slug"], [])):
+        _sc["narration_temne"] = _tn

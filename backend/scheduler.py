@@ -127,6 +127,12 @@ def start():
         register_billing(scheduler)
     except Exception:
         logger.exception("Failed to attach billing cron")
+    # Attach voucher-deadline nudge scheduler — 72h + 24h reminders to branch supervisors.
+    try:
+        from voucher_nudge import attach as attach_nudges
+        attach_nudges(scheduler)
+    except Exception:
+        logger.exception("Failed to attach voucher nudge scheduler")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

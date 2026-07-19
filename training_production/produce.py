@@ -152,7 +152,7 @@ async def do_step(page, step):
         await page.wait_for_timeout(int(step[1] * 1000))
 
 
-LANG_TITLE = {"krio": " (Krio)", "mende": " (Mɛnde)"}
+LANG_TITLE = {"krio": " (Krio)", "mende": " (Mɛnde)", "temne": " (Temne)"}
 
 
 async def produce(video: dict, lang: str = "en") -> dict:

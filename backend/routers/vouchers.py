@@ -414,6 +414,28 @@ async def pack_history(user: dict = Depends(get_current_user)):
     return await db.mof_pack_emails.find(tenant_filter(user), {"_id": 0}).sort("sent_at", -1).to_list(24)
 
 
+@vouchers_router.post("/nudge/send-now")
+async def nudge_send_now(period: Optional[str] = None, user: dict = Depends(require_admin)):
+    """Manually fire a nudge to every branch missing a voucher for `period`
+    (defaults to current month)."""
+    from voucher_nudge import run_for_tenant
+    res = await run_for_tenant(user["company_id"], period=period, window="manual")
+    await audit("voucher_nudge_manual", "payroll_vouchers", user,
+                {"period": res.get("period"), "sent": res.get("sent", 0)})
+    return res
+
+
+@vouchers_router.get("/nudge/history")
+async def nudge_history(period: Optional[str] = None,
+                        user: dict = Depends(get_current_user)):
+    if not _is_finance(user):
+        raise HTTPException(403, "Finance officers or admins only")
+    q = dict(tenant_filter(user))
+    if period:
+        q["period"] = period
+    return await db.voucher_nudges.find(q, {"_id": 0}).sort("sent_at", -1).to_list(200)
+
+
 @vouchers_router.post("/pack-config/send-now")
 async def send_pack_now(period: str, user: dict = Depends(require_admin)):
     result = await _send_period_pack(user, period, force=True)
@@ -620,9 +642,13 @@ def _batch_pdf(vouchers: list, branches: dict, period: str) -> bytes:
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, PageBreak
 
-    green, grey, line = "#0A4A1E", "#525860", "#E2DFD6"
+    green, blue, grey, line = "#0A4A1E", "#0072C6", "#525860", "#E2DFD6"
     h1 = ParagraphStyle("bh1", fontName="Helvetica-Bold", fontSize=20, textColor=rc.HexColor(green))
     sub = ParagraphStyle("bsub", fontName="Helvetica", fontSize=10, textColor=rc.HexColor(grey), leading=14)
+    h2 = ParagraphStyle("bh2", fontName="Helvetica-Bold", fontSize=12,
+                        textColor=rc.HexColor(blue), spaceBefore=16, spaceAfter=6)
+    body_small = ParagraphStyle("bbody", fontName="Helvetica", fontSize=8.5,
+                                textColor=rc.HexColor("#1A1C1E"), leading=12)
     story = [
         Paragraph("MoF PAYMENT PACK", h1),
         Spacer(1, 4),
@@ -653,6 +679,47 @@ def _batch_pdf(vouchers: list, branches: dict, period: str) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(t)
+
+    # ----- Minister sign-off block (wet-signature) -----
+    story.append(Paragraph("Ministry of Finance — Authorization", h2))
+    story.append(Paragraph(
+        "This pack contains every payment-authorized branch voucher for the period above. "
+        "By counter-signing below, the Honourable Minister of Finance (or a duly authorised delegate) "
+        "endorses the release of the total sum shown for immediate treasury settlement.",
+        body_small))
+    story.append(Spacer(1, 10))
+    sig_rows = [
+        ["Honourable Minister of Finance", "", "", ""],
+        ["Full name", Paragraph("_______________________________", body_small),
+         "Title / Position", Paragraph("_______________________________", body_small)],
+        ["Signature", Paragraph("<br/><br/>_______________________________", body_small),
+         "Date", Paragraph("_______________________________", body_small)],
+        ["Official stamp", "", "", ""],
+    ]
+    sig = Table(sig_rows, colWidths=[3.6 * cm, 6.4 * cm, 2.6 * cm, 5.3 * cm])
+    sig.setStyle(TableStyle([
+        ("SPAN", (0, 0), (-1, 0)),
+        ("SPAN", (0, 3), (-1, 3)),
+        ("BACKGROUND", (0, 0), (-1, 0), rc.HexColor("#F7F6F2")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (0, -2), "Helvetica-Bold"),
+        ("FONTNAME", (2, 1), (2, -2), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("ALIGN", (0, -1), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.4, rc.HexColor(line)),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("MINROWHEIGHT", (0, 3), (-1, 3), 60),
+    ]))
+    story.append(sig)
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "Once counter-signed, retain the original pack at the Ministry archive; every branch voucher "
+        "that follows this cover page bears its own full digital approval chain.",
+        body_small))
+
     for v in vouchers:
         story.append(PageBreak())
         story.extend(_voucher_flowables(v, branches.get(v["branch_id"], {})))

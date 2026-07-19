@@ -49,7 +49,7 @@ def ts(x: float) -> str:
 manifest = json.loads(MANIFEST.read_text())
 
 for v in VIDEOS:
-    for lang in ("en", "krio", "mende"):
+    for lang in ("en", "krio", "mende", "temne"):
         slug = v["slug"] + ("" if lang == "en" else f"-{lang}")
         entry = manifest.get(slug)
         if not entry:
@@ -68,8 +68,8 @@ for v in VIDEOS:
         (OUT / f"{slug}.vtt").write_text("\n".join(lines), encoding="utf-8")
         entry["captions"] = [{
             "src": f"/api/static/training/subs/{slug}.vtt",
-            "srclang": {"en": "en", "krio": "kri", "mende": "men"}[lang],
-            "label": {"en": "English", "krio": "Krio", "mende": "Mɛnde"}[lang],
+            "srclang": {"en": "en", "krio": "kri", "mende": "men", "temne": "tem"}[lang],
+            "label": {"en": "English", "krio": "Krio", "mende": "Mɛnde", "temne": "Temne"}[lang],
         }]
         print(f"wrote {slug}.vtt ({n - 1} cues)")
 
