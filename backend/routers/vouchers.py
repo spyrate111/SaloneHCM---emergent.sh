@@ -436,6 +436,26 @@ async def nudge_history(period: Optional[str] = None,
     return await db.voucher_nudges.find(q, {"_id": 0}).sort("sent_at", -1).to_list(200)
 
 
+@vouchers_router.post("/nudge/digest/send-now")
+async def nudge_digest_send_now(user: dict = Depends(require_admin)):
+    """Fire the daily supervisor digest immediately for this tenant. Uses the
+    same idempotency guard as the 06:00 UTC cron — one digest per supervisor
+    per calendar day, so calling twice in a day is a no-op."""
+    from voucher_nudge import run_digest_now
+    res = await run_digest_now(user["company_id"])
+    await audit("voucher_nudge_digest_manual", "payroll_vouchers", user,
+                {"sent": res.get("sent", 0)})
+    return res
+
+
+@vouchers_router.get("/nudge/digest/history")
+async def nudge_digest_history(user: dict = Depends(get_current_user)):
+    if not _is_finance(user):
+        raise HTTPException(403, "Finance officers or admins only")
+    return await db.voucher_nudge_digests.find(
+        tenant_filter(user), {"_id": 0}).sort("sent_at", -1).to_list(60)
+
+
 @vouchers_router.post("/pack-config/send-now")
 async def send_pack_now(period: str, user: dict = Depends(require_admin)):
     result = await _send_period_pack(user, period, force=True)
@@ -682,11 +702,27 @@ def _batch_pdf(vouchers: list, branches: dict, period: str) -> bytes:
 
     # ----- Minister sign-off block (wet-signature) -----
     story.append(Paragraph("Ministry of Finance — Authorization", h2))
-    story.append(Paragraph(
+    # Coat-of-arms header row: emblem left + official statement right
+    from reportlab.platypus import Image as RLImage
+    from pathlib import Path as _P
+    crest_path = _P(__file__).resolve().parent.parent / "static" / "brand" / "sl-coat-of-arms.png"
+    crest_cell = RLImage(str(crest_path), width=2.6 * cm, height=2.6 * cm) if crest_path.exists() else ""
+    intro = Paragraph(
+        "<font color='#8B6A14'><b>REPUBLIC OF SIERRA LEONE</b></font><br/>"
+        "<font color='#0A4A1E'><b>Ministry of Finance</b></font><br/><br/>"
         "This pack contains every payment-authorized branch voucher for the period above. "
         "By counter-signing below, the Honourable Minister of Finance (or a duly authorised delegate) "
         "endorses the release of the total sum shown for immediate treasury settlement.",
-        body_small))
+        body_small)
+    crest_hdr = Table([[crest_cell, intro]], colWidths=[3.0 * cm, 14.9 * cm])
+    crest_hdr.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(crest_hdr)
     story.append(Spacer(1, 10))
     sig_rows = [
         ["Honourable Minister of Finance", "", "", ""],

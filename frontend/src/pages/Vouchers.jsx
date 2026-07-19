@@ -350,16 +350,23 @@ function PackEmailCard({ history = [], onRefresh }) {
 
 function NudgeCard({ missingCount, missingBranches = [], period }) {
   const [busy, setBusy] = useState(false);
+  const [digestBusy, setDigestBusy] = useState(false);
   const [history, setHistory] = useState([]);
+  const [digestHistory, setDigestHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showDigest, setShowDigest] = useState(false);
 
   const loadHistory = useCallback(async () => {
     try {
       const params = period ? `?period=${period}` : "";
-      const r = await api.get(`/vouchers/nudge/history${params}`);
-      setHistory(r.data || []);
+      const [n, d] = await Promise.all([
+        api.get(`/vouchers/nudge/history${params}`),
+        api.get(`/vouchers/nudge/digest/history`),
+      ]);
+      setHistory(n.data || []);
+      setDigestHistory(d.data || []);
     } catch {
-      // finance-only endpoint; silent
+      // finance-only endpoints; silent
     }
   }, [period]);
 
@@ -384,6 +391,24 @@ function NudgeCard({ missingCount, missingBranches = [], period }) {
     }
   };
 
+  const sendDigest = async () => {
+    setDigestBusy(true);
+    try {
+      const r = await api.post(`/vouchers/nudge/digest/send-now`);
+      const sent = r.data?.sent || 0;
+      const targeted = r.data?.supervisors_targeted || 0;
+      if (sent > 0) toast.success(`Digest sent to ${sent} supervisor(s)`);
+      else if (targeted > 0) toast(`All ${targeted} supervisor(s) already got today's digest`);
+      else toast("No missing vouchers to digest right now");
+      loadHistory();
+    } catch (e) {
+      toast.error(typeof e?.response?.data?.detail === "string"
+        ? e.response.data.detail : "Could not send digest");
+    } finally {
+      setDigestBusy(false);
+    }
+  };
+
   const preview = missingBranches.slice(0, 3).join(", ") + (missingBranches.length > 3 ? "…" : "");
 
   return (
@@ -398,61 +423,111 @@ function NudgeCard({ missingCount, missingBranches = [], period }) {
             {period ? ` for ${period}` : " this period"}: <span className="text-[#525860]">{preview}</span>
           </p>
           <p className="text-[10px] text-[#A1A5AB] mt-1">
-            Automatic reminders fire 72h and 24h before the payroll cut-off · SMS + email to each branch supervisor
+            SMS reminders fire 72h and 24h before cut-off · one consolidated digest email per supervisor at 06:00 UTC daily
           </p>
         </div>
+        <button
+          data-testid="voucher-nudge-digest-send-now"
+          disabled={digestBusy}
+          onClick={sendDigest}
+          className="text-xs border border-[#E2DFD6] text-[#0A4A1E] px-3 py-2 rounded-md hover:bg-[#E4F7E7] disabled:opacity-50"
+          title="Send today's consolidated digest email to every supervisor with pending vouchers"
+        >
+          {digestBusy ? "Sending…" : "Send digest now"}
+        </button>
         <button
           data-testid="voucher-nudge-send-now"
           disabled={busy}
           onClick={sendNow}
-          className="ml-auto text-sm bg-[#8B6A14] text-white px-4 py-2 rounded-md disabled:opacity-50 hover:bg-[#725511]"
+          className="text-sm bg-[#8B6A14] text-white px-4 py-2 rounded-md disabled:opacity-50 hover:bg-[#725511]"
+          title="Immediate SMS + email to every missing branch supervisor (bypasses the daily digest)"
         >
           {busy ? "Sending…" : "Send reminders now"}
         </button>
       </div>
-      {history.length > 0 && (
-        <div className="mt-3">
+      <div className="mt-3 flex flex-wrap gap-4">
+        {history.length > 0 && (
           <button
             data-testid="voucher-nudge-history-toggle"
             onClick={() => setShowHistory(!showHistory)}
             className="text-[11px] font-medium text-[#26547C] hover:underline"
           >
-            {showHistory ? "Hide" : "Show"} reminder history ({history.length})
+            {showHistory ? "Hide" : "Show"} per-branch nudges ({history.length})
           </button>
-          {showHistory && (
-            <table className="w-full text-xs mt-2" data-testid="voucher-nudge-history-table">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-[#525860]">
-                  <th className="text-left py-1.5 pr-3 font-medium">Sent</th>
-                  <th className="text-left py-1.5 pr-3 font-medium">Branch</th>
-                  <th className="text-left py-1.5 pr-3 font-medium">Period</th>
-                  <th className="text-left py-1.5 pr-3 font-medium">Window</th>
-                  <th className="text-left py-1.5 pr-3 font-medium">To</th>
-                  <th className="text-left py-1.5 font-medium">Channels</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.slice(0, 40).map((h, i) => (
-                  <tr key={h.branch_id + h.period + h.window + i} className="border-t border-[#F1EEE6]">
-                    <td className="py-1.5 pr-3 text-[#686D76] font-data">{new Date(h.sent_at).toLocaleString()}</td>
-                    <td className="py-1.5 pr-3">{h.branch_name}</td>
-                    <td className="py-1.5 pr-3 font-data">{h.period}</td>
-                    <td className="py-1.5 pr-3">
-                      <span className="text-[10px] uppercase tracking-wider bg-[#F6EDD8] text-[#8B6A14] px-2 py-0.5 rounded-full">
-                        {h.window}
-                      </span>
-                    </td>
-                    <td className="py-1.5 pr-3 text-[#686D76]">{h.supervisor_email || "—"}</td>
-                    <td className="py-1.5 pr-3">
-                      <ChannelPill kind="SMS" state={h.channels?.sms} />
-                      <ChannelPill kind="Email" state={h.channels?.email} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        )}
+        {digestHistory.length > 0 && (
+          <button
+            data-testid="voucher-nudge-digest-toggle"
+            onClick={() => setShowDigest(!showDigest)}
+            className="text-[11px] font-medium text-[#26547C] hover:underline"
+          >
+            {showDigest ? "Hide" : "Show"} daily digests ({digestHistory.length})
+          </button>
+        )}
+      </div>
+      {showHistory && history.length > 0 && (
+        <table className="w-full text-xs mt-2" data-testid="voucher-nudge-history-table">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-[#525860]">
+              <th className="text-left py-1.5 pr-3 font-medium">Sent</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Branch</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Period</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Window</th>
+              <th className="text-left py-1.5 pr-3 font-medium">To</th>
+              <th className="text-left py-1.5 font-medium">Channels</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.slice(0, 40).map((h, i) => (
+              <tr key={h.branch_id + h.period + h.window + i} className="border-t border-[#F1EEE6]">
+                <td className="py-1.5 pr-3 text-[#686D76] font-data">{new Date(h.sent_at).toLocaleString()}</td>
+                <td className="py-1.5 pr-3">{h.branch_name}</td>
+                <td className="py-1.5 pr-3 font-data">{h.period}</td>
+                <td className="py-1.5 pr-3">
+                  <span className="text-[10px] uppercase tracking-wider bg-[#F6EDD8] text-[#8B6A14] px-2 py-0.5 rounded-full">
+                    {h.window}
+                  </span>
+                </td>
+                <td className="py-1.5 pr-3 text-[#686D76]">{h.supervisor_email || "—"}</td>
+                <td className="py-1.5 pr-3">
+                  <ChannelPill kind="SMS" state={h.channels?.sms} />
+                  <ChannelPill kind="Email" state={h.channels?.email} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {showDigest && digestHistory.length > 0 && (
+        <table className="w-full text-xs mt-2" data-testid="voucher-nudge-digest-table">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-[#525860]">
+              <th className="text-left py-1.5 pr-3 font-medium">Sent</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Supervisor</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Period</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Branches</th>
+              <th className="text-left py-1.5 pr-3 font-medium">Left</th>
+              <th className="text-left py-1.5 font-medium">Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {digestHistory.slice(0, 40).map((h, i) => (
+              <tr key={h.supervisor_user_id + h.day + i} className="border-t border-[#F1EEE6]">
+                <td className="py-1.5 pr-3 text-[#686D76] font-data">{new Date(h.sent_at).toLocaleString()}</td>
+                <td className="py-1.5 pr-3">
+                  <div>{h.supervisor_name || "—"}</div>
+                  <div className="text-[10px] text-[#A1A5AB]">{h.supervisor_email}</div>
+                </td>
+                <td className="py-1.5 pr-3 font-data">{h.period}</td>
+                <td className="py-1.5 pr-3 font-data">{h.branch_count}</td>
+                <td className="py-1.5 pr-3 font-data text-[#8B6A14]">~{h.hours_left}h</td>
+                <td className="py-1.5 pr-3">
+                  <ChannelPill kind="Email" state={{ ok: h.email_ok, error: h.email_error }} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

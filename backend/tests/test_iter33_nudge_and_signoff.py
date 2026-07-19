@@ -97,6 +97,54 @@ class TestVoucherNudge:
 
 
 # ============================================================
+# Daily digest — one supervisor summary per day
+# ============================================================
+
+class TestNudgeDigest:
+    def test_enable_cutoff_and_send_digest(self, gov_token):
+        # Enable cutoff so the digest job has a computable deadline
+        r = requests.put(f"{API}/payroll/cutoff/config",
+                         headers=_h(gov_token),
+                         json={"payroll_cutoff_day": 25, "enabled": True},
+                         timeout=15)
+        assert r.status_code == 200
+
+        r = requests.post(f"{API}/vouchers/nudge/digest/send-now",
+                          headers=_h(gov_token), timeout=20)
+        assert r.status_code == 200, r.text
+        payload = r.json()
+        assert payload["ok"] is True
+        assert payload["period"]
+        # supervisors_targeted may be 0 or more depending on residual state,
+        # but the endpoint must always return a coherent shape
+        assert "supervisors_targeted" in payload
+        assert "digests_new" in payload
+
+    def test_digest_is_idempotent_per_day(self, gov_token):
+        # Enable + trigger twice; second call must add no new digests
+        requests.put(f"{API}/payroll/cutoff/config", headers=_h(gov_token),
+                     json={"payroll_cutoff_day": 25, "enabled": True}, timeout=15)
+        r1 = requests.post(f"{API}/vouchers/nudge/digest/send-now",
+                           headers=_h(gov_token), timeout=20)
+        r2 = requests.post(f"{API}/vouchers/nudge/digest/send-now",
+                           headers=_h(gov_token), timeout=20)
+        assert r1.status_code == r2.status_code == 200
+        assert r2.json()["digests_new"] == 0
+
+    def test_digest_history_admin_only(self, gov_token):
+        r = requests.get(f"{API}/vouchers/nudge/digest/history",
+                         headers=_h(gov_token), timeout=15)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_digest_history_forbidden_plain_employee(self):
+        emp_tok = _login("joseph.williams@gov.sl", "Employee@2026")
+        r = requests.get(f"{API}/vouchers/nudge/digest/history",
+                         headers=_h(emp_tok), timeout=15)
+        assert r.status_code == 403
+
+
+# ============================================================
 # MoF pack cover sign-off block
 # ============================================================
 
@@ -106,21 +154,23 @@ class TestPackCoverSignOff:
         """Full workflow: create → submit → approve → authorize a voucher, then
         request the batch PDF and confirm the Minister sign-off block is on
         the cover page."""
-        # unique period
-        period = f"20{55 + secrets.randbelow(30)}-{1 + secrets.randbelow(12):02d}"
-        # find an employee attached to the MOF-HQ branch
+        # Find a period with no existing voucher for MOF-HQ (retry loop)
         emps = requests.get(f"{API}/branches/{mof_branch['id']}/employees",
                             headers=_h(gov_token), timeout=15).json()
-        # accept any employee
         emp = emps[0]
-        # Build a minimal voucher payload
-        body = {"branch_id": mof_branch["id"], "period": period,
-                "line_items": [{"employee_id": emp["id"], "gross": 4000,
-                                "paye": 200, "nassit_employee": 100,
-                                "loan_deduction": 0, "net": 3700}]}
-        r = requests.post(f"{API}/vouchers", headers=_h(gov_token), json=body, timeout=15)
-        assert r.status_code == 200, r.text
-        vid = r.json()["id"]
+        vid = None
+        period = None
+        for _ in range(20):
+            period = f"20{55 + secrets.randbelow(45)}-{1 + secrets.randbelow(12):02d}"
+            body = {"branch_id": mof_branch["id"], "period": period,
+                    "line_items": [{"employee_id": emp["id"], "gross": 4000,
+                                    "paye": 200, "nassit_employee": 100,
+                                    "loan_deduction": 0, "net": 3700}]}
+            r = requests.post(f"{API}/vouchers", headers=_h(gov_token), json=body, timeout=15)
+            if r.status_code == 200:
+                vid = r.json()["id"]
+                break
+        assert vid is not None, f"could not find a clean period after 20 tries"
 
         # submit → supervisor_approve → start_review → approve → authorize
         # gov admin created it — supervisor is Adama; but admin can pass through
@@ -157,6 +207,7 @@ class TestPackCoverSignOff:
         assert len(reader.pages) >= 2  # cover + at least one voucher
         cover_text = (reader.pages[0].extract_text() or "").lower()
         for keyword in ("mof payment pack",
+                        "republic of sierra leone",
                         "ministry of finance",
                         "minister of finance",
                         "full name",
@@ -164,6 +215,16 @@ class TestPackCoverSignOff:
                         "official stamp",
                         "counter-sign"):
             assert keyword in cover_text, f"Missing '{keyword}' on cover page"
+
+        # Coat-of-arms watermark image must be embedded on the cover
+        resources = reader.pages[0].get("/Resources") or {}
+        xo = resources.get_object().get("/XObject") if resources else None
+        img_count = 0
+        if xo:
+            xo = xo.get_object()
+            img_count = sum(1 for _k, v in xo.items()
+                            if v.get_object().get("/Subtype") == "/Image")
+        assert img_count >= 1, "Expected the coat-of-arms watermark image on the cover"
 
 
 # ============================================================
