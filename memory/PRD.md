@@ -524,3 +524,12 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Resend**: STILL pending — user's DNS records not yet published (NXDOMAIN). Next fork: check dns, POST /domains/{id}/verify, then set SENDER_EMAIL and restart (see /app/memory/resend_domain.md).
 - NOTE: branch supervisors are seeded for ALL 3 gov branches (MOF-HQ Adama, MOH-FT Foday, MOL-FT Joseph). test_plain_employee_sees_nothing relies on MOL-FT having no vouchers — don't leave stray vouchers in seed periods.
 - Full suite: 438 passed.
+
+## v1.27 (Jun 2026) — Mende narration, pack history, period-close banner
+- **Mende (3rd language)**: `translate_mende.py` used Emergent LLM (Claude Sonnet) to translate all 44 narrations → `mende.py` (MENDE dict, attached in scenes.py like Krio). produce.py generalized (`narration_{lang}`, LANG_TITLE map); all 7 `-mende` videos produced + seeded (21 training videos total: en/krio/mende). make_subtitles.py covers all 3 langs (srclang men, label Mɛnde). VideosPage toggle now 3-way (video-lang-en/krio/mende), playlist hides all non-en variants.
+- **Pack history**: GET /api/vouchers/pack-history (finance/admin, 24 latest mof_pack_emails). PackEmailCard shows collapsible history table (pack-history-toggle/table, per-row Download via export-batch.pdf).
+- **Period-close banner**: authorize response now includes `pack_email` when the pack auto-send was attempted; VoucherDetail toasts "Period closed — MoF pack emailed to X". Vouchers page shows green banner (period-closed-banner + period-closed-download) when history has a sent pack for the filtered period, or the latest sent pack is <24h old. Demo history record seeded for period 2041-11.
+- Fixed flaky test_duplicate_and_double_pay_guards (retries on residue-period collision).
+- **Resend**: DNS records STILL not added by user; Resend domain status moved to "failed" (it stops checking) — once user adds the 3 records, re-trigger POST /domains/{id}/verify (works from failed state), then set SENDER_EMAIL + restart backend. See /app/memory/resend_domain.md.
+- **POD RESPAWN GOTCHA (recurring)**: apt (ffmpeg) + playwright chromium + pip extras (pypdf, dnspython) do NOT survive pod respawns ("Credits Recharged" gaps). Reinstall before any video production: `apt-get install -y ffmpeg && python -m playwright install chromium`.
+- Full suite: 438 passed.

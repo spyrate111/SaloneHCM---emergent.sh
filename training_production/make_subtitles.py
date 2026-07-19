@@ -49,8 +49,8 @@ def ts(x: float) -> str:
 manifest = json.loads(MANIFEST.read_text())
 
 for v in VIDEOS:
-    for lang in ("en", "krio"):
-        slug = v["slug"] + ("" if lang == "en" else "-krio")
+    for lang in ("en", "krio", "mende"):
+        slug = v["slug"] + ("" if lang == "en" else f"-{lang}")
         entry = manifest.get(slug)
         if not entry:
             continue
@@ -58,7 +58,7 @@ for v in VIDEOS:
         lines = ["WEBVTT", ""]
         n = 1
         for sc, off in zip(v["scenes"], offsets):
-            text = sc["narration_krio"] if lang == "krio" else sc["narration"]
+            text = sc["narration"] if lang == "en" else sc[f"narration_{lang}"]
             key = hashlib.sha1(text.encode()).hexdigest()[:16]
             ap = AUDIO / f"{key}.mp3"
             adur = dur_of(ap) if ap.exists() else max(4.0, len(text) / 16)
@@ -68,8 +68,8 @@ for v in VIDEOS:
         (OUT / f"{slug}.vtt").write_text("\n".join(lines), encoding="utf-8")
         entry["captions"] = [{
             "src": f"/api/static/training/subs/{slug}.vtt",
-            "srclang": "kri" if lang == "krio" else "en",
-            "label": "Krio" if lang == "krio" else "English",
+            "srclang": {"en": "en", "krio": "kri", "mende": "men"}[lang],
+            "label": {"en": "English", "krio": "Krio", "mende": "Mɛnde"}[lang],
         }]
         print(f"wrote {slug}.vtt ({n - 1} cues)")
 

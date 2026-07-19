@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import api from "../lib/api";
 import { fmtSLE, downloadBlob } from "../lib/api";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../lib/features";
-import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown, Mail } from "lucide-react";
+import { FileCheck2, Plus, Zap, Building2, Inbox, FileDown, Mail, CheckCircle2 } from "lucide-react";
 import VoucherDetail, { STATUS_PILL } from "../components/VoucherDetail";
 import BranchesPanel from "../components/BranchesPanel";
 import { CreateVoucherModal, GenerateFromRunModal } from "../components/VoucherCreateModals";
@@ -30,6 +30,7 @@ export default function Vouchers() {
   const [detailId, setDetailId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [packHistory, setPackHistory] = useState([]);
 
   const refresh = useCallback(async () => {
     const params = {};
@@ -44,7 +45,18 @@ export default function Vouchers() {
     setVouchers(v.data);
     setBranches(b.data);
     setSummary(s.data);
-  }, [period, branchId, status]);
+    if (canManage) {
+      api.get("/vouchers/pack-history").then((r) => setPackHistory(r.data || [])).catch(() => {});
+    }
+  }, [period, branchId, status, canManage]);
+
+  const closedPack = useMemo(() => {
+    const sent = packHistory.filter((h) => h.status === "sent");
+    if (period) return sent.find((h) => h.period === period) || null;
+    const latest = sent[0];
+    if (latest && Date.now() - new Date(latest.sent_at).getTime() < 24 * 3600 * 1000) return latest;
+    return null;
+  }, [packHistory, period]);
 
   useEffect(() => { if (has("payroll_vouchers")) refresh(); }, [refresh, has]);
 
@@ -109,7 +121,24 @@ export default function Vouchers() {
         )}
       </div>
 
-      {isAdminRole && <PackEmailCard />}
+      {isAdminRole && <PackEmailCard history={packHistory} onRefresh={refresh} />}
+
+      {canManage && closedPack && (
+        <div data-testid="period-closed-banner" className="flex flex-wrap items-center gap-3 bg-[#E4F7E7] border border-[#17A035]/50 rounded-lg px-4 py-3">
+          <CheckCircle2 className="w-5 h-5 text-[#128A2C] shrink-0" />
+          <div className="text-sm text-[#0A4A1E]">
+            <b>Period {closedPack.period} closed</b> — every branch voucher is payment-authorized.
+            MoF pack emailed to <b>{closedPack.to}</b> · {new Date(closedPack.sent_at).toLocaleString()}.
+          </div>
+          <button
+            data-testid="period-closed-download"
+            onClick={() => downloadBlob(`/vouchers/export-batch.pdf?period=${closedPack.period}`, `mof-voucher-pack-${closedPack.period}.pdf`).catch(() => toast.error("Download failed"))}
+            className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium border border-[#17A035]/50 text-[#0A4A1E] px-3 py-1.5 rounded-md hover:bg-white"
+          >
+            <FileDown className="w-3.5 h-3.5" /> Download pack
+          </button>
+        </div>
+      )}
 
       {tab === "branches" && isAdminRole ? (
         <BranchesPanel branches={branches} onChanged={refresh} />
@@ -181,16 +210,15 @@ export default function Vouchers() {
   );
 }
 
-function PackEmailCard() {
+function PackEmailCard({ history = [], onRefresh }) {
   const [email, setEmail] = useState("");
-  const [lastSent, setLastSent] = useState(null);
   const [sendPeriod, setSendPeriod] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     api.get("/vouchers/pack-config").then((r) => {
       setEmail(r.data.email || "");
-      setLastSent(r.data.last_sent);
     }).catch(() => {});
   }, []);
 
@@ -212,8 +240,7 @@ function PackEmailCard() {
       const r = await api.post(`/vouchers/pack-config/send-now?period=${sendPeriod}`);
       if (r.data.ok) toast.success(`Pack sent to ${r.data.to}`);
       else toast.error(`Send failed: ${r.data.error || "email provider rejected"}`);
-      const cfg = await api.get("/vouchers/pack-config");
-      setLastSent(cfg.data.last_sent);
+      onRefresh?.();
     } catch (e) {
       toast.error(typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Could not send");
     } finally {
@@ -262,9 +289,53 @@ function PackEmailCard() {
           </button>
         </div>
       </div>
-      {lastSent && (
-        <div className="text-[11px] text-[#686D76] mt-2" data-testid="pack-last-sent">
-          Last {lastSent.status === "sent" ? "sent" : "attempt (failed)"}: period {lastSent.period} → {lastSent.to} · {new Date(lastSent.sent_at).toLocaleString()}
+      {history.length > 0 && (
+        <div className="mt-3">
+          <button
+            data-testid="pack-history-toggle"
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-[11px] font-medium text-[#26547C] hover:underline"
+          >
+            {showHistory ? "Hide" : "Show"} pack history ({history.length})
+          </button>
+          {showHistory && (
+            <table className="w-full text-xs mt-2" data-testid="pack-history-table">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-[#525860]">
+                  <th className="text-left py-1.5 pr-3 font-medium">Period</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">Sent to</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">Vouchers</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">Status</th>
+                  <th className="text-left py-1.5 pr-3 font-medium">When</th>
+                  <th className="text-right py-1.5 font-medium">Pack</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} className="border-t border-[#F1EEE6]">
+                    <td className="py-1.5 pr-3 font-data">{h.period}</td>
+                    <td className="py-1.5 pr-3">{h.to}</td>
+                    <td className="py-1.5 pr-3 font-data">{h.voucher_count}</td>
+                    <td className="py-1.5 pr-3">
+                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${h.status === "sent" ? "bg-[#E4F7E7] text-[#128A2C]" : "bg-[#E9F2FB] text-[#005A9C]"}`}>
+                        {h.status}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3 text-[#686D76]">{new Date(h.sent_at).toLocaleString()}</td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        data-testid={`pack-history-download-${h.period}`}
+                        onClick={() => downloadBlob(`/vouchers/export-batch.pdf?period=${h.period}`, `mof-voucher-pack-${h.period}.pdf`).catch(() => toast.error("Download failed"))}
+                        className="inline-flex items-center gap-1 text-[11px] text-[#0A4A1E] hover:underline"
+                      >
+                        <FileDown className="w-3 h-3" /> Download
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>

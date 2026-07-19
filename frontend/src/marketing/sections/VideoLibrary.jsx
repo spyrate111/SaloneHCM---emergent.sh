@@ -28,7 +28,7 @@ export default function VideoLibrary() {
 
   useEffect(() => {
     api.get("/marketing/videos?limit=20").then((r) => {
-      const list = (r.data || []).filter((v) => v.lang !== "krio").slice(0, 12);
+      const list = (r.data || []).filter((v) => !v.lang || v.lang === "en").slice(0, 12);
       setVideos(list);
       if (list.length > 0) {
         setFeatured(list[0]);

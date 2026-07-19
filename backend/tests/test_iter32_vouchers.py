@@ -182,8 +182,17 @@ class TestVoucherWorkflow:
         assert detail["returned_reason"]
 
     def test_duplicate_and_double_pay_guards(self, gov_token, mof_branch, mof_employee):
-        period = _rand_period()
-        v = _make_voucher(gov_token, mof_branch, mof_employee, period=period)
+        v = None
+        for _ in range(5):  # retry on residue-voucher period collision
+            period = _rand_period()
+            r0 = requests.post(f"{API}/vouchers", headers=_h(gov_token), json={
+                "branch_id": mof_branch["id"], "period": period,
+                "line_items": [{"employee_id": mof_employee["id"], "gross": 5000, "paye": 700,
+                                "nassit_employee": 250}]}, timeout=15)
+            if r0.status_code == 200:
+                v = r0.json()
+                break
+        assert v, f"could not create voucher after retries: {r0.status_code} {r0.text}"
         # same branch + period → 409
         dup = requests.post(f"{API}/vouchers", headers=_h(gov_token), json={
             "branch_id": mof_branch["id"], "period": period,

@@ -407,6 +407,13 @@ async def set_pack_config(body: PackConfigIn, user: dict = Depends(require_admin
     return {"ok": True, "email": email}
 
 
+@vouchers_router.get("/pack-history")
+async def pack_history(user: dict = Depends(get_current_user)):
+    if not _is_finance(user):
+        raise HTTPException(403, "Finance officers or admins only")
+    return await db.mof_pack_emails.find(tenant_filter(user), {"_id": 0}).sort("sent_at", -1).to_list(24)
+
+
 @vouchers_router.post("/pack-config/send-now")
 async def send_pack_now(period: str, user: dict = Depends(require_admin)):
     result = await _send_period_pack(user, period, force=True)
@@ -816,12 +823,13 @@ async def _send_period_pack(user: dict, period: str, force: bool = False) -> dic
             "voucher_count": len(vs), "error": res.get("error")}
 
 
-async def _maybe_send_period_pack(user: dict, period: str) -> None:
+async def _maybe_send_period_pack(user: dict, period: str) -> Optional[dict]:
     try:
-        await _send_period_pack(user, period)
+        return await _send_period_pack(user, period)
     except Exception as e:  # never block payment authorization on email problems
         import logging
         logging.getLogger("salonehcm.vouchers").warning("MoF pack auto-email failed for %s: %s", period, e)
+        return None
 
 
 @vouchers_router.post("/{vid}/authorize")
@@ -837,5 +845,7 @@ async def authorize_payment(vid: str, body: ActionIn, user: dict = Depends(get_c
         raise HTTPException(403, "Dual control — the finance approver cannot also authorize payment")
     result = await _apply_transition(vid, user, "payment_authorized", "authorize", body.note,
                                      {"authorized_by": user["email"], "authorized_at": iso(now_utc())})
-    await _maybe_send_period_pack(user, v["period"])
+    pack = await _maybe_send_period_pack(user, v["period"])
+    if pack and pack.get("attempted"):
+        result["pack_email"] = pack
     return result

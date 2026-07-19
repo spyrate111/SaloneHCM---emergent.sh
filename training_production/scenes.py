@@ -206,3 +206,12 @@ from krio import KRIO  # noqa: E402
 for _v in VIDEOS:
     for _sc, _kn in zip(_v["scenes"], KRIO[_v["slug"]]):
         _sc["narration_krio"] = _kn
+
+try:
+    from mende import MENDE  # noqa: E402
+except ImportError:
+    MENDE = {}
+
+for _v in VIDEOS:
+    for _sc, _mn in zip(_v["scenes"], MENDE.get(_v["slug"], [])):
+        _sc["narration_mende"] = _mn

@@ -47,8 +47,13 @@ export default function VoucherDetail({ voucherId, user, canManage, isAdminRole,
   const act = async (path, body = {}, ok = "Done") => {
     setBusy(true);
     try {
-      await api.post(`/vouchers/${voucherId}/${path}`, body);
+      const r = await api.post(`/vouchers/${voucherId}/${path}`, body);
       toast.success(ok);
+      const pack = r.data?.pack_email;
+      if (pack?.attempted) {
+        if (pack.ok) toast.success(`Period closed — MoF pack emailed to ${pack.to}`);
+        else toast.error(`Period closed, but pack email failed: ${pack.error || "provider error"}`);
+      }
       setReturning(false);
       setReason("");
       await load();

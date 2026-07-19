@@ -644,5 +644,335 @@
         "label": "Krio"
       }
     ]
+  },
+  "getting-started-mende": {
+    "slug": "getting-started-mende",
+    "base_slug": "getting-started",
+    "lang": "mende",
+    "title": "Getting Started & Onboarding \u2014 your first day in SaloneHCM (M\u025bnde)",
+    "summary": "Sign in, learn the dashboard, master the navigation, and discover every module with the Feature Directory. The essential first video for every new user.",
+    "persona": "general",
+    "sort": 11,
+    "duration_s": 108,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 19,
+        "label": "Signing in"
+      },
+      {
+        "t": 38,
+        "label": "Dashboard tour"
+      },
+      {
+        "t": 55,
+        "label": "Navigation"
+      },
+      {
+        "t": 71,
+        "label": "Feature Directory"
+      },
+      {
+        "t": 91,
+        "label": "Your profile & help"
+      }
+    ],
+    "src": "/api/static/training/getting-started-mende.mp4",
+    "poster": "/api/static/training/getting-started-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/getting-started-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
+  },
+  "administrator-guide-mende": {
+    "slug": "administrator-guide-mende",
+    "base_slug": "administrator-guide",
+    "lang": "mende",
+    "title": "Administrator Guide \u2014 users, access, settings & branches (M\u025bnde)",
+    "summary": "For system administrators: inviting users, granting Finance and MoF approval powers, organisation settings, plan tiers, and managing branches and offices.",
+    "persona": "government",
+    "sort": 21,
+    "duration_s": 139,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 19,
+        "label": "Users & access"
+      },
+      {
+        "t": 36,
+        "label": "Finance & MoF flags"
+      },
+      {
+        "t": 58,
+        "label": "Organisation settings"
+      },
+      {
+        "t": 74,
+        "label": "Branches & offices"
+      },
+      {
+        "t": 107,
+        "label": "Audit log"
+      },
+      {
+        "t": 123,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/administrator-guide-mende.mp4",
+    "poster": "/api/static/training/administrator-guide-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/administrator-guide-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
+  },
+  "hr-officer-training-mende": {
+    "slug": "hr-officer-training-mende",
+    "base_slug": "hr-officer-training",
+    "lang": "mende",
+    "title": "HR Officer Training \u2014 employees, leave, attendance & documents (M\u025bnde)",
+    "summary": "The complete human resources workflow: maintaining employee records, approving leave, monitoring attendance, and managing the secure document vault.",
+    "persona": "general",
+    "sort": 31,
+    "duration_s": 95,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 16,
+        "label": "Employee register"
+      },
+      {
+        "t": 36,
+        "label": "Leave management"
+      },
+      {
+        "t": 52,
+        "label": "Attendance"
+      },
+      {
+        "t": 67,
+        "label": "Document vault"
+      },
+      {
+        "t": 83,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/hr-officer-training-mende.mp4",
+    "poster": "/api/static/training/hr-officer-training-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/hr-officer-training-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
+  },
+  "payroll-officer-training-mende": {
+    "slug": "payroll-officer-training-mende",
+    "base_slug": "payroll-officer-training",
+    "lang": "mende",
+    "title": "Payroll Officer Training \u2014 runs, payslips, bank files & compliance (M\u025bnde)",
+    "summary": "Run gross-to-net payroll with Sierra Leone PAYE and NASSIT, preview before you commit, export payslips and bank files, and file NRA returns on time.",
+    "persona": "general",
+    "sort": 41,
+    "duration_s": 112,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "The payroll engine"
+      },
+      {
+        "t": 50,
+        "label": "Committing a run"
+      },
+      {
+        "t": 67,
+        "label": "Payslips & bank files"
+      },
+      {
+        "t": 83,
+        "label": "Compliance & filing"
+      },
+      {
+        "t": 98,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/payroll-officer-training-mende.mp4",
+    "poster": "/api/static/training/payroll-officer-training-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/payroll-officer-training-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
+  },
+  "vouchers-deep-dive-mende": {
+    "slug": "vouchers-deep-dive-mende",
+    "base_slug": "vouchers-deep-dive",
+    "lang": "mende",
+    "title": "Payroll Vouchers Deep-dive \u2014 branch submission to MoF authorization (M\u025bnde)",
+    "summary": "The centralized voucher repository end-to-end: branch submission, supervisor approval, finance review, MoF payment authorization \u2014 and the anti-fraud rails at every step.",
+    "persona": "government",
+    "sort": 51,
+    "duration_s": 155,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 23,
+        "label": "The central repository"
+      },
+      {
+        "t": 65,
+        "label": "Inside a voucher"
+      },
+      {
+        "t": 83,
+        "label": "The approval chain"
+      },
+      {
+        "t": 109,
+        "label": "Returns & corrections"
+      },
+      {
+        "t": 125,
+        "label": "Fraud rails"
+      },
+      {
+        "t": 144,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/vouchers-deep-dive-mende.mp4",
+    "poster": "/api/static/training/vouchers-deep-dive-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/vouchers-deep-dive-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
+  },
+  "employee-self-service-mende": {
+    "slug": "employee-self-service-mende",
+    "base_slug": "employee-self-service",
+    "lang": "mende",
+    "title": "Employee Self-Service \u2014 payslips, leave & attendance (M\u025bnde)",
+    "summary": "For every employee: view and download payslips, request leave, clock attendance, and keep your personal records current \u2014 all from your own portal.",
+    "persona": "general",
+    "sort": 61,
+    "duration_s": 94,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 15,
+        "label": "Signing in"
+      },
+      {
+        "t": 28,
+        "label": "Your payslips"
+      },
+      {
+        "t": 48,
+        "label": "Requesting leave"
+      },
+      {
+        "t": 66,
+        "label": "Attendance"
+      },
+      {
+        "t": 80,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/employee-self-service-mende.mp4",
+    "poster": "/api/static/training/employee-self-service-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/employee-self-service-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
+  },
+  "gov-modules-tour-mende": {
+    "slug": "gov-modules-tour-mende",
+    "base_slug": "gov-modules-tour",
+    "lang": "mende",
+    "title": "Government Modules Tour \u2014 civil service, establishment & transparency (M\u025bnde)",
+    "summary": "For MDAs and government payroll teams: grade & step salary structure, establishment control, pre-payroll budget checks, and the public transparency portal.",
+    "persona": "government",
+    "sort": 71,
+    "duration_s": 134,
+    "chapters": [
+      {
+        "t": 0,
+        "label": "Welcome"
+      },
+      {
+        "t": 18,
+        "label": "Civil service structure"
+      },
+      {
+        "t": 40,
+        "label": "Establishment control"
+      },
+      {
+        "t": 77,
+        "label": "Budget checks"
+      },
+      {
+        "t": 100,
+        "label": "Transparency portal"
+      },
+      {
+        "t": 120,
+        "label": "Wrap-up"
+      }
+    ],
+    "src": "/api/static/training/gov-modules-tour-mende.mp4",
+    "poster": "/api/static/training/gov-modules-tour-mende.jpg",
+    "category": "training",
+    "captions": [
+      {
+        "src": "/api/static/training/subs/gov-modules-tour-mende.vtt",
+        "srclang": "men",
+        "label": "M\u025bnde"
+      }
+    ]
   }
 }

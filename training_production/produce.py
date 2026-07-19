@@ -152,11 +152,14 @@ async def do_step(page, step):
         await page.wait_for_timeout(int(step[1] * 1000))
 
 
+LANG_TITLE = {"krio": " (Krio)", "mende": " (Mɛnde)"}
+
+
 async def produce(video: dict, lang: str = "en") -> dict:
     slug = video["slug"] + ("" if lang == "en" else f"-{lang}")
     print(f"=== producing {slug} ===", flush=True)
     for sc in video["scenes"]:
-        text = sc["narration_krio"] if lang == "krio" else sc["narration"]
+        text = sc["narration"] if lang == "en" else sc[f"narration_{lang}"]
         sc["audio"] = await tts_for(text)
         sc["adur"] = dur_of(sc["audio"])
     print(f"narration total {sum(s['adur'] for s in video['scenes']):.0f}s", flush=True)
@@ -224,9 +227,9 @@ async def produce(video: dict, lang: str = "en") -> dict:
                 for sc, off in zip(video["scenes"], offsets) if sc.get("chapter")]
     entry = {
         "slug": slug, "base_slug": video["slug"], "lang": lang,
-        "title": video["title"] + (" (Krio)" if lang == "krio" else ""),
+        "title": video["title"] + LANG_TITLE.get(lang, ""),
         "summary": video["summary"],
-        "persona": video["persona"], "sort": video["sort"] + (1 if lang == "krio" else 0),
+        "persona": video["persona"], "sort": video["sort"] + (0 if lang == "en" else 1),
         "duration_s": int(total), "chapters": chapters,
         "src": f"/api/static/training/{slug}.mp4",
         "poster": f"/api/static/training/{slug}.jpg",

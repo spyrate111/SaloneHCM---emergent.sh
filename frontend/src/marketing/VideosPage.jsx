@@ -40,7 +40,7 @@ export default function VideosPage() {
   const visible = useMemo(() => {
     const term = q.trim().toLowerCase();
     return videos.filter((v) => {
-      if (v.lang === "krio") return false;
+      if (v.lang && v.lang !== "en") return false;
       if (cat !== "all" && v.category !== cat) return false;
       if (term && !`${v.title} ${v.summary}`.toLowerCase().includes(term)) return false;
       return true;
@@ -88,9 +88,9 @@ export default function VideosPage() {
                       {PERSONA_LABELS[active.persona] || active.persona}
                     </span>
                     <span className="text-[11px] text-[#525860] flex items-center gap-1"><Clock className="w-3 h-3" /> {fmt(active.duration_s)}</span>
-                    {langSet?.krio && langSet?.en && (
+                    {langSet && Object.keys(langSet).length > 1 && (
                       <span className="inline-flex rounded-full border border-[#EAE7DF] overflow-hidden" data-testid="video-lang-toggle">
-                        {["en", "krio"].map((lng) => (
+                        {["en", "krio", "mende"].filter((lng) => langSet[lng]).map((lng) => (
                           <button
                             key={lng}
                             type="button"
@@ -98,7 +98,7 @@ export default function VideosPage() {
                             className={`px-2.5 h-6 text-[10px] font-bold uppercase tracking-wide transition-colors ${(active.lang || "en") === lng ? "bg-[#0072C6] text-white" : "bg-white text-[#073A16] hover:bg-[#F1EEE6]"}`}
                             data-testid={`video-lang-${lng}`}
                           >
-                            {lng === "en" ? "English" : "Krio"}
+                            {{ en: "English", krio: "Krio", mende: "Mɛnde" }[lng]}
                           </button>
                         ))}
                       </span>
