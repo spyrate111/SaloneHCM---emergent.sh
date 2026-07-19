@@ -1,4 +1,5 @@
-import { Menu } from "lucide-react";
+import { Menu, Smartphone } from "lucide-react";
+import { Link } from "react-router-dom";
 import CompanySwitcher from "./CompanySwitcher";
 
 /** Top header for the authenticated app shell. */
@@ -25,6 +26,14 @@ export default function AppHeader({ company, tierColor, isSuperAdmin, onOpenSide
         {isSuperAdmin && <div className="hidden md:block"><CompanySwitcher /></div>}
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
+        <Link
+          to="/m"
+          data-testid="header-mobile-launcher"
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#0A4A1E] bg-[#E4F7E7] hover:bg-[#D6F0DB] px-2.5 py-1.5 rounded-full"
+          title="Open the mobile app view"
+        >
+          <Smartphone className="w-3.5 h-3.5" /> Mobile
+        </Link>
         <span
           data-testid="header-tier-badge"
           className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-medium px-2.5 py-1 rounded-full ${tierColor}`}

@@ -20,7 +20,7 @@ from routers import (
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
-    vouchers, training,
+    vouchers, training, mobile, webauthn,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -90,6 +90,8 @@ api.include_router(payroll_rails.cutoff_router, prefix="/payroll")
 api.include_router(vouchers.branches_router)
 api.include_router(vouchers.vouchers_router)
 api.include_router(training.router)
+api.include_router(mobile.router)
+api.include_router(webauthn.router)
 
 
 @api.get("/")

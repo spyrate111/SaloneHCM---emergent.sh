@@ -45,6 +45,13 @@ import DemoPage from "./marketing/DemoPage";
 import TourPage from "./marketing/TourPage";
 import VideosPage from "./marketing/VideosPage";
 import AdminVideos from "./pages/admin/Videos";
+import MobileLayout from "./mobile/MobileLayout";
+import MobileHome from "./mobile/pages/MobileHome";
+import MobilePayslips from "./mobile/pages/MobilePayslips";
+import MobileLeave from "./mobile/pages/MobileLeave";
+import MobileClock from "./mobile/pages/MobileClock";
+import MobileVouchers from "./mobile/pages/MobileVouchers";
+import MobileProfile from "./mobile/pages/MobileProfile";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -101,6 +108,15 @@ export default function App() {
             <Route path="/companies" element={<ProtectedRoute superAdminOnly><Companies /></ProtectedRoute>} />
             <Route path="/admin/videos" element={<ProtectedRoute superAdminOnly><AdminVideos /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
+          </Route>
+          {/* Mobile PWA shell — /m/* — same auth, same backend, mobile-optimized layout */}
+          <Route path="/m" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
+            <Route index element={<MobileHome />} />
+            <Route path="payslips" element={<MobilePayslips />} />
+            <Route path="leave" element={<MobileLeave />} />
+            <Route path="clock" element={<MobileClock />} />
+            <Route path="vouchers" element={<MobileVouchers />} />
+            <Route path="profile" element={<MobileProfile />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

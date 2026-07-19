@@ -25,8 +25,9 @@
     }
   ],
   "shortcuts": [
-    { "name": "My payslip", "url": "/self-service" },
-    { "name": "Request leave", "url": "/leave" },
-    { "name": "Documents", "url": "/documents" }
+    { "name": "Mobile home", "url": "/m", "description": "SaloneHCM mobile home screen" },
+    { "name": "My payslip", "url": "/m/payslips" },
+    { "name": "Clock in / out", "url": "/m/clock" },
+    { "name": "Request leave", "url": "/m/leave" }
   ]
 }
