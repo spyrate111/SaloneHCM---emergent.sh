@@ -86,6 +86,16 @@ class TestBalancesCrud:
 class TestBudgetCheckVerdicts:
     def test_check_safe_verdict_persists_snapshot(self, gov_token):
         p = _period()
+        # Self-heal: earlier suite runs poison FUTURE periods (period+2/+3)
+        # with 1.0 SLE allocations; months later those become the CURRENT
+        # period. Discover the codes in play and restore generous allocations
+        # before asserting "safe".
+        pre = requests.post(f"{API}/payroll-budget/check", headers=_h(gov_token), json={"period": p}, timeout=15).json()
+        for row in pre.get("by_code", []):
+            need = max(row["total_needed_sle"] * 2, 1_000_000.0)
+            requests.put(f"{API}/payroll-budget/balances/{row['budget_code']}",
+                         headers=_h(gov_token),
+                         json={"allocated_sle": need, "period": p, "note": "self-heal baseline"}, timeout=15)
         r = requests.post(f"{API}/payroll-budget/check", headers=_h(gov_token), json={"period": p}, timeout=15)
         assert r.status_code == 200, r.text
         d = r.json()

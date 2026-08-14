@@ -4,7 +4,7 @@ set of dense, role-aware endpoints that minimise round-trips on cellular
 networks."""
 from __future__ import annotations
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -160,6 +160,17 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
     if not emp:
         raise HTTPException(404, "Employee not found")
     today = now_utc().strftime("%Y-%m-%d")
+
+    # Idempotency guard — offline queue replays (multiple drain passes /
+    # BackgroundSync restarts) can resend the same punch. A same-kind punch
+    # within 15s is a duplicate: return the existing row instead of inserting.
+    dup = await db.attendance.find_one({
+        "employee_id": eid, "date": today, "kind": body.kind,
+        "clocked_at": {"$gte": iso(now_utc() - timedelta(seconds=15))},
+        **tenant_filter(user),
+    }, {"_id": 0}, sort=[("clocked_at", -1)])
+    if dup:
+        return dup
 
     # Compute distance-to-branch if branch has coords + punch has coords.
     distance_m: Optional[float] = None

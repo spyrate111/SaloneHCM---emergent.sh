@@ -805,15 +805,67 @@ async def delete_voucher(vid: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+async def _push_next_approvers(v_full: dict, new_status: str, user: dict) -> None:
+    """After a voucher transition, buzz whoever's phone the ball is now in.
+    Silent-fails — never blocks the API on push infra."""
+    import push_service
+    if not push_service.is_configured():
+        return
+    from core import db as _db
+    tf = tenant_filter(user)
+    target_user_ids: set[str] = set()
+    branch = await _db.branches.find_one({"id": v_full["branch_id"], **tf}, {"_id": 0, "supervisor_user_id": 1, "name": 1})
+    if new_status == "pending_supervisor" and branch and branch.get("supervisor_user_id"):
+        target_user_ids.add(branch["supervisor_user_id"])
+    elif new_status == "submitted":
+        # Any finance officer in the tenant
+        for u in await _db.users.find({"role": "finance_officer", **tf},
+                                      {"_id": 0, "id": 1}).to_list(50):
+            target_user_ids.add(u["id"])
+    elif new_status == "approved":
+        for u in await _db.users.find({"role": "mof_approver", **tf},
+                                      {"_id": 0, "id": 1}).to_list(50):
+            target_user_ids.add(u["id"])
+    elif new_status == "returned":
+        # Return goes back to the submitter
+        if v_full.get("submitted_by"):
+            sub = await _db.users.find_one({"email": v_full["submitted_by"], **tf},
+                                           {"_id": 0, "id": 1})
+            if sub:
+                target_user_ids.add(sub["id"])
+    if not target_user_ids:
+        return
+    title_map = {
+        "pending_supervisor": "Voucher needs your sign-off",
+        "submitted": "New voucher submitted for finance review",
+        "approved": "Voucher awaits your MoF authorization",
+        "returned": "Voucher returned for correction",
+    }
+    body = (f"{v_full['voucher_ref']} · {(branch or {}).get('name') or v_full.get('branch_name','')} · "
+            f"{v_full.get('period','')}")
+    payload = {"title": title_map.get(new_status, "Voucher update"),
+               "body": body, "url": "/m/vouchers", "kind": "voucher",
+               "voucher_ref": v_full["voucher_ref"]}
+    import asyncio as _asyncio
+    await _asyncio.gather(
+        *[push_service.fanout_to_user(uid, payload) for uid in target_user_ids],
+        return_exceptions=True,
+    )
+
+
 async def _apply_transition(vid: str, user: dict, new_status: str, action: str,
                             note: str, extra: Optional[dict] = None) -> dict:
-    v = await db.payroll_vouchers.find_one({"id": vid, **tenant_filter(user)}, {"_id": 0, "status": 1})
+    v = await db.payroll_vouchers.find_one({"id": vid, **tenant_filter(user)}, {"_id": 0})
     hist = _hist(user, action, v["status"], new_status, note)
     sets = {"status": new_status, "updated_at": iso(now_utc()), **(extra or {})}
     await db.payroll_vouchers.update_one(
         {"id": vid, **tenant_filter(user)},
         {"$set": sets, "$push": {"status_history": hist}})
     await audit(f"voucher_{action}", f"payroll_vouchers/{vid}", user, {"to": new_status, "note": note})
+    try:
+        await _push_next_approvers(v, new_status, user)
+    except Exception:  # noqa: BLE001
+        pass  # never fail a transition on a push error
     return {"ok": True, "status": new_status}
 
 

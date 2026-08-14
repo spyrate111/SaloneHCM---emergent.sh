@@ -69,7 +69,7 @@ Manager Self-Service (`/team`), Manager Leave Approval, Decision Brief PDF, Docu
 ### P2
 - **DONE (iter12)** ~~Twilio bulk SMS payslips (Gov tier — requires user API keys)~~ — LIVE; user must enable +232 region in Twilio console
 - **DONE (iter12)** ~~Resend email approver notifications for scenarios (requires user API key)~~ — LIVE; user on free plan so deliverable destinations are restricted
-- Mobile ESS PWA — ICONS + manifest shipped iter9; offline-first still pending
+- Mobile ESS PWA — offline-first shell + punch queue DONE and verified (v1.32)
 - **DONE (iter10)** ~~NRA export filing automation (Gov tier)~~
 - Cosmetic: Recharts width(-1) warning + UploadModal hydration warning
 
@@ -560,3 +560,11 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Tests**: `test_iter33_nudge_and_signoff.py` now 11 tests — TestNudgeDigest (send-now, idempotency, history, plain-employee 403) + strengthened cover-page assertion (also checks embedded image XObject). All pass; broader regression 48/48 across iter26/30/31/32/33.
 - **Resend**: DNS still NXDOMAIN on all 3 records; blocked until user publishes at GoDaddy.
 
+
+## v1.32 (Aug 2026) — PWA offline shell VERIFIED + drain race fix
+- **Offline app-shell caching verified end-to-end** (user's reported bug: offline refresh → network error). True-offline Playwright test (`PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1` + `ctx.route` abort + `set_offline` — note: plain `set_offline` does NOT emulate offline for SW-context fetches, giving false passes): offline reload renders the full mobile shell; offline punch → 202 + IndexedDB row (`status: queued`) + amber "1 punch queued" badge + toast; reconnect → queue drains, badge clears, punch appears in today list and lands in `db.attendance` exactly once.
+- **BUG FOUND + FIXED — duplicate punch replay on reconnect**: reconnect fires browser online event + manual dispatch + BackgroundSync concurrently → 3 parallel `drainQueue()` passes each replayed the same queued item (3 identical rows 35ms apart in DB). Fix (a) `sw.js`: drain mutex (`_drainInFlight` promise guard around `_drainQueue`); (b) `routers/mobile.py` punch endpoint: 15s idempotency guard — same employee+kind+date within 15s returns the existing row instead of inserting.
+- **Post-sync staleness fix**: after a successful drain, SW deletes cached `/api/mobile/*` GETs (`invalidateMobileApiCache`) so the refresh after sync hits the network (stale-while-revalidate previously served the pre-punch cached list).
+- **Test-suite time-bombs fixed**: (1) `test_iter29_budget_check.py` safe-verdict test — earlier runs poison FUTURE periods (period+2/+3) with 1.0 SLE allocations which later become the current period; test now self-heals by restoring generous allocations for all codes in play before asserting. (2) `test_iter32_vouchers.py` dup-employee-422 test — random period could collide with residue vouchers (409 fires first); now retries with fresh periods.
+- Full regression: **458 passed, 7 skipped** (entire `/app/backend/tests`).
+- Offline test script kept at `/tmp/test_pwa_offline.py` (rebuild if pod respawns; launch chromium via `executable_path="/usr/bin/google-chrome"` — pw-browsers cache incomplete).

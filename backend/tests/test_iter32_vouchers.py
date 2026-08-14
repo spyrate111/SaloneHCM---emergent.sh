@@ -198,11 +198,15 @@ class TestVoucherWorkflow:
             "branch_id": mof_branch["id"], "period": period,
             "line_items": [{"employee_id": mof_employee["id"], "gross": 100}]}, timeout=15)
         assert dup.status_code == 409
-        # duplicate employee inside one voucher → 422
-        r = requests.post(f"{API}/vouchers", headers=_h(gov_token), json={
-            "branch_id": mof_branch["id"], "period": _rand_period(),
-            "line_items": [{"employee_id": mof_employee["id"], "gross": 100},
-                           {"employee_id": mof_employee["id"], "gross": 200}]}, timeout=15)
+        # duplicate employee inside one voucher → 422 (retry: a random period
+        # can collide with residue vouchers, firing the 409 guard first)
+        for _ in range(5):
+            r = requests.post(f"{API}/vouchers", headers=_h(gov_token), json={
+                "branch_id": mof_branch["id"], "period": _rand_period(),
+                "line_items": [{"employee_id": mof_employee["id"], "gross": 100},
+                               {"employee_id": mof_employee["id"], "gross": 200}]}, timeout=15)
+            if r.status_code != 409:
+                break
         assert r.status_code == 422
         # cleanup draft
         requests.delete(f"{API}/vouchers/{v['id']}", headers=_h(gov_token), timeout=15)

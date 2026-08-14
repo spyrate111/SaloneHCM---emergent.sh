@@ -45,6 +45,7 @@ import DemoPage from "./marketing/DemoPage";
 import TourPage from "./marketing/TourPage";
 import VideosPage from "./marketing/VideosPage";
 import AdminVideos from "./pages/admin/Videos";
+import Onboard from "./pages/Onboard";
 import MobileLayout from "./mobile/MobileLayout";
 import MobileHome from "./mobile/pages/MobileHome";
 import MobilePayslips from "./mobile/pages/MobilePayslips";
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/transparency/:slug" element={<Transparency />} />
           <Route path="/careers/:slug" element={<PublicCareers />} />
           <Route path="/verify/:cid" element={<Verify />} />
+          <Route path="/onboard/:token" element={<Onboard />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/directory" element={<FeatureDirectory />} />
