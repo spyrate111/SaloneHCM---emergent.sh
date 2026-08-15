@@ -133,6 +133,12 @@ def start():
         attach_nudges(scheduler)
     except Exception:
         logger.exception("Failed to attach voucher nudge scheduler")
+
+    try:
+        from ooz_alerts import attach as attach_ooz
+        attach_ooz(scheduler)
+    except Exception:
+        logger.exception("Failed to attach out-of-zone digest scheduler")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

@@ -14,6 +14,26 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 
 # ===== Public read-only endpoints (no auth) =====
+@router.get("/payslip/{vid}")
+async def public_payslip_verify(vid: str):
+    """Banks scan the payslip QR → this endpoint confirms authenticity.
+    Returns ONLY the data already printed on the payslip itself."""
+    ver = await db.payslip_verifications.find_one({"id": vid}, {"_id": 0})
+    if not ver:
+        return {"valid": False, "reason": "not_found"}
+    company = await db.companies.find_one({"id": ver.get("company_id")}, {"_id": 0}) or {}
+    return {
+        "valid": True,
+        "verification_id": vid,
+        "employee_name": ver.get("employee_name"),
+        "period": ver.get("period"),
+        "net": ver.get("net"),
+        "gross": ver.get("gross"),
+        "issued_by": company.get("name") or "SaloneHCM",
+        "issued_at": ver.get("created_at"),
+    }
+
+
 @router.get("/certificate/{cid}")
 async def public_certificate_verify(cid: str):
     """Anyone can verify a Certificate ID — returns ONLY the data printed on the certificate.

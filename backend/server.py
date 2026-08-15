@@ -20,7 +20,7 @@ from routers import (
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
-    vouchers, training, mobile, webauthn, onboarding,
+    vouchers, training, mobile, webauthn, onboarding, training_progress,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -93,6 +93,7 @@ api.include_router(training.router)
 api.include_router(mobile.router)
 api.include_router(webauthn.router)
 api.include_router(onboarding.router)
+api.include_router(training_progress.router)
 
 
 @api.get("/")

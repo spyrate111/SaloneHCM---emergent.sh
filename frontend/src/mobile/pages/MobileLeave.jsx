@@ -2,10 +2,11 @@
  * Mobile leave — mine + reports queue (if I'm a manager). Employees can
  * submit a new request via a bottom-sheet modal.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import api from "../../lib/api";
-import { CalendarDays, Plus, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { ymNow, shiftMonth, daysInMonth, firstDow, monthLabel, buildDayMap, todayKey } from "../../lib/leaveCal";
 
 const CACHE_KEY = "salonehcm_m_leave";
 
@@ -60,6 +61,8 @@ export default function MobileLeave() {
           <Plus className="w-4 h-4" /> New
         </button>
       </div>
+
+      <TeamCalendar />
 
       {reports.length > 0 && (
         <section data-testid="mobile-leave-reports">
@@ -122,6 +125,95 @@ export default function MobileLeave() {
 
       {showForm && <LeaveForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); refresh(); }} />}
     </div>
+  );
+}
+
+/** Compact team calendar — managers/admins only (endpoint 403s others → hidden).
+ *  A count dot per day; tap a day to see who's off. */
+function TeamCalendar() {
+  const [month, setMonth] = useState(ymNow());
+  const [data, setData] = useState(null);
+  const [sel, setSel] = useState(todayKey());
+
+  useEffect(() => {
+    api.get("/leave/calendar", { params: { month } })
+      .then((r) => setData(r.data))
+      .catch(() => setData(null));
+  }, [month]);
+
+  const dayMap = useMemo(() => (data ? buildDayMap(month, data.leaves) : {}), [data, month]);
+  if (!data) return null;
+
+  const n = daysInMonth(month);
+  const pad = firstDow(month);
+  const cells = [...Array(pad).fill(null), ...Array.from({ length: n }, (_, i) => i + 1)];
+  const tKey = todayKey();
+  const selLvs = dayMap[sel] || [];
+
+  return (
+    <section className="bg-white border border-[#E2DFD6] rounded-xl p-3 space-y-2" data-testid="mobile-leave-calendar">
+      <div className="flex items-center gap-2">
+        <CalendarDays className="w-4 h-4 text-[#0A4A1E]" />
+        <div className="flex-1 text-sm font-semibold text-[#0A4A1E]">Team calendar</div>
+        <button onClick={() => setMonth(shiftMonth(month, -1))} className="p-1 rounded-md border border-[#E2DFD6] active:bg-[#F7F6F2]"
+                data-testid="mobile-leave-cal-prev" aria-label="Previous month">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-[11px] font-semibold w-24 text-center" data-testid="mobile-leave-cal-month">{monthLabel(month)}</span>
+        <button onClick={() => setMonth(shiftMonth(month, 1))} className="p-1 rounded-md border border-[#E2DFD6] active:bg-[#F7F6F2]"
+                data-testid="mobile-leave-cal-next" aria-label="Next month">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {["S", "M", "T", "W", "T2", "F", "S2"].map((d) => (
+          <div key={d} className="text-[9px] uppercase text-[#8A8F96] font-semibold py-0.5">{d[0]}</div>
+        ))}
+        {cells.map((day, i) => {
+          if (day === null) return <div key={`p-${i}`} />;
+          const key = `${month}-${String(day).padStart(2, "0")}`;
+          const count = (dayMap[key] || []).length;
+          const isSel = key === sel;
+          const isToday = key === tKey;
+          return (
+            <button key={key} onClick={() => setSel(key)}
+                    className={`relative rounded-lg py-1.5 text-[11px] font-data transition-colors ${
+                      isSel ? "bg-[#0A4A1E] text-white"
+                      : isToday ? "bg-[#E4F7E7] text-[#0A4A1E] font-bold"
+                      : "text-[#1A1C1E] active:bg-[#F7F6F2]"}`}
+                    data-testid={`mobile-leave-cal-day-${key}`}>
+              {day}
+              {count > 0 && (
+                <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 min-w-[13px] h-[13px] px-0.5 rounded-full text-[8px] font-bold grid place-items-center leading-none ${
+                  isSel ? "bg-white text-[#0A4A1E]" : "bg-[#D8A31A] text-white"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div className="border-t border-[#F1EEE6] pt-2" data-testid="mobile-leave-cal-detail">
+        <div className="text-[10px] uppercase tracking-widest text-[#525860] mb-1.5">
+          {new Date(`${sel}T00:00:00`).toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" })}
+          {" · "}{selLvs.length} on leave
+        </div>
+        {selLvs.length === 0 ? (
+          <div className="text-[11px] text-[#8A8F96]">Everyone is in.</div>
+        ) : (
+          <div className="space-y-1">
+            {selLvs.map((lv) => (
+              <div key={`${lv.id}-${sel}`} className="flex items-center gap-2 text-[11px]"
+                   data-testid={`mobile-leave-cal-item-${lv.id}`}>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${lv.status === "approved" ? "bg-[#17A035]" : "bg-[#D8A31A]"}`} />
+                <span className="font-medium">{lv.employee_name}</span>
+                <span className="text-[#8A8F96] capitalize ml-auto">{lv.leave_type} · {lv.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

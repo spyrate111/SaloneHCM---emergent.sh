@@ -152,7 +152,9 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     return doc
 
 
-def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd.") -> bytes:
+def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd.",
+                      verification_id: Optional[str] = None,
+                      verify_url: Optional[str] = None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
@@ -197,5 +199,37 @@ def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd."
         "<i>Calculated per Sierra Leone NRA PAYE bands and NASSIT (5% employee, 10% employer) on basic salary.</i>",
         label,
     ))
+    if verify_url and verification_id:
+        try:
+            import qrcode as _qr
+            from reportlab.platypus import Image as _RLImage
+            q = _qr.QRCode(border=1, box_size=4)
+            q.add_data(verify_url)
+            q.make(fit=True)
+            img = q.make_image(fill_color="#0A4A1E", back_color="#FFFFFF").convert("RGB")
+            qb = io.BytesIO()
+            img.save(qb, format="PNG")
+            qb.seek(0)
+            note = Paragraph(
+                f"<b>Bank verification</b><br/>"
+                f"Scan the QR code (or visit the link below) to confirm this payslip is genuine.<br/>"
+                f"<font size=7 color='#525860'>{verify_url}</font><br/>"
+                f"<font size=7 color='#525860'>Verification ID: {verification_id}</font>",
+                ParagraphStyle("v", parent=label, fontSize=8, leading=11),
+            )
+            vt = Table([[_RLImage(qb, width=68, height=68), note]], colWidths=[84, 416])
+            vt.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7F6F2")),
+                ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2DFD6")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            story.append(Spacer(1, 14))
+            story.append(vt)
+        except Exception:
+            logger.exception("payslip QR block failed — PDF built without it")
     doc.build(story)
     return buf.getvalue()

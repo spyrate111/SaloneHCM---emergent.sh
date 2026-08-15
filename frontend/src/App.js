@@ -30,6 +30,7 @@ import Transparency from "./pages/Transparency";
 import PublicCareers from "./pages/PublicCareers";
 import Performance from "./pages/Performance";
 import Verify from "./pages/Verify";
+import VerifyPayslip from "./pages/VerifyPayslip";
 import CivilService from "./pages/CivilService";
 import Establishment from "./pages/Establishment";
 import Loans from "./pages/Loans";
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="/transparency/:slug" element={<Transparency />} />
           <Route path="/careers/:slug" element={<PublicCareers />} />
           <Route path="/verify/:cid" element={<Verify />} />
+          <Route path="/verify-payslip/:vid" element={<VerifyPayslip />} />
           <Route path="/onboard/:token" element={<Onboard />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />

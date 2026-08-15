@@ -49,7 +49,12 @@ export default function Talent() {
         <Tab active={tab === "learning"} onClick={() => setTab("learning")} icon={GraduationCap} testId="tab-learning">Learning</Tab>
       </div>
       {tab === "recruitment" && <Recruitment isAdmin={isAdmin} />}
-      {tab === "learning" && <Learning isAdmin={isAdmin} />}
+      {tab === "learning" && (
+        <>
+          <Learning isAdmin={isAdmin} />
+          <TrainingProgressPanel />
+        </>
+      )}
     </div>
   );
 }

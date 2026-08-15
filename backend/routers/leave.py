@@ -28,6 +28,41 @@ async def list_leaves(user: dict = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(1000)
 
 
+@router.get("/calendar")
+async def leave_calendar(month: str = None, user: dict = Depends(get_current_user)):
+    """Month grid data for managers/admins: every approved + pending leave
+    overlapping the month. Admin: whole tenant. Manager: self + direct reports."""
+    tf = tenant_filter(user)
+    m = month or now_utc().strftime("%Y-%m")
+    try:
+        y, mm = int(m[:4]), int(m[5:7])
+        assert 1 <= mm <= 12
+    except Exception:
+        raise HTTPException(422, "month must be YYYY-MM")
+    start = f"{m}-01"
+    ny, nm = (y + 1, 1) if mm == 12 else (y, mm + 1)
+    end = f"{ny}-{nm:02d}-01"
+
+    if is_admin(user):
+        scope = tf
+    else:
+        my_eid = user.get("employee_id")
+        reports = await db.employees.find(
+            {"manager_id": my_eid, **tf}, {"_id": 0, "id": 1}).to_list(500) if my_eid else []
+        if not reports:
+            raise HTTPException(403, "Managers and admins only")
+        scope = {**tf, "employee_id": {"$in": [r["id"] for r in reports] + [my_eid]}}
+
+    rows = await db.leave_requests.find({
+        **scope,
+        "status": {"$in": ["approved", "pending"]},
+        "start_date": {"$lt": end},
+        "end_date": {"$gte": start},
+    }, {"_id": 0, "id": 1, "employee_id": 1, "employee_name": 1, "leave_type": 1,
+        "status": 1, "start_date": 1, "end_date": 1, "days": 1}).to_list(1000)
+    return {"month": m, "leaves": rows}
+
+
 @router.post("")
 async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
     eid = body.employee_id if is_admin(user) else user.get("employee_id")

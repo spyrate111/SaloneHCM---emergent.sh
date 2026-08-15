@@ -4,6 +4,7 @@ import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { Check, X, Plus, Filter } from "lucide-react";
 import { DatePicker } from "../components/ui/date-picker";
+import LeaveCalendar from "../components/LeaveCalendar";
 
 export default function Leave() {
   const { user } = useAuth();
@@ -51,6 +52,8 @@ export default function Leave() {
           <button data-testid="leave-clear-filter" onClick={() => setParams({})} className="ml-2 text-xs text-[#3A7CB8] hover:underline">clear</button>
         </div>
       )}
+
+      <LeaveCalendar />
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
         <table className="w-full text-sm">

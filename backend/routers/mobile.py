@@ -191,9 +191,13 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
     branch = None
     if emp.get("branch_id"):
         branch = await db.branches.find_one(
-            {"id": emp["branch_id"]}, {"_id": 0, "id": 1, "name": 1, "lat": 1, "lng": 1})
+            {"id": emp["branch_id"]},
+            {"_id": 0, "id": 1, "name": 1, "lat": 1, "lng": 1,
+             "geofence_radius_m": 1, "supervisor_user_id": 1})
     if branch and branch.get("lat") is not None and body.lat is not None:
         distance_m = _haversine_m(branch["lat"], branch["lng"], body.lat, body.lng)
+    geofence_m = (branch or {}).get("geofence_radius_m") or DEFAULT_GEOFENCE_M
+    in_zone: Optional[bool] = None if distance_m is None else (distance_m <= geofence_m)
 
     doc = with_tenant({
         "id": str(uuid.uuid4()),
@@ -206,6 +210,7 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
         "accuracy_m": body.accuracy_m,
         "distance_from_branch_m": (round(distance_m, 1)
                                    if distance_m is not None else None),
+        "in_zone": in_zone,
         "branch_id": emp.get("branch_id"),
         "branch_name": branch.get("name") if branch else None,
         "device_id": (body.device_id or "")[:64],
@@ -240,7 +245,35 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
         "kind": body.kind, "date": today,
         "distance_m": doc["distance_from_branch_m"],
     })
+
+    # Out-of-zone → alert supervisor (push+SMS) and tenant admins (push).
+    if in_zone is False:
+        import asyncio
+        from ooz_alerts import fire_out_of_zone_alert
+        asyncio.create_task(fire_out_of_zone_alert(doc, branch, doc["company_id"]))
+
     return doc
+
+
+@router.post("/ooz-digest/run-now")
+async def ooz_digest_run_now(user: dict = Depends(get_current_user)):
+    """Manually trigger today's out-of-zone email digest for my tenant (admin)."""
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    from ooz_alerts import run_digest_now
+    return await run_digest_now(user["company_id"])
+
+
+@router.get("/ooz-alerts")
+async def list_ooz_alerts(date: Optional[str] = None,
+                          user: dict = Depends(get_current_user)):
+    """Today's (or a given day's) out-of-zone alert log — admins only."""
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    day = date or now_utc().strftime("%Y-%m-%d")
+    return await db.ooz_alerts.find(
+        {"company_id": user["company_id"], "date": day},
+        {"_id": 0}).sort("clocked_at", 1).to_list(500)
 
 
 @router.get("/punch/today")

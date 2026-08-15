@@ -1,12 +1,14 @@
 """Payroll endpoints: preview, run, history, payslip PDF, bank file CSV, my-payslips."""
 import io
 import csv
+import os
+import uuid
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
+from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature, now_utc, iso
 from models import PayrollRunIn
 from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf
 from sms import send_payslip_batch, is_configured as sms_is_configured
@@ -135,7 +137,24 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
     if not slip:
         raise HTTPException(404, "Payslip not found")
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
-    pdf = build_payslip_pdf(slip, r["period"], company=company.get("name") if company else "Demo Salone Ltd.")
+
+    # Upsert a verification record + QR so banks can confirm authenticity.
+    ver = await db.payslip_verifications.find_one({"run_id": rid, "employee_id": eid}, {"_id": 0})
+    if not ver:
+        ver = {
+            "id": str(uuid.uuid4()), "run_id": rid, "employee_id": eid,
+            "company_id": user["company_id"], "period": r["period"],
+            "employee_name": slip["employee_name"],
+            "net": slip["net"], "gross": slip["gross"],
+            "created_at": iso(now_utc()),
+        }
+        await db.payslip_verifications.insert_one(dict(ver))
+    frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    verify_url = f"{frontend_url}/verify-payslip/{ver['id']}"
+
+    pdf = build_payslip_pdf(slip, r["period"],
+                            company=company.get("name") if company else "Demo Salone Ltd.",
+                            verification_id=ver["id"], verify_url=verify_url)
     fname = f"payslip-{slip['employee_name'].replace(' ', '_')}-{r['period']}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf), media_type="application/pdf",
