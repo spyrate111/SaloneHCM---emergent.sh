@@ -63,6 +63,54 @@ async def leave_calendar(month: str = None, user: dict = Depends(get_current_use
     return {"month": m, "leaves": rows}
 
 
+@router.get("/{lid}/conflicts")
+async def leave_conflicts(lid: str, user: dict = Depends(get_current_user)):
+    """Pre-approval coverage check: warn when approving would put >= 20% of the
+    branch's staff (minimum 2 people) off on any overlapping day. Never blocks."""
+    import math
+    from datetime import timedelta
+    tf = tenant_filter(user)
+    lv = await db.leave_requests.find_one({"id": lid, **tf}, {"_id": 0})
+    if not lv:
+        raise HTTPException(404, "Leave request not found")
+    emp = await db.employees.find_one({"id": lv["employee_id"], **tf}, {"_id": 0})
+    if not is_admin(user):
+        if not emp or emp.get("manager_id") != user.get("employee_id"):
+            raise HTTPException(403, "Admin or manager only")
+    branch_id = (emp or {}).get("branch_id")
+    if not branch_id:
+        return {"warn": False, "reason": "employee has no branch", "days": [],
+                "employee_name": lv["employee_name"]}
+    branch = await db.branches.find_one({"id": branch_id, **tf}, {"_id": 0}) or {}
+    staff = await db.employees.find(
+        {"branch_id": branch_id, "status": "active", **tf},
+        {"_id": 0, "id": 1}).to_list(2000)
+    headcount = len(staff)
+    threshold = max(2, math.ceil(0.2 * headcount))
+    others = await db.leave_requests.find({
+        **tf, "id": {"$ne": lid}, "status": "approved",
+        "employee_id": {"$in": [s["id"] for s in staff if s["id"] != lv["employee_id"]]},
+        "start_date": {"$lte": lv["end_date"]}, "end_date": {"$gte": lv["start_date"]},
+    }, {"_id": 0, "employee_id": 1, "employee_name": 1, "start_date": 1, "end_date": 1}).to_list(500)
+
+    days = []
+    cur = datetime.fromisoformat(lv["start_date"])
+    last = datetime.fromisoformat(lv["end_date"])
+    steps = 0
+    while cur <= last and steps < 62:
+        key = cur.strftime("%Y-%m-%d")
+        names = sorted({o["employee_name"] for o in others
+                        if o["start_date"] <= key <= o["end_date"]})
+        off = len(names) + 1  # + this request
+        if off >= threshold:
+            days.append({"date": key, "off_count": off, "already_off": names})
+        cur += timedelta(days=1)
+        steps += 1
+    return {"warn": bool(days), "branch_name": branch.get("name"),
+            "headcount": headcount, "threshold": threshold,
+            "employee_name": lv["employee_name"], "days": days[:14]}
+
+
 @router.post("")
 async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
     eid = body.employee_id if is_admin(user) else user.get("employee_id")

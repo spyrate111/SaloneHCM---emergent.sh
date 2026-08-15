@@ -15,12 +15,24 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 # ===== Public read-only endpoints (no auth) =====
 @router.get("/payslip/{vid}")
-async def public_payslip_verify(vid: str):
+async def public_payslip_verify(vid: str, request: Request):
     """Banks scan the payslip QR → this endpoint confirms authenticity.
-    Returns ONLY the data already printed on the payslip itself."""
+    Returns ONLY the data already printed on the payslip itself.
+    Every successful lookup is logged for anti-fraud scan analytics."""
     ver = await db.payslip_verifications.find_one({"id": vid}, {"_id": 0})
     if not ver:
         return {"valid": False, "reason": "not_found"}
+    try:
+        ip = ((request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+              or (request.client.host if request.client else ""))
+        await db.payslip_scans.insert_one({
+            "id": str(uuid.uuid4()), "verification_id": vid,
+            "company_id": ver.get("company_id"),
+            "scanned_at": iso(now_utc()), "ip": ip[:64],
+            "user_agent": (request.headers.get("user-agent") or "")[:160],
+        })
+    except Exception:
+        pass
     company = await db.companies.find_one({"id": ver.get("company_id")}, {"_id": 0}) or {}
     return {
         "valid": True,

@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { Clock, Plus, MapPin, Download } from "lucide-react";
 import { DatePicker } from "../components/ui/date-picker";
 import PunchMap from "../components/PunchMap";
+import OozSnoozePanel from "../components/OozSnoozePanel";
 
 export default function Attendance() {
   const { user } = useAuth();
@@ -120,6 +121,8 @@ export default function Attendance() {
           </div>
         </div>
       )}
+
+      {team && <OozSnoozePanel />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <form onSubmit={submit} className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4 lg:col-span-1" data-testid="attendance-form">

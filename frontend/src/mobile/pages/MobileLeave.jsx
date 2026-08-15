@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import api from "../../lib/api";
-import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { ymNow, shiftMonth, daysInMonth, firstDow, monthLabel, buildDayMap, todayKey } from "../../lib/leaveCal";
 
 const CACHE_KEY = "salonehcm_m_leave";
@@ -34,9 +34,11 @@ export default function MobileLeave() {
   useEffect(refresh, []);
 
   const mine = rows.filter((r) => r.employee_id === me?.employee_id);
-  const reports = rows.filter((r) => r.employee_id !== me?.employee_id);
+  const reports = rows.filter((r) => r.employee_id !== me?.employee_id && r.status === "pending");
 
-  const decide = async (id, status) => {
+  const [conflict, setConflict] = useState(null); // {lid, ...conflictData}
+
+  const doDecide = async (id, status) => {
     try {
       await api.put(`/leave/${id}/decision`, { status });
       toast.success(`Leave ${status}`);
@@ -44,6 +46,16 @@ export default function MobileLeave() {
     } catch (e) {
       toast.error("Could not update — check your connection");
     }
+  };
+
+  const decide = async (id, status) => {
+    if (status === "approved") {
+      try {
+        const r = await api.get(`/leave/${id}/conflicts`);
+        if (r.data.warn) { setConflict({ lid: id, ...r.data }); return; }
+      } catch { /* no access to check — proceed */ }
+    }
+    await doDecide(id, status);
   };
 
   return (
@@ -123,6 +135,38 @@ export default function MobileLeave() {
         )}
       </section>
 
+      {conflict && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end" onClick={() => setConflict(null)} data-testid="mobile-leave-conflict-sheet">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full rounded-t-2xl p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-[#8B6A14] flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-bold">Coverage warning</div>
+                <p className="text-[11px] text-[#8B6A14] mt-0.5">
+                  Approving {conflict.employee_name}'s leave puts {conflict.threshold}+ of {conflict.branch_name}'s {conflict.headcount} staff off the same day.
+                </p>
+              </div>
+            </div>
+            <div className="max-h-40 overflow-y-auto space-y-1.5">
+              {conflict.days.map((d) => (
+                <div key={d.date} className="text-[11px]" data-testid={`mobile-leave-conflict-day-${d.date}`}>
+                  <span className="font-data font-semibold">{d.date}</span>
+                  <span className="text-[#B03A2E] font-semibold"> — {d.off_count} off</span>
+                  {d.already_off.length > 0 && <span className="text-[#8A8F96]"> ({d.already_off.join(", ")})</span>}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConflict(null)}
+                className="flex-1 text-xs font-semibold border border-[#E2DFD6] py-2.5 rounded-lg"
+                data-testid="mobile-leave-conflict-cancel">Cancel</button>
+              <button onClick={async () => { const id = conflict.lid; setConflict(null); await doDecide(id, "approved"); }}
+                className="flex-1 text-xs font-semibold bg-[#8B6A14] text-white py-2.5 rounded-lg"
+                data-testid="mobile-leave-conflict-approve-anyway">Approve anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showForm && <LeaveForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); refresh(); }} />}
     </div>
   );

@@ -139,6 +139,12 @@ def start():
         attach_ooz(scheduler)
     except Exception:
         logger.exception("Failed to attach out-of-zone digest scheduler")
+
+    try:
+        from training_reminders import attach as attach_training_reminders
+        attach_training_reminders(scheduler)
+    except Exception:
+        logger.exception("Failed to attach training reminder scheduler")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

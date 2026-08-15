@@ -246,11 +246,16 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
         "distance_m": doc["distance_from_branch_m"],
     })
 
-    # Out-of-zone → alert supervisor (push+SMS) and tenant admins (push).
+    # Out-of-zone → alert supervisor (push+SMS) and tenant admins (push),
+    # unless an active snooze rule (approved field assignment) suppresses it.
     if in_zone is False:
         import asyncio
         from ooz_alerts import fire_out_of_zone_alert
-        asyncio.create_task(fire_out_of_zone_alert(doc, branch, doc["company_id"]))
+        snooze = await db.ooz_snoozes.find_one({
+            "company_id": doc["company_id"], "employee_id": eid,
+            "start_date": {"$lte": today}, "end_date": {"$gte": today},
+        }, {"_id": 0})
+        asyncio.create_task(fire_out_of_zone_alert(doc, branch, doc["company_id"], snooze=snooze))
 
     return doc
 
@@ -274,6 +279,91 @@ async def list_ooz_alerts(date: Optional[str] = None,
     return await db.ooz_alerts.find(
         {"company_id": user["company_id"], "date": day},
         {"_id": 0}).sort("clocked_at", 1).to_list(500)
+
+
+# ---------------------------------------------------------------------------
+# Alert snooze rules — mute out-of-zone notifications for approved field work.
+# ---------------------------------------------------------------------------
+class SnoozeIn(BaseModel):
+    employee_id: str
+    start_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    reason: str = Field(..., min_length=3, max_length=200)
+
+
+class SnoozePatch(BaseModel):
+    start_date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    reason: Optional[str] = Field(default=None, min_length=3, max_length=200)
+
+
+def _with_active(row: dict) -> dict:
+    today = now_utc().strftime("%Y-%m-%d")
+    row["active"] = row["start_date"] <= today <= row["end_date"]
+    return row
+
+
+@router.post("/ooz-snoozes")
+async def create_snooze(body: SnoozeIn, user: dict = Depends(get_current_user)):
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    if body.end_date < body.start_date:
+        raise HTTPException(422, "end_date is before start_date")
+    emp = await db.employees.find_one(
+        {"id": body.employee_id, **tenant_filter(user)}, {"_id": 0})
+    if not emp:
+        raise HTTPException(404, "Employee not found")
+    doc = {
+        "id": str(uuid.uuid4()), "company_id": user["company_id"],
+        "employee_id": emp["id"],
+        "employee_name": f"{emp.get('first_name','')} {emp.get('last_name','')}".strip(),
+        "start_date": body.start_date, "end_date": body.end_date,
+        "reason": body.reason.strip(),
+        "created_by": user["email"], "created_at": iso(now_utc()),
+    }
+    await db.ooz_snoozes.insert_one(doc)
+    doc.pop("_id", None)
+    await audit("ooz_snooze_created", f"ooz_snoozes/{doc['id']}", user,
+                {"employee": doc["employee_name"], "range": f"{doc['start_date']}..{doc['end_date']}"})
+    return _with_active(doc)
+
+
+@router.get("/ooz-snoozes")
+async def list_snoozes(user: dict = Depends(get_current_user)):
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    rows = await db.ooz_snoozes.find(
+        tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [_with_active(r) for r in rows]
+
+
+@router.patch("/ooz-snoozes/{sid}")
+async def update_snooze(sid: str, body: SnoozePatch, user: dict = Depends(get_current_user)):
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    doc = await db.ooz_snoozes.find_one({"id": sid, **tenant_filter(user)}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Snooze rule not found")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(422, "Nothing to update")
+    if updates.get("end_date", doc["end_date"]) < updates.get("start_date", doc["start_date"]):
+        raise HTTPException(422, "end_date is before start_date")
+    if "reason" in updates:
+        updates["reason"] = updates["reason"].strip()
+    await db.ooz_snoozes.update_one({"id": sid}, {"$set": updates})
+    return _with_active({**doc, **updates})
+
+
+@router.delete("/ooz-snoozes/{sid}")
+async def delete_snooze(sid: str, user: dict = Depends(get_current_user)):
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    r = await db.ooz_snoozes.delete_one({"id": sid, **tenant_filter(user)})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Snooze rule not found")
+    await audit("ooz_snooze_deleted", f"ooz_snoozes/{sid}", user, {})
+    return {"ok": True}
 
 
 @router.get("/punch/today")

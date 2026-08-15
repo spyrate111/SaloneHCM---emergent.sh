@@ -8,6 +8,7 @@ import IfmisActions from "../components/IfmisActions";
 import { BudgetCheckModal, BudgetBalancesPanel } from "../components/BudgetCheck";
 import { VarianceButton } from "../components/Variance";
 import { MoFSignaturesButton } from "../components/MoFSignatures";
+import PayslipScanPanel from "../components/PayslipScanPanel";
 import MoFConfigCard from "../components/MoFConfigCard";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
@@ -297,6 +298,8 @@ export default function Payroll() {
           </tbody>
         </table>
       </div>
+
+      <PayslipScanPanel />
     </div>
   );
 }

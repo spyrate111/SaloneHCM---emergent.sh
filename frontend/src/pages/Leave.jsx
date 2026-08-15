@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { Check, X, Plus, Filter } from "lucide-react";
+import { Check, X, Plus, Filter, AlertTriangle } from "lucide-react";
 import { DatePicker } from "../components/ui/date-picker";
 import LeaveCalendar from "../components/LeaveCalendar";
 
@@ -27,7 +27,17 @@ export default function Leave() {
     setOpen(false); setForm({ employee_id: "", leave_type: "annual", start_date: "", end_date: "", reason: "" }); load();
   };
 
-  const decide = async (id, status) => { await api.put(`/leave/${id}/decision`, { status }); load(); };
+  const [conflict, setConflict] = useState(null); // {lid, ...conflictData}
+  const doDecide = async (id, status) => { await api.put(`/leave/${id}/decision`, { status }); load(); };
+  const decide = async (id, status) => {
+    if (status === "approved") {
+      try {
+        const r = await api.get(`/leave/${id}/conflicts`);
+        if (r.data.warn) { setConflict({ lid: id, ...r.data }); return; }
+      } catch { /* no access to check — proceed */ }
+    }
+    await doDecide(id, status);
+  };
 
   const STATUS_BG = { pending: "bg-[#FBF1DE] text-[#8B6A14]", approved: "bg-[#E4F7E7] text-[#17A035]", rejected: "bg-[#E9F2FB] text-[#3A7CB8]" };
 
@@ -83,6 +93,41 @@ export default function Leave() {
           </tbody>
         </table>
       </div>
+
+      {conflict && (
+        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => setConflict(null)} data-testid="leave-conflict-dialog">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg w-full max-w-md overflow-hidden">
+            <div className="bg-[#FBF1DE] px-6 py-4 flex items-start gap-3 border-b border-[#EAD9AE]">
+              <AlertTriangle className="w-5 h-5 text-[#8B6A14] flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-heading text-lg font-semibold text-[#1A1C1E]">Coverage warning</h3>
+                <p className="text-xs text-[#8B6A14] mt-0.5">
+                  Approving {conflict.employee_name}'s leave puts {conflict.threshold}+ of {conflict.branch_name}'s {conflict.headcount} staff off the same day.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 max-h-64 overflow-y-auto space-y-2">
+              {conflict.days.map((d) => (
+                <div key={d.date} className="text-sm" data-testid={`leave-conflict-day-${d.date}`}>
+                  <span className="font-data font-semibold">{d.date}</span>
+                  <span className="text-[#B03A2E] font-semibold"> — {d.off_count} off</span>
+                  {d.already_off.length > 0 && (
+                    <div className="text-xs text-[#525860] mt-0.5">Already approved: {d.already_off.join(", ")}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-[#E2DFD6] flex gap-3 justify-end">
+              <button onClick={() => setConflict(null)}
+                className="text-sm border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#F7F6F2]"
+                data-testid="leave-conflict-cancel">Cancel</button>
+              <button onClick={async () => { const id = conflict.lid; setConflict(null); await doDecide(id, "approved"); }}
+                className="text-sm bg-[#8B6A14] hover:bg-[#6E540F] text-white px-4 py-2 rounded-md"
+                data-testid="leave-conflict-approve-anyway">Approve anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => setOpen(false)}>

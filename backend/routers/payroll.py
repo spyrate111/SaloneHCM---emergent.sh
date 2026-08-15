@@ -405,3 +405,49 @@ async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_a
     )
     await audit("sms_log_email", "payroll/sms/logs.csv/email", user, {"to": to, "rows": len(rows), "ok": res.get("ok")})
     return {**res, "rows": len(rows), "to": to}
+
+
+# ---------------------------------------------------------------------------
+# Payslip QR scan log — anti-fraud analytics over public verification scans.
+# ---------------------------------------------------------------------------
+def _flag_scans(times: list[str]) -> bool:
+    """Flag when 5+ scans fall within ANY 24-hour window."""
+    from datetime import datetime as _dt, timedelta as _td
+    for i in range(len(times) - 4):
+        if _dt.fromisoformat(times[i + 4]) - _dt.fromisoformat(times[i]) <= _td(hours=24):
+            return True
+    return False
+
+
+@router.get("/verification-scans")
+async def verification_scans(user: dict = Depends(require_admin)):
+    vers = await db.payslip_verifications.find(
+        tenant_filter(user), {"_id": 0}).to_list(2000)
+    out = []
+    for v in vers:
+        scans = await db.payslip_scans.find(
+            {"verification_id": v["id"]},
+            {"_id": 0, "scanned_at": 1}).sort("scanned_at", 1).to_list(5000)
+        times = [s["scanned_at"] for s in scans]
+        out.append({
+            "verification_id": v["id"], "run_id": v.get("run_id"),
+            "employee_name": v.get("employee_name"), "period": v.get("period"),
+            "scan_count": len(times),
+            "first_scanned_at": times[0] if times else None,
+            "last_scanned_at": times[-1] if times else None,
+            "flagged": _flag_scans(times),
+        })
+    out.sort(key=lambda r: (not r["flagged"], -r["scan_count"]))
+    return out
+
+
+@router.get("/verification-scans/{vid}")
+async def verification_scan_history(vid: str, user: dict = Depends(require_admin)):
+    ver = await db.payslip_verifications.find_one(
+        {"id": vid, **tenant_filter(user)}, {"_id": 0})
+    if not ver:
+        raise HTTPException(404, "Verification not found")
+    scans = await db.payslip_scans.find(
+        {"verification_id": vid}, {"_id": 0}).sort("scanned_at", -1).to_list(1000)
+    return {"verification": ver, "scans": scans, "flagged": _flag_scans(
+        sorted(s["scanned_at"] for s in scans))}

@@ -3,9 +3,11 @@
 When a GPS punch lands outside its branch geofence:
   - branch supervisor  → web push + SMS (they must act now)
   - tenant admins      → web push only (no SMS)
+An active snooze rule (approved field assignment) suppresses ALL channels;
+the alert is still logged with snoozed=True + the reason, for audit.
 Every alert is logged to `ooz_alerts`; a daily 18:00 UTC email digest
-summarises the day's out-of-zone punches for tenant admins (idempotent
-per company per day via `ooz_digests`).
+summarises the day's NON-SNOOZED out-of-zone punches for tenant admins
+(idempotent per company per day via `ooz_digests`).
 """
 import logging
 import uuid
@@ -43,9 +45,40 @@ def _push_payload(punch: dict) -> dict:
     }
 
 
-async def fire_out_of_zone_alert(punch: dict, branch: Optional[dict], company_id: str) -> dict:
+def _base_alert(punch: dict, branch: Optional[dict], company_id: str) -> dict:
+    return {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "punch_id": punch["id"],
+        "employee_id": punch.get("employee_id"),
+        "employee_name": punch.get("employee_name"),
+        "branch_id": punch.get("branch_id"),
+        "branch_name": punch.get("branch_name"),
+        "kind": punch.get("kind"),
+        "clocked_at": punch.get("clocked_at"),
+        "date": punch.get("date"),
+        "distance_from_branch_m": punch.get("distance_from_branch_m"),
+        "geofence_radius_m": (branch or {}).get("geofence_radius_m") or 250.0,
+        "created_at": iso(now_utc()),
+    }
+
+
+async def fire_out_of_zone_alert(punch: dict, branch: Optional[dict], company_id: str,
+                                 snooze: Optional[dict] = None) -> dict:
     """Fire-and-forget: must NEVER raise into the punch endpoint."""
     try:
+        if snooze:
+            alert = {**_base_alert(punch, branch, company_id),
+                     "snoozed": True,
+                     "snooze_id": snooze.get("id"),
+                     "snooze_reason": snooze.get("reason"),
+                     "channels": {"suppressed": "active snooze rule"}}
+            await db.ooz_alerts.insert_one(alert)
+            alert.pop("_id", None)
+            logger.info("OOZ alert SNOOZED: %s (%s)", punch.get("employee_name"),
+                        snooze.get("reason"))
+            return alert
+
         channels = {"supervisor_push": None, "supervisor_sms": None, "admin_push": []}
         from push_service import fanout_to_user
 
@@ -89,22 +122,8 @@ async def fire_out_of_zone_alert(punch: dict, branch: Optional[dict], company_id
             except Exception as e:
                 channels["admin_push"].append({"user_id": a["id"], "ok": False, "error": str(e)[:200]})
 
-        alert = {
-            "id": str(uuid.uuid4()),
-            "company_id": company_id,
-            "punch_id": punch["id"],
-            "employee_id": punch.get("employee_id"),
-            "employee_name": punch.get("employee_name"),
-            "branch_id": punch.get("branch_id"),
-            "branch_name": punch.get("branch_name"),
-            "kind": punch.get("kind"),
-            "clocked_at": punch.get("clocked_at"),
-            "date": punch.get("date"),
-            "distance_from_branch_m": punch.get("distance_from_branch_m"),
-            "geofence_radius_m": (branch or {}).get("geofence_radius_m") or 250.0,
-            "channels": channels,
-            "created_at": iso(now_utc()),
-        }
+        alert = {**_base_alert(punch, branch, company_id),
+                 "snoozed": False, "channels": channels}
         await db.ooz_alerts.insert_one(alert)
         alert.pop("_id", None)
         logger.info("OOZ alert fired: %s %sm out at %s", alert["employee_name"],
@@ -139,7 +158,7 @@ def _digest_html(admin_name: str, company_name: str, day: str, rows: list[dict])
       <div style="border:1px solid #E2DFD6;border-top:none;padding:20px 24px;border-radius:0 0 8px 8px">
         <p style="font-size:13px">Hello {admin_name or 'Admin'},</p>
         <p style="font-size:13px">{len(rows)} punch{'es were' if len(rows) != 1 else ' was'} recorded
-        outside a branch geofence today:</p>
+        outside a branch geofence today (snoozed field assignments excluded):</p>
         <table style="border-collapse:collapse;width:100%;font-size:12px">
           <tr style="background:#F7F6F2;text-align:left">
             <th style="padding:8px 12px">Employee</th><th style="padding:8px 12px">Kind</th>
@@ -162,7 +181,8 @@ async def _digest_for_company(company: dict, day: str) -> dict:
     if already:
         return {"company_id": company["id"], "skipped": "already sent"}
     rows = await db.ooz_alerts.find(
-        {"company_id": company["id"], "date": day}, {"_id": 0}).sort("clocked_at", 1).to_list(500)
+        {"company_id": company["id"], "date": day, "snoozed": {"$ne": True}},
+        {"_id": 0}).sort("clocked_at", 1).to_list(500)
     if not rows:
         return {"company_id": company["id"], "skipped": "no out-of-zone punches"}
 
@@ -189,7 +209,8 @@ async def _digest_for_company(company: dict, day: str) -> dict:
 async def send_daily_digest() -> list[dict]:
     day = now_utc().strftime("%Y-%m-%d")
     out = []
-    company_ids = await db.ooz_alerts.distinct("company_id", {"date": day})
+    company_ids = await db.ooz_alerts.distinct(
+        "company_id", {"date": day, "snoozed": {"$ne": True}})
     for cid in company_ids:
         company = await db.companies.find_one({"id": cid}, {"_id": 0})
         if company:

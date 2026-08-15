@@ -101,3 +101,23 @@ async def team_progress(branch_id: Optional[str] = None,
         })
     rows.sort(key=lambda r: (-r["completed_count"], r["name"]))
     return {"videos": catalog, "total": len(catalog), "rows": rows}
+
+
+class LangIn(BaseModel):
+    lang: str = Field(..., pattern="^(en|krio|mende|temne)$")
+
+
+@router.post("/lang")
+async def set_training_lang(body: LangIn, user: dict = Depends(get_current_user)):
+    """Remember the user's Training Center language — weekly reminders use it."""
+    await db.users.update_one({"id": user["id"]}, {"$set": {"training_lang": body.lang}})
+    return {"ok": True, "lang": body.lang}
+
+
+@router.post("/reminders/run-now")
+async def reminders_run_now(user: dict = Depends(get_current_user)):
+    """Manually trigger this week's reminder push for my tenant (admin only)."""
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    from training_reminders import run_for_company
+    return await run_for_company(user["company_id"])

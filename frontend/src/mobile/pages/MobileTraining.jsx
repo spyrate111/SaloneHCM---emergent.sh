@@ -78,6 +78,7 @@ export default function MobileTraining() {
   const pickLang = (id) => {
     setLang(id);
     localStorage.setItem(LANG_KEY, id);
+    api.post("/training-progress/lang", { lang: id }).catch(() => {}); // weekly reminders use it
   };
 
   return (
