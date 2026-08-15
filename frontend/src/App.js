@@ -53,6 +53,7 @@ import MobileLeave from "./mobile/pages/MobileLeave";
 import MobileClock from "./mobile/pages/MobileClock";
 import MobileVouchers from "./mobile/pages/MobileVouchers";
 import MobileProfile from "./mobile/pages/MobileProfile";
+import MobileTraining from "./mobile/pages/MobileTraining";
 import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
@@ -118,6 +119,7 @@ export default function App() {
             <Route path="leave" element={<MobileLeave />} />
             <Route path="clock" element={<MobileClock />} />
             <Route path="vouchers" element={<MobileVouchers />} />
+            <Route path="training" element={<MobileTraining />} />
             <Route path="profile" element={<MobileProfile />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

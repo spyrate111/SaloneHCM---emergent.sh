@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../../lib/api";
 import { fmtSLE } from "../../lib/api";
-import { CalendarDays, FileText, Timer, ClipboardCheck, ChevronRight, MapPin, BellRing } from "lucide-react";
+import { CalendarDays, FileText, Timer, ClipboardCheck, ChevronRight, MapPin, BellRing, GraduationCap } from "lucide-react";
 
 const CACHE_KEY = "salonehcm_m_summary";
 
@@ -69,6 +69,8 @@ export default function MobileHome() {
               hint="today" testid="mobile-home-tile-clock" />
         <Tile to="/m/payslips" icon={FileText} label="Payslips" value={data?.payslip_latest ? data.payslip_latest.period : "—"}
               hint="latest run" testid="mobile-home-tile-payslips" />
+        <Tile to="/m/training" icon={GraduationCap} label="Learn" value="Training"
+              hint="videos in 4 languages" testid="mobile-home-tile-training" />
         {isSupervisor && (
           <Tile to="/m/vouchers" icon={ClipboardCheck} label="Vouchers"
                 value={data?.voucher_queue?.length ? `${data.voucher_queue.length} to sign` : "clear"}

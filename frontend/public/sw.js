@@ -5,6 +5,8 @@ const APP_SHELL_CACHE = "salonehcm-shell-v5";
 const RUNTIME_CACHE = "salonehcm-runtime-v5";
 const PAYSLIP_CACHE = "salonehcm-payslip-v5";
 const ALL_CACHES = [APP_SHELL_CACHE, RUNTIME_CACHE, PAYSLIP_CACHE];
+// Caches that must SURVIVE version bumps (user-saved offline payslip pack).
+const PERSISTENT_PREFIX = "salonehcm-payslip-pack";
 
 // Files we know exist up front — index.html gives us the SPA entry, favicon
 // and the manifest let install progress. Everything else is populated on
@@ -49,7 +51,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     // Purge stale caches from prior versions
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => !ALL_CACHES.includes(k)).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => !ALL_CACHES.includes(k) && !k.startsWith(PERSISTENT_PREFIX)).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });

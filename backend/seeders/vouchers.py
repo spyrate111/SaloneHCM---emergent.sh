@@ -3,13 +3,13 @@ import uuid
 from core import db, logger, iso, now_utc
 
 GOV_BRANCHES = [
-    ("MOF-HQ", "Ministry of Finance HQ", "Freetown", "Ministry of Finance"),
-    ("MOH-FT", "Ministry of Health Office", "Freetown", "Ministry of Health"),
-    ("MOL-FT", "Ministry of Labour Office", "Freetown", "Ministry of Labour"),
+    ("MOF-HQ", "Ministry of Finance HQ", "Freetown", "Ministry of Finance", 8.4657, -13.2317),
+    ("MOH-FT", "Ministry of Health Office", "Freetown", "Ministry of Health", 8.4687, -13.2337),
+    ("MOL-FT", "Ministry of Labour Office", "Freetown", "Ministry of Labour", 8.4745, -13.2247),
 ]
 DEMO_BRANCHES = [
-    ("HQ-FT", "Freetown Head Office", "Freetown", ""),
-    ("BO-01", "Bo Branch", "Bo", ""),
+    ("HQ-FT", "Freetown Head Office", "Freetown", "", 8.4844, -13.2299),
+    ("BO-01", "Bo Branch", "Bo", "", 7.9647, -11.7383),
 ]
 
 
@@ -27,14 +27,20 @@ async def seed_branches(gov_id: str, demo_id: str) -> None:
 
 
 async def _seed_tenant(company_id: str, defs: list, match_ministry: bool) -> None:
-    for code, name, region, ministry in defs:
+    for code, name, region, ministry, lat, lng in defs:
         if not await db.branches.find_one({"company_id": company_id, "code": code}):
             await db.branches.insert_one({
                 "id": str(uuid.uuid4()), "company_id": company_id, "code": code,
                 "name": name, "region": region, "ministry": ministry,
+                "lat": lat, "lng": lng, "geofence_radius_m": 250.0,
                 "supervisor_user_id": None, "supervisor_email": None, "supervisor_name": None,
                 "created_by": "seed", "created_at": iso(now_utc()),
             })
+        else:
+            # Backfill coords on branches created before geofencing existed.
+            await db.branches.update_one(
+                {"company_id": company_id, "code": code, "lat": {"$exists": False}},
+                {"$set": {"lat": lat, "lng": lng, "geofence_radius_m": 250.0}})
     branches = await db.branches.find({"company_id": company_id}, {"_id": 0}).to_list(50)
     if not branches:
         return

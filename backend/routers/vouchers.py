@@ -78,6 +78,9 @@ class BranchIn(BaseModel):
     region: Optional[str] = Field(default="", max_length=80)
     ministry: Optional[str] = Field(default="", max_length=120)
     supervisor_user_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    geofence_radius_m: Optional[float] = Field(default=None, ge=25, le=10000)
 
 
 class BranchPatch(BaseModel):
@@ -85,6 +88,9 @@ class BranchPatch(BaseModel):
     region: Optional[str] = Field(default=None, max_length=80)
     ministry: Optional[str] = Field(default=None, max_length=120)
     supervisor_user_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    geofence_radius_m: Optional[float] = Field(default=None, ge=25, le=10000)
 
 
 async def _resolve_supervisor(uid: Optional[str], user: dict) -> dict:
@@ -114,6 +120,8 @@ async def create_branch(body: BranchIn, user: dict = Depends(require_admin)):
     doc = with_tenant({
         "id": str(uuid.uuid4()), "name": body.name.strip(), "code": code,
         "region": body.region or "", "ministry": body.ministry or "",
+        "lat": body.lat, "lng": body.lng,
+        "geofence_radius_m": body.geofence_radius_m,
         **sup,
         "created_by": user["email"], "created_at": iso(now_utc()),
     }, user)

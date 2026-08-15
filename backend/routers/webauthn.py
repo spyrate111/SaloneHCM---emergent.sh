@@ -45,7 +45,7 @@ from webauthn.helpers.structs import (
 )
 
 from core import db, get_current_user, now_utc, iso, make_access
-from routers.auth import _set_auth_cookies
+from routers.auth import _set_auth_cookies, _public_company
 
 router = APIRouter(prefix="/auth/webauthn", tags=["webauthn"])
 
@@ -71,11 +71,11 @@ def _b64url_dec(s: str) -> bytes:
     return base64.urlsafe_b64decode(s)
 
 
-async def _issue_session(user: dict, response: Response) -> str:
+async def _issue_session(user: dict, response: Response) -> tuple[str, str]:
     """Mint JWT + set httpOnly cookie + CSRF, matching the classic login path."""
-    token = make_access(user)
-    _set_auth_cookies(response, token)
-    return token
+    token = make_access(user["id"], user["email"], user["role"])
+    csrf = _set_auth_cookies(response, token)
+    return token, csrf
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +265,15 @@ async def login_finish(body: LoginFinishIn, response: Response):
     await db.webauthn_challenges.delete_many(
         {"purpose": "login", "challenge": saved["challenge"]})
 
-    token = await _issue_session(user, response)
-    return {"ok": True, "token": token,
-            "user": {"id": user["id"], "email": user["email"],
-                     "name": user.get("name"), "role": user.get("role")}}
+    token, csrf = await _issue_session(user, response)
+    company = await db.companies.find_one({"id": user.get("company_id")}, {"_id": 0})
+    return {
+        "ok": True,
+        "id": user["id"], "email": user["email"], "name": user.get("name"),
+        "role": user.get("role"), "employee_id": user.get("employee_id"),
+        "company_id": user.get("company_id"), "company": _public_company(company),
+        "twofa_enabled": bool(user.get("twofa_enabled")),
+        "mof_approver": bool(user.get("mof_approver")),
+        "finance_officer": bool(user.get("finance_officer")),
+        "token": token, "csrf_token": csrf,
+    }

@@ -37,14 +37,19 @@ export default function Vouchers() {
     if (period) params.period = period;
     if (branchId) params.branch_id = branchId;
     if (status) params.status = status;
-    const [v, b, s] = await Promise.all([
-      api.get("/vouchers", { params }),
-      api.get("/branches"),
-      api.get("/vouchers/summary", { params: period ? { period } : {} }),
-    ]);
-    setVouchers(v.data);
-    setBranches(b.data);
-    setSummary(s.data);
+    try {
+      const [v, b, s] = await Promise.all([
+        api.get("/vouchers", { params }),
+        api.get("/branches"),
+        api.get("/vouchers/summary", { params: period ? { period } : {} }),
+      ]);
+      setVouchers(v.data);
+      setBranches(b.data);
+      setSummary(s.data);
+    } catch {
+      // transient failure (e.g. rate limit) — keep the current UI instead of
+      // surfacing an unhandled rejection overlay
+    }
     if (canManage) {
       api.get("/vouchers/pack-history").then((r) => setPackHistory(r.data || [])).catch(() => {});
     }

@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend-only regression on Iter 35 features: mobile training (7 items, 4 langs, video+track), offline payslip pack (save/save-all/open, Cache Storage), team punch map RBAC (admin visible, plain user hidden), desktop /attendance punch map (stats, filter, CSV, table), biometric button gating (hidden without platform authenticator), branch geofence edit (persist + cleanup), classic regression flows. All PASS. One minor observation on /vouchers dev error overlay from Axios 429s during automated test bursts.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/attendance desktop punch map date picker", "issues": ["attendance-map-date is a custom shadcn calendar (DIV button) rather than a native <input type=date>, so it cannot be driven via Playwright .fill(). Not a bug (spec-compliant with shadcn), but automated tests need to open the popover and click a day. Consider adding a data-testid on the calendar body to make the empty-state past-date scenario testable."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL: /vouchers page fires many parallel /api requests on mount (summary, list, branches, digest prefs, etc). During rapid navigation this triggers the backend rate limiter (429) and CRA's uncaught runtime error overlay pops with a wall of AxiosErrors. Consider (a) catching AxiosErrors at the load functions instead of Promise.all rejecting, and/or (b) softening the rate limit for authenticated GETs. Only reproducible under aggressive testing but the overlay hides the UI when it does happen.",
+    "OPTIONAL: expose a testable native input alongside the shadcn calendar for attendance-map-date, or add data-testid to day buttons in the popover, so the empty-past-date branch can be exercised by Playwright."
+  ],
+  "critical_code_review_comments": [
+    "MobileClock team-map section renders only when the /api/mobile/punch/team fetch succeeds — under 429 it silently hides for supervisors too. Consider showing an error/retry state instead of blank so admins don't think RBAC is broken.",
+    "Vouchers page load functions swallow individual failures into Promise.all which surfaces as an unhandled runtime overlay in dev; wrap each with .catch to keep partial UI rendering."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (7/7 features verified)"},
+  "verified_features": {
+    "mobile_training": "PASS — 7 items EN, 7 items Temne with '(Temne)' suffix; lang toggles en/krio/mende/temne all present; tapping item shows mobile-training-video with src=/api/static/training/getting-started-temne.mp4 and <track> caption. Learn tile mobile-home-tile-training present at /m pointing to /m/training.",
+    "offline_payslip_pack": "PASS — 3 rows for aminata, individual save flips status pill to 'Saved offline' and reveals Open button, save-all saves remainder and disappears, caches.keys() includes 'salonehcm-payslip-pack' with 3 entries (URLs to /offline-payslips/*.pdf).",
+    "mobile_team_map_rbac": "PASS — Admin @gov.sl on /m/clock sees mobile-clock-team-map with stats '0 in-zone / 8 out-of-zone / 0 no GPS', punch-map (Leaflet) and mobile-clock-team-outzone-list. Plain employee sia.kallon@gov.sl on /m/clock does NOT see the team map section (as required).",
+    "desktop_punch_map": "PASS — /attendance shows attendance-map-section, stats, date, emp-filter (2 opts: All + Joseph Williams), export, table (8 rows all OUT OF ZONE for Joseph Williams). CSV download fires: punch-map-2026-08-14.csv. Empty-past-date scenario not asserted due to date-picker being a shadcn DIV (see design_issues).",
+    "branch_geofence": "PASS — Ministry of Finance HQ (id f1b44ab4…) prefills lat=8.4657, lng=-13.2317, geofence=250. Changed to 400 → save → reopen shows 400 persisted → cleaned up to 250 → verified. Toast 'Branch updated' shown.",
+    "biometric_gating": "PASS — login-biometric-button NOT visible on default Chromium (no platform authenticator).",
+    "regression": "PASS — admin@gov.sl and aminata.kamara@salonehcm.sl both login to /dashboard. mobile-clock-in creates a punch with 'Clocked in ✓' toast. Bottom nav testids are m-nav-{home,payslips,leave,clock,vouchers,profile} (not mobile-nav-*, which is what the review referenced but not what the code uses — reviewer note only)."
+  },
+  "test_credentials": "used /app/memory/test_credentials.md — admin@gov.sl/GovAdmin@2026, aminata.kamara@salonehcm.sl/Employee@2026, sia.kallon@gov.sl/Employee@2026 (confirmed plain gov employee via Mongo — not a supervisor of any branch).",
+  "seed_data_creation": "None. Branch geofence temporarily changed 250→400 on MOF-HQ, then restored to 250. Punches: 1 clock-in for aminata on demo tenant today (acceptable per reviewer).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The /vouchers page can drop into a CRA red 'Uncaught runtime errors' overlay when the backend rate-limits (429) — this is caused by rapid navigation during automated testing and is not a real functional bug. Space out UI test bursts with 60-120s sleeps when running against this preview. attendance-map-date is a shadcn calendar (DIV), not a native input; use popover clicks or a virtual date via evaluate() to test the empty state. Mobile bottom nav uses testids m-nav-* NOT mobile-nav-*.",
+  "rca_of_issues": "None — all features working as specified. The 429 overlay under load is an environmental artifact of automated testing hitting the backend rate limiter, plus /vouchers doing many parallel loads. Suggested code-side softening captured in action_items above."
+}

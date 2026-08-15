@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle, Fingerprint } from "lucide-react";
 import api from "../lib/api";
 
 const BG = "https://images.unsplash.com/photo-1676029461383-215556e79bc8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwyfHxzaWVycmElMjBsZW9uZSUyMGxhbmRzY2FwZSUyMHN1bnNldHxlbnwwfHx8fDE3Nzg0MjIzODZ8MA&ixlib=rb-4.1.0&q=85";
+
+// WebAuthn helpers — base64url <-> ArrayBuffer for JSON transit
+const b64uEnc = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64uDec = (s) => {
+  const pad = "=".repeat((4 - (s.length % 4)) % 4);
+  const base = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(base);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+};
 
 export default function Login() {
   const [params] = useSearchParams();
@@ -19,8 +31,51 @@ export default function Login() {
   const [invite, setInvite] = useState(null);
   const [inviteErr, setInviteErr] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [bioAvail, setBioAvail] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
   const { login, applyAuth } = useAuth();
   const nav = useNavigate();
+
+  // Show the biometric button only on devices with a platform authenticator
+  useEffect(() => {
+    if (window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable) {
+      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then((ok) => setBioAvail(!!ok))
+        .catch(() => {});
+    }
+  }, []);
+
+  const bioLogin = async () => {
+    setErr(""); setBioBusy(true);
+    try {
+      const opts = await api.post("/auth/webauthn/login/begin", { email: email || undefined });
+      const publicKey = opts.data;
+      publicKey.challenge = b64uDec(publicKey.challenge);
+      (publicKey.allowCredentials || []).forEach((c) => { c.id = b64uDec(c.id); });
+      const cred = await navigator.credentials.get({ publicKey });
+      const assertion = {
+        id: cred.id,
+        rawId: b64uEnc(cred.rawId),
+        type: cred.type,
+        response: {
+          clientDataJSON: b64uEnc(cred.response.clientDataJSON),
+          authenticatorData: b64uEnc(cred.response.authenticatorData),
+          signature: b64uEnc(cred.response.signature),
+          userHandle: cred.response.userHandle ? b64uEnc(cred.response.userHandle) : null,
+        },
+        clientExtensionResults: cred.getClientExtensionResults(),
+      };
+      const r = await api.post("/auth/webauthn/login/finish", { credential: assertion });
+      applyAuth(r.data);
+      nav("/dashboard");
+    } catch (e) {
+      const d = e?.response?.data?.detail;
+      if (e?.name === "NotAllowedError") setErr("Biometric prompt was cancelled or timed out");
+      else setErr(typeof d === "string" ? d : "Biometric sign-in failed — use your password");
+    } finally {
+      setBioBusy(false);
+    }
+  };
 
   // Look up invite metadata on mount when ?invite=<token>
   useEffect(() => {
@@ -245,6 +300,26 @@ export default function Login() {
               {loading ? "Signing in…" : "Sign In"}
               <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
             </button>
+
+            {bioAvail && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-[#E2DFD6]" />
+                  <span className="text-[10px] uppercase tracking-widest text-[#A1A5AB]">or</span>
+                  <div className="flex-1 h-px bg-[#E2DFD6]" />
+                </div>
+                <button
+                  data-testid="login-biometric-button"
+                  type="button"
+                  onClick={bioLogin}
+                  disabled={bioBusy}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-white border border-[#0A4A1E] text-[#0A4A1E] hover:bg-[#E4F7E7] rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+                >
+                  <Fingerprint className="w-4 h-4" strokeWidth={1.5} />
+                  {bioBusy ? "Waiting for biometric…" : "Sign in with biometrics"}
+                </button>
+              </>
+            )}
           </form>
           )}
 

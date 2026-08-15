@@ -150,6 +150,20 @@ class PunchIn(BaseModel):
     notes: Optional[str] = None
 
 
+DEFAULT_GEOFENCE_M = 250.0
+
+
+def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    import math
+    R = 6371000.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(dlng / 2) ** 2)
+    return 2 * R * math.asin(math.sqrt(a))
+
+
 @router.post("/punch")
 async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
     eid = user.get("employee_id")
@@ -179,15 +193,7 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
         branch = await db.branches.find_one(
             {"id": emp["branch_id"]}, {"_id": 0, "id": 1, "name": 1, "lat": 1, "lng": 1})
     if branch and branch.get("lat") is not None and body.lat is not None:
-        # Haversine (metres)
-        import math
-        R = 6371000.0
-        dlat = math.radians(body.lat - branch["lat"])
-        dlng = math.radians(body.lng - branch["lng"])
-        a = (math.sin(dlat / 2) ** 2
-             + math.cos(math.radians(branch["lat"])) *
-             math.cos(math.radians(body.lat)) * math.sin(dlng / 2) ** 2)
-        distance_m = 2 * R * math.asin(math.sqrt(a))
+        distance_m = _haversine_m(branch["lat"], branch["lng"], body.lat, body.lng)
 
     doc = with_tenant({
         "id": str(uuid.uuid4()),
@@ -246,3 +252,95 @@ async def todays_punches(user: dict = Depends(get_current_user)):
         {"employee_id": user["employee_id"], "date": today,
          **tenant_filter(user)},
         {"_id": 0}).sort("clocked_at", 1).to_list(20)
+
+
+# ---------------------------------------------------------------------------
+# Team punch map — supervisors see their branches' GPS punches; admins see all.
+# ---------------------------------------------------------------------------
+async def _team_branches(user: dict):
+    """Branches visible on the team map, or None when the user has no access."""
+    tf = tenant_filter(user)
+    if is_admin(user):
+        return await db.branches.find(tf, {"_id": 0}).to_list(200)
+    rows = await db.branches.find(
+        {**tf, "supervisor_user_id": user["id"]}, {"_id": 0}).to_list(200)
+    return rows or None
+
+
+async def _team_data(user: dict, day: str, employee_id: Optional[str]) -> dict:
+    branches = await _team_branches(user)
+    if branches is None:
+        raise HTTPException(403, "Supervisors and admins only")
+    q = {**tenant_filter(user), "date": day, "kind": {"$in": ["in", "out"]}}
+    if not is_admin(user):
+        q["branch_id"] = {"$in": [b["id"] for b in branches]}
+    if employee_id:
+        q["employee_id"] = employee_id
+    rows = await db.attendance.find(q, {"_id": 0}).sort("clocked_at", 1).to_list(2000)
+
+    bmap = {b["id"]: b for b in branches}
+    punches = []
+    stats = {"total": 0, "in_zone": 0, "out_zone": 0, "no_gps": 0}
+    for p in rows:
+        b = bmap.get(p.get("branch_id"))
+        dist = p.get("distance_from_branch_m")
+        if dist is None and b and b.get("lat") is not None and p.get("lat") is not None:
+            dist = round(_haversine_m(b["lat"], b["lng"], p["lat"], p["lng"]), 1)
+        radius = (b or {}).get("geofence_radius_m") or DEFAULT_GEOFENCE_M
+        in_zone = None
+        if p.get("lat") is None or dist is None:
+            stats["no_gps"] += 1
+        else:
+            in_zone = dist <= radius
+            stats["in_zone" if in_zone else "out_zone"] += 1
+        stats["total"] += 1
+        punches.append({
+            "id": p["id"], "employee_id": p.get("employee_id"),
+            "employee_name": p.get("employee_name"),
+            "kind": p.get("kind"), "clocked_at": p.get("clocked_at"),
+            "lat": p.get("lat"), "lng": p.get("lng"),
+            "accuracy_m": p.get("accuracy_m"),
+            "distance_from_branch_m": dist,
+            "geofence_radius_m": radius,
+            "in_zone": in_zone,
+            "branch_id": p.get("branch_id"),
+            "branch_name": p.get("branch_name") or (b or {}).get("name"),
+        })
+    return {
+        "date": day,
+        "branches": [{"id": b["id"], "code": b.get("code"), "name": b.get("name"),
+                      "lat": b.get("lat"), "lng": b.get("lng"),
+                      "geofence_radius_m": b.get("geofence_radius_m") or DEFAULT_GEOFENCE_M}
+                     for b in branches],
+        "punches": punches,
+        "stats": stats,
+    }
+
+
+@router.get("/punch/team")
+async def team_punches(date: Optional[str] = None, employee_id: Optional[str] = None,
+                       user: dict = Depends(get_current_user)):
+    day = date or now_utc().strftime("%Y-%m-%d")
+    return await _team_data(user, day, employee_id)
+
+
+@router.get("/punch/team.csv")
+async def team_punches_csv(date: Optional[str] = None, employee_id: Optional[str] = None,
+                           user: dict = Depends(get_current_user)):
+    import csv as _csv
+    import io as _io
+    from fastapi.responses import StreamingResponse
+    day = date or now_utc().strftime("%Y-%m-%d")
+    data = await _team_data(user, day, employee_id)
+    buf = _io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow(["employee", "kind", "clocked_at", "branch", "lat", "lng",
+                "accuracy_m", "distance_from_branch_m", "geofence_radius_m", "zone"])
+    for p in data["punches"]:
+        zone = "in_zone" if p["in_zone"] else ("out_of_zone" if p["in_zone"] is False else "no_gps")
+        w.writerow([p["employee_name"], p["kind"], p["clocked_at"], p["branch_name"],
+                    p["lat"], p["lng"], p["accuracy_m"],
+                    p["distance_from_branch_m"], p["geofence_radius_m"], zone])
+    buf.seek(0)
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename=punch-map-{day}.csv"})

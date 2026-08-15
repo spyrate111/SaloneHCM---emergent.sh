@@ -4,10 +4,12 @@
  * offline the request is intercepted by the service worker and queued in
  * IndexedDB for later sync.
  */
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import api from "../../lib/api";
-import { Timer, MapPin, LogIn, LogOut, AlertTriangle, WifiOff, RefreshCw, CheckCircle2, XCircle, RotateCw, Trash2 } from "lucide-react";
+import { Timer, MapPin, LogIn, LogOut, AlertTriangle, WifiOff, RefreshCw, CheckCircle2, XCircle, RotateCw, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react";
+
+const PunchMap = lazy(() => import("../../components/PunchMap"));
 
 const EMPTY_SUMMARY = { queued: 0, syncing: 0, failed: 0, total: 0 };
 
@@ -20,11 +22,24 @@ export default function MobileClock() {
   const [queue, setQueue] = useState([]); // detailed rows for the drawer
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [showQueue, setShowQueue] = useState(false);
+  const [team, setTeam] = useState(null); // null = not a supervisor/admin
+  const [teamErr, setTeamErr] = useState(false); // transient load failure (non-403)
+  const [showMap, setShowMap] = useState(true);
 
   const refresh = () =>
     api.get("/mobile/punch/today").then((r) => setToday(r.data || [])).catch(() => {});
 
   useEffect(() => { refresh(); }, []);
+
+  // Supervisors/admins get the team punch map; everyone else 403s → hidden.
+  const loadTeam = () =>
+    api.get("/mobile/punch/team")
+      .then((r) => { setTeam(r.data); setTeamErr(false); })
+      .catch((e) => {
+        setTeam(null);
+        setTeamErr(!!e?.response?.status && e.response.status !== 403);
+      });
+  useEffect(() => { loadTeam(); }, []);
 
   // Ask the service worker for its current queue snapshot on mount
   useEffect(() => {
@@ -295,6 +310,54 @@ export default function MobileClock() {
           </div>
         )}
       </section>
+
+      {/* team punch map — supervisors & admins only */}
+      {!team && teamErr && (
+        <section className="bg-white border border-[#E2DFD6] rounded-xl p-3 flex items-center gap-2 text-xs text-[#525860]"
+                 data-testid="mobile-clock-team-map-error">
+          <Users className="w-4 h-4 text-[#8B6A14] flex-shrink-0" />
+          <span className="flex-1">Team map couldn't load.</span>
+          <button onClick={loadTeam} className="font-semibold text-[#0A4A1E] underline"
+                  data-testid="mobile-clock-team-map-retry">Retry</button>
+        </section>
+      )}
+      {team && (
+        <section className="bg-white border border-[#E2DFD6] rounded-xl p-3 space-y-3" data-testid="mobile-clock-team-map">
+          <button onClick={() => setShowMap(!showMap)} className="w-full flex items-center gap-2"
+                  data-testid="mobile-clock-team-map-toggle">
+            <Users className="w-4 h-4 text-[#0A4A1E]" />
+            <div className="flex-1 text-left">
+              <div className="text-sm font-semibold text-[#0A4A1E]">Team map · today</div>
+              <div className="text-[10px] text-[#525860]">Who clocked in, and from where</div>
+            </div>
+            {showMap ? <ChevronUp className="w-4 h-4 text-[#525860]" /> : <ChevronDown className="w-4 h-4 text-[#525860]" />}
+          </button>
+          <div className="flex gap-2 text-[10px]" data-testid="mobile-clock-team-stats">
+            <span className="px-2 py-1 rounded-full bg-[#E4F7E7] text-[#0A4A1E] font-semibold">{team.stats.in_zone} in-zone</span>
+            <span className={`px-2 py-1 rounded-full font-semibold ${team.stats.out_zone > 0 ? "bg-[#FBE9E9] text-[#B03A2E]" : "bg-[#F7F6F2] text-[#525860]"}`}>{team.stats.out_zone} out-of-zone</span>
+            <span className="px-2 py-1 rounded-full bg-[#F7F6F2] text-[#525860] font-semibold">{team.stats.no_gps} no GPS</span>
+          </div>
+          {showMap && (
+            <Suspense fallback={<div className="h-[280px] grid place-items-center text-xs text-[#525860]">Loading map…</div>}>
+              <PunchMap punches={team.punches} branches={team.branches} height={280} />
+            </Suspense>
+          )}
+          {team.punches.filter((p) => p.in_zone === false).length > 0 && (
+            <div className="space-y-1.5" data-testid="mobile-clock-team-outzone-list">
+              <div className="text-[10px] uppercase tracking-widest text-[#B03A2E]">Out-of-zone punches</div>
+              {team.punches.filter((p) => p.in_zone === false).map((p) => (
+                <div key={p.id} className="flex items-center gap-2 bg-[#FBE9E9] rounded-lg px-2.5 py-2 text-[11px] text-[#B03A2E]"
+                     data-testid={`mobile-clock-outzone-${p.id}`}>
+                  <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="font-semibold">{p.employee_name}</span>
+                  <span className="uppercase">{p.kind}</span>
+                  <span className="ml-auto font-data">{Math.round(p.distance_from_branch_m)}m out</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -4,11 +4,14 @@
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import api from "../../lib/api";
-import { Bell, BellOff, Fingerprint, Smartphone, Trash2, Info, LogOut } from "lucide-react";
+import api, { fmtSLE } from "../../lib/api";
+import { Bell, BellOff, Fingerprint, Smartphone, Trash2, Info, LogOut, FileText, CloudDownload, CheckCircle2, FolderDown } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const REGISTRATION_KEY = "salonehcm_push_endpoint";
+const PACK_CACHE = "salonehcm-payslip-pack";
+const PACK_META_KEY = "salonehcm_m_pack_meta";
+const packKey = (row) => `/offline-payslips/${row.run_id}.pdf`;
 
 function urlBase64ToUint8Array(base64) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -35,6 +38,67 @@ export default function MobileProfile() {
   const [pushBusy, setPushBusy] = useState(false);
   const [creds, setCreds] = useState([]);
   const [bioBusy, setBioBusy] = useState(false);
+  const [slips, setSlips] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(PACK_META_KEY) || "[]"); } catch { return []; }
+  });
+  const [savedIds, setSavedIds] = useState({});
+  const [savingId, setSavingId] = useState(null);
+
+  const checkSaved = async (rows) => {
+    if (!("caches" in window)) return;
+    const c = await caches.open(PACK_CACHE);
+    const map = {};
+    for (const row of rows) map[row.run_id] = !!(await c.match(packKey(row)));
+    setSavedIds(map);
+  };
+
+  useEffect(() => {
+    api.get("/payroll/my-payslips").then((r) => {
+      const last3 = (r.data || []).slice(0, 3);
+      setSlips(last3);
+      try { localStorage.setItem(PACK_META_KEY, JSON.stringify(last3)); } catch { /* quota */ }
+      checkSaved(last3);
+    }).catch(() => checkSaved(slips)); // offline — check cache against cached meta
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const savePdf = async (row) => {
+    setSavingId(row.run_id);
+    try {
+      const res = await api.get(
+        `/payroll/runs/${row.run_id}/payslip/${row.slip.employee_id}.pdf`,
+        { responseType: "blob" },
+      );
+      const c = await caches.open(PACK_CACHE);
+      await c.put(packKey(row), new Response(res.data, { headers: { "Content-Type": "application/pdf" } }));
+      setSavedIds((s) => ({ ...s, [row.run_id]: true }));
+      toast.success(`${row.period} payslip saved for offline`);
+    } catch {
+      toast.error("Could not save — check your connection");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const saveAll = async () => {
+    for (const row of slips) {
+      if (!savedIds[row.run_id]) await savePdf(row); // sequential — mobile networks
+    }
+  };
+
+  const openSaved = async (row) => {
+    const c = await caches.open(PACK_CACHE);
+    const hit = await c.match(packKey(row));
+    if (!hit) { toast.error("Not saved offline yet"); return; }
+    const blob = await hit.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payslip-${row.period}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
 
   const refresh = () => {
     api.get("/push/status").then((r) => setPushOn(r.data?.subscription_count > 0)).catch(() => {});
@@ -224,6 +288,63 @@ export default function MobileProfile() {
                 data-testid="mobile-profile-biometric-enrol">
           <Fingerprint className="w-4 h-4" /> {bioBusy ? "Enrolling…" : "Enrol this device"}
         </button>
+      </section>
+
+      {/* Offline payslip pack */}
+      <section className="bg-white border border-[#E2DFD6] rounded-xl p-4 space-y-3" data-testid="mobile-profile-payslip-pack">
+        <div className="flex items-center gap-2">
+          <FolderDown className="w-5 h-5 text-[#0A4A1E]" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Offline payslip pack</div>
+            <div className="text-[11px] text-[#525860]">Save your last 3 payslip PDFs — open with zero signal</div>
+          </div>
+          {slips.length > 0 && slips.some((r) => !savedIds[r.run_id]) && (
+            <button onClick={saveAll} disabled={!!savingId}
+                    className="text-[10px] font-semibold bg-[#0A4A1E] text-white px-2.5 py-1.5 rounded-lg disabled:opacity-50"
+                    data-testid="mobile-profile-pack-save-all">
+              Save all
+            </button>
+          )}
+        </div>
+        {slips.length === 0 ? (
+          <p className="text-[11px] text-[#686D76]" data-testid="mobile-profile-pack-empty">No payslips yet.</p>
+        ) : (
+          <div className="divide-y divide-[#F1EEE6]">
+            {slips.map((row) => {
+              const isSaved = !!savedIds[row.run_id];
+              return (
+                <div key={row.run_id} className="flex items-center gap-3 py-2.5" data-testid={`mobile-profile-pack-row-${row.period}`}>
+                  <FileText className="w-4 h-4 text-[#525860] flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold">{row.period}</div>
+                    <div className="text-[10px] text-[#525860] font-data">Net {fmtSLE(row.slip?.net)}</div>
+                  </div>
+                  <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full flex items-center gap-1 ${
+                          isSaved ? "bg-[#E4F7E7] text-[#0A4A1E]" : "bg-[#F7F6F2] text-[#8A8F96]"
+                        }`}
+                        data-testid={`mobile-profile-pack-status-${row.period}`}>
+                    {isSaved && <CheckCircle2 className="w-3 h-3" />}
+                    {isSaved ? "Saved offline" : "Not saved"}
+                  </span>
+                  {isSaved ? (
+                    <button onClick={() => openSaved(row)}
+                            className="text-[10px] font-semibold border border-[#0A4A1E] text-[#0A4A1E] px-2.5 py-1.5 rounded-lg"
+                            data-testid={`mobile-profile-pack-open-${row.period}`}>
+                      Open
+                    </button>
+                  ) : (
+                    <button onClick={() => savePdf(row)} disabled={savingId === row.run_id}
+                            className="text-[10px] font-semibold bg-[#0A4A1E] text-white px-2.5 py-1.5 rounded-lg disabled:opacity-50 flex items-center gap-1"
+                            data-testid={`mobile-profile-pack-save-${row.period}`}>
+                      <CloudDownload className="w-3 h-3" />
+                      {savingId === row.run_id ? "Saving…" : "Save"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* About */}

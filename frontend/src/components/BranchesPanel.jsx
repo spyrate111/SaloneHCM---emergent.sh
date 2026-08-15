@@ -87,6 +87,7 @@ function BranchModal({ branch, onClose, onSaved }) {
   const [form, setForm] = useState({
     name: branch?.name || "", code: branch?.code || "", region: branch?.region || "",
     ministry: branch?.ministry || "", supervisor_user_id: branch?.supervisor_user_id || "",
+    lat: branch?.lat ?? "", lng: branch?.lng ?? "", geofence_radius_m: branch?.geofence_radius_m ?? "",
   });
   const [busy, setBusy] = useState(false);
 
@@ -98,7 +99,12 @@ function BranchModal({ branch, onClose, onSaved }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const payload = { ...form, supervisor_user_id: form.supervisor_user_id || null };
+      const num = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+      const payload = {
+        ...form,
+        supervisor_user_id: form.supervisor_user_id || null,
+        lat: num(form.lat), lng: num(form.lng), geofence_radius_m: num(form.geofence_radius_m),
+      };
       if (branch) {
         delete payload.code;
         await api.patch(`/branches/${branch.id}`, payload);
@@ -131,6 +137,21 @@ function BranchModal({ branch, onClose, onSaved }) {
         </Field>
         <Field label="Region"><input data-testid="branch-region" value={form.region} onChange={set("region")} placeholder="Bo" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
         <Field label="Ministry / MDA (optional link)"><input data-testid="branch-ministry" value={form.ministry} onChange={set("ministry")} placeholder="Ministry of Finance" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Latitude">
+            <input data-testid="branch-lat" type="number" step="any" min={-90} max={90} value={form.lat} onChange={set("lat")} placeholder="8.4657"
+              className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+          </Field>
+          <Field label="Longitude">
+            <input data-testid="branch-lng" type="number" step="any" min={-180} max={180} value={form.lng} onChange={set("lng")} placeholder="-13.2317"
+              className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+          </Field>
+          <Field label="Geofence (m)">
+            <input data-testid="branch-geofence" type="number" step="1" min={25} max={10000} value={form.geofence_radius_m} onChange={set("geofence_radius_m")} placeholder="250"
+              className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+          </Field>
+        </div>
+        <p className="text-[10px] text-[#686D76] -mt-2">GPS punches beyond the geofence radius show as out-of-zone on the punch map. Leave radius blank for the 250m default.</p>
         <Field label="Branch supervisor (approves vouchers before central submission)">
           <select data-testid="branch-supervisor" value={form.supervisor_user_id} onChange={set("supervisor_user_id")}
             className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
