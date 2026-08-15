@@ -10,6 +10,7 @@ import {
   SortableContext, useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import TrainingProgressPanel from "../components/TrainingProgressPanel";
 import PostJobModal from "../components/PostJobModal";
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];

@@ -89,6 +89,15 @@ export default function MobileTraining() {
         <p className="text-[11px] text-[#525860] mt-1">
           Short walkthroughs in your language — payslips, leave, clocking & more.
         </p>
+        {total > 0 && (
+          <div className="flex items-center gap-2 mt-2" data-testid="mobile-training-my-progress">
+            <div className="flex-1 h-1.5 rounded-full bg-[#EBE8E0] overflow-hidden">
+              <div className={`h-full rounded-full ${done.size >= total ? "bg-[#17A035]" : "bg-[#0A4A1E]"}`}
+                   style={{ width: `${Math.round((done.size / total) * 100)}%` }} />
+            </div>
+            <span className="text-[10px] font-data text-[#525860]">{done.size}/{total} done</span>
+          </div>
+        )}
       </div>
 
       {/* language toggle */}
@@ -242,22 +251,4 @@ function fmt(s) {
   const t = Math.floor(s);
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
-ctive?.id === v.id ? "text-[#0A4A1E]" : "text-[#1A1C1E]"}`}>
-                {v.title}
-              </div>
-              <div className="text-[10px] text-[#525860] mt-1 flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {fmt(v.duration_s)}
-              </div>
-            </div>
-          </button>
-        ))}
-      </section>
-    </div>
-  );
-}
 
-function fmt(s) {
-  if (!s) return "0:00";
-  const t = Math.floor(s);
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
-}
