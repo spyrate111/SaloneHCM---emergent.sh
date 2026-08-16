@@ -70,6 +70,9 @@ def _summarize(snap: dict) -> str:
         parts.append(f"{len(snap['outstanding_filings'])} NRA filing{'s' if len(snap['outstanding_filings']) != 1 else ''} outstanding")
     if snap["pending_manager_reviews"]:
         parts.append(f"{snap['pending_manager_reviews']} review{'s' if snap['pending_manager_reviews'] != 1 else ''} awaiting manager")
+    if snap.get("scan_alerts"):
+        n = len(snap["scan_alerts"])
+        parts.append(f"{n} flagged payslip scan{'s' if n != 1 else ''}")
     return " · ".join(parts) or "All clear — no pending actions."
 
 
@@ -100,6 +103,15 @@ def _email_items(snap: dict) -> list[dict]:
             "label": f"<strong>{snap['pending_manager_reviews']}</strong> performance review{'s' if snap['pending_manager_reviews'] != 1 else ''} awaiting manager",
             "url": f"{frontend}/performance",
             "cta": "Score reviews",
+        })
+    for al in snap.get("scan_alerts", []):
+        flagged_at = al["created_at"][:16].replace("T", " ")
+        items.append({
+            "label": (f'<strong style="color:#B03A2E;">Flagged payslip</strong> — '
+                      f'{al["employee_name"]} · {al["period"]} · {al["scan_count"]} scans · '
+                      f'flagged {flagged_at} UTC'),
+            "url": f"{frontend}/payroll?flag={al['verification_id']}",
+            "cta": "View scan log",
         })
     return items
 

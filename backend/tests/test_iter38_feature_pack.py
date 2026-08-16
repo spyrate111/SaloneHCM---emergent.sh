@@ -3,6 +3,7 @@ coverage planner, reminder nudge stats. Classes added feature-by-feature.
 """
 import os
 import time
+import json
 from datetime import datetime, timezone
 
 import pytest
