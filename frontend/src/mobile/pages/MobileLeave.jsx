@@ -37,6 +37,18 @@ export default function MobileLeave() {
   const reports = rows.filter((r) => r.employee_id !== me?.employee_id && r.status === "pending");
 
   const [conflict, setConflict] = useState(null); // {lid, ...conflictData}
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestToEmployee = async () => {
+    setSuggesting(true);
+    try {
+      await api.post(`/leave/${conflict.lid}/suggest-dates`);
+      toast.success(`Alternative dates sent to ${conflict.employee_name}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not send suggestion");
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   const doDecide = async (id, status) => {
     try {
@@ -156,6 +168,24 @@ export default function MobileLeave() {
                 </div>
               ))}
             </div>
+            {conflict.suggestions?.length > 0 && (
+              <div className="border-t border-[#EAD9AE] pt-2" data-testid="mobile-leave-conflict-suggestions">
+                <div className="text-[11px] font-semibold text-[#8B6A14] mb-1">Better-covered nearby dates:</div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {conflict.suggestions.map((s) => (
+                    <span key={s.start_date} className="text-[11px] font-data border border-[#8B6A14]/40 bg-white text-[#8B6A14] px-2 py-0.5 rounded-md"
+                      data-testid={`mobile-leave-conflict-suggestion-${s.start_date}`}>
+                      {s.start_date === s.end_date ? s.start_date : `${s.start_date} → ${s.end_date}`}
+                    </span>
+                  ))}
+                </div>
+                <button onClick={suggestToEmployee} disabled={suggesting}
+                  className="w-full text-xs font-semibold border border-[#8B6A14] text-[#8B6A14] py-2 rounded-lg active:bg-[#FDF8EC] disabled:opacity-50"
+                  data-testid="mobile-leave-conflict-suggest-btn">
+                  {suggesting ? "Sending…" : "Suggest these dates to employee"}
+                </button>
+              </div>
+            )}
             <div className="flex gap-2">
               <button onClick={() => setConflict(null)}
                 className="flex-1 text-xs font-semibold border border-[#E2DFD6] py-2.5 rounded-lg"
@@ -286,6 +316,15 @@ function LeaveForm({ onClose, onSaved }) {
       .then((r) => setCoverage(r.data)).catch(() => setCoverage(null));
   }, [start, end]);
 
+  // Annual leave balance (current year)
+  const [balance, setBalance] = useState(null);
+  useEffect(() => {
+    api.get("/leave/balance").then((r) => setBalance(r.data)).catch(() => setBalance(null));
+  }, []);
+  const reqDays = start && end && start <= end
+    ? Math.floor((new Date(end) - new Date(start)) / 86400000) + 1 : 0;
+  const afterLeft = balance ? balance.remaining - (type === "annual" ? reqDays : 0) : null;
+
   const submit = async (e) => {
     e.preventDefault();
     if (!start || !end) return toast.error("Pick start and end dates");
@@ -323,6 +362,21 @@ function LeaveForm({ onClose, onSaved }) {
             <option value="unpaid">Unpaid</option>
           </select>
         </label>
+        {balance && (
+          <div data-testid="mobile-leave-balance"
+            className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-lg px-3 py-2 text-[11px] flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[#525860]">
+              Annual balance {balance.year}: <b className="font-data text-[#1A1C1E]">{balance.remaining}</b>/{balance.entitlement}d left
+              {balance.pending > 0 && <span className="text-[#8B6A14]"> · {balance.pending}d pending</span>}
+            </span>
+            {reqDays > 0 && type === "annual" && (
+              <span data-testid="mobile-leave-balance-after"
+                className={`font-semibold font-data ${afterLeft < 0 ? "text-[#B03A2E]" : "text-[#17A035]"}`}>
+                {afterLeft < 0 ? `Exceeds by ${-afterLeft}d` : `After this: ${afterLeft}d`}
+              </span>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <span className="text-[11px] uppercase tracking-widest text-[#525860]">Start</span>

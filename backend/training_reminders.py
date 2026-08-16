@@ -31,7 +31,7 @@ async def _catalog_total() -> int:
     return len(slugs)
 
 
-async def run_for_company(company_id: str) -> dict:
+async def run_for_company(company_id: str, force_lang: str | None = None) -> dict:
     total = await _catalog_total()
     week = _week_key()
     if total == 0:
@@ -49,7 +49,10 @@ async def run_for_company(company_id: str) -> dict:
         if await db.training_reminders.find_one({"user_id": u["id"], "week": week}):
             skipped_already += 1
             continue
-        lang = u.get("training_lang") if u.get("training_lang") in MESSAGES else "en"
+        if force_lang in MESSAGES:
+            lang = force_lang
+        else:
+            lang = u.get("training_lang") if u.get("training_lang") in MESSAGES else "en"
         title, body = MESSAGES[lang]
         r = await fanout_to_user(u["id"], {
             "title": title, "body": body.format(n=total - done),
@@ -66,6 +69,7 @@ async def run_for_company(company_id: str) -> dict:
         delivered += 1 if sent else 0
     return {"week": week, "total_videos": total, "reminded": reminded,
             "delivered_to_devices": delivered,
+            "lang": force_lang if force_lang in MESSAGES else "per-user",
             "skipped_complete": skipped_complete, "skipped_already": skipped_already}
 
 

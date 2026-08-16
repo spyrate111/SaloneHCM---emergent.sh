@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../lib/api";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { Check, X, Plus, Filter, AlertTriangle } from "lucide-react";
 import { DatePicker } from "../components/ui/date-picker";
@@ -39,7 +40,32 @@ export default function Leave() {
       .then((r) => setCoverage(r.data)).catch(() => setCoverage(null));
   }, [open, form, user]);
 
+  // Annual leave balance for the selected employee (self for non-admins)
+  const [balance, setBalance] = useState(null);
+  useEffect(() => {
+    if (!open) { setBalance(null); return; }
+    if (user?.role === "admin" && !form.employee_id) { setBalance(null); return; }
+    const params = user?.role === "admin" ? { employee_id: form.employee_id } : {};
+    api.get("/leave/balance", { params })
+      .then((r) => setBalance(r.data)).catch(() => setBalance(null));
+  }, [open, form.employee_id, user]);
+  const reqDays = form.start_date && form.end_date && form.start_date <= form.end_date
+    ? Math.floor((new Date(form.end_date) - new Date(form.start_date)) / 86400000) + 1 : 0;
+  const afterLeft = balance ? balance.remaining - (form.leave_type === "annual" ? reqDays : 0) : null;
+
   const [conflict, setConflict] = useState(null); // {lid, ...conflictData}
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestToEmployee = async () => {
+    setSuggesting(true);
+    try {
+      await api.post(`/leave/${conflict.lid}/suggest-dates`);
+      toast.success(`Alternative dates sent to ${conflict.employee_name}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not send suggestion");
+    } finally {
+      setSuggesting(false);
+    }
+  };
   const doDecide = async (id, status) => { await api.put(`/leave/${id}/decision`, { status }); load(); };
   const decide = async (id, status) => {
     if (status === "approved") {
@@ -129,6 +155,24 @@ export default function Leave() {
                 </div>
               ))}
             </div>
+            {conflict.suggestions?.length > 0 && (
+              <div className="px-6 py-3 border-t border-[#EAD9AE] bg-[#FDF8EC]" data-testid="leave-conflict-suggestions">
+                <div className="text-xs font-semibold text-[#8B6A14] mb-1.5">Better-covered nearby dates:</div>
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {conflict.suggestions.map((s) => (
+                    <span key={s.start_date} className="text-xs font-data border border-[#8B6A14]/40 bg-white text-[#8B6A14] px-2 py-1 rounded-md"
+                      data-testid={`leave-conflict-suggestion-${s.start_date}`}>
+                      {s.start_date === s.end_date ? s.start_date : `${s.start_date} → ${s.end_date}`}
+                    </span>
+                  ))}
+                </div>
+                <button onClick={suggestToEmployee} disabled={suggesting}
+                  className="text-xs font-semibold border border-[#8B6A14] text-[#8B6A14] px-3 py-1.5 rounded-md hover:bg-[#8B6A14] hover:text-white disabled:opacity-50"
+                  data-testid="leave-conflict-suggest-btn">
+                  {suggesting ? "Sending…" : "Suggest these dates to employee"}
+                </button>
+              </div>
+            )}
             <div className="px-6 py-4 border-t border-[#E2DFD6] flex gap-3 justify-end">
               <button onClick={() => setConflict(null)}
                 className="text-sm border border-[#E2DFD6] px-4 py-2 rounded-md hover:bg-[#F7F6F2]"
@@ -161,6 +205,21 @@ export default function Leave() {
                   {["annual", "sick", "maternity", "paternity", "unpaid"].map((o) => <option key={o}>{o}</option>)}
                 </select>
               </div>
+              {balance && (
+                <div data-testid="leave-balance-info"
+                  className="bg-[#F7F6F2] border border-[#E2DFD6] rounded-md px-3 py-2.5 text-xs flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[#525860]">
+                    Annual balance {balance.year}: <b className="font-data text-[#1A1C1E]">{balance.remaining}</b> of {balance.entitlement} days left
+                    {balance.pending > 0 && <span className="text-[#8B6A14]"> · {balance.pending}d pending approval</span>}
+                  </span>
+                  {reqDays > 0 && form.leave_type === "annual" && (
+                    <span data-testid="leave-balance-after"
+                      className={`font-semibold font-data ${afterLeft < 0 ? "text-[#B03A2E]" : "text-[#17A035]"}`}>
+                      {afterLeft < 0 ? `Exceeds balance by ${-afterLeft}d` : `After this: ${afterLeft}d left`}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Start</label>

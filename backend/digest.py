@@ -38,12 +38,23 @@ async def _aggregate_for_tenant(company_id: str) -> dict:
     pending_perf = await db.performance_reviews_v2.count_documents({
         "company_id": company_id, "status": "pending_manager",
     })
+
+    # Payslip QR fraud alerts flagged since the last digest went out
+    last = await db.digest_runs.find_one({}, {"_id": 0, "ran_at": 1},
+                                         sort=[("ran_at", -1)])
+    since = last["ran_at"] if last else iso(now - timedelta(hours=24))
+    scan_alerts = await db.payslip_scan_alerts.find(
+        {"company_id": company_id, "created_at": {"$gt": since}},
+        {"_id": 0, "verification_id": 1, "employee_name": 1, "period": 1,
+         "scan_count": 1, "created_at": 1},
+    ).sort("created_at", -1).to_list(20)
     return {
         "pending_leaves": pending_leaves,
         "employee_count": employee_count,
         "upcoming_runs": next_runs,
         "outstanding_filings": outstanding,
         "pending_manager_reviews": pending_perf,
+        "scan_alerts": scan_alerts,
         "generated_at": iso(now),
     }
 

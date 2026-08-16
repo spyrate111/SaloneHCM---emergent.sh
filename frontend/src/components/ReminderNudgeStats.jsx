@@ -10,6 +10,7 @@ import { BellRing, Send } from "lucide-react";
 export default function ReminderNudgeStats() {
   const [data, setData] = useState(null);
   const [sending, setSending] = useState(false);
+  const [nudgeLang, setNudgeLang] = useState("all");
   const load = () =>
     api.get("/training-progress/reminders/stats")
       .then((r) => setData(r.data)).catch(() => setData(null));
@@ -20,14 +21,18 @@ export default function ReminderNudgeStats() {
 
   const sendNow = async () => {
     setSending(true);
+    const langLabel = nudgeLang === "all"
+      ? "each person's language"
+      : ({ en: "English", krio: "Krio", mende: "Mɛnde", temne: "Temne" }[nudgeLang]);
     try {
-      const { data: r } = await api.post("/training-progress/reminders/run-now");
+      const payload = nudgeLang === "all" ? {} : { lang: nudgeLang };
+      const { data: r } = await api.post("/training-progress/reminders/run-now", payload);
       if (r.skipped) {
         toast.info(`Nothing to send — ${r.skipped}`);
       } else if (r.reminded === 0) {
         toast.info(`No one to nudge — ${r.skipped_already} already reminded this week, ${r.skipped_complete} finished all videos`);
       } else {
-        toast.success(`Sent ${r.reminded} reminder${r.reminded === 1 ? "" : "s"} (${r.delivered_to_devices} reached a device) · ${r.skipped_already} already nudged · ${r.skipped_complete} all done`);
+        toast.success(`Sent ${r.reminded} reminder${r.reminded === 1 ? "" : "s"} in ${langLabel} (${r.delivered_to_devices} reached a device) · ${r.skipped_already} already nudged · ${r.skipped_complete} all done`);
       }
       load();
     } catch (e) {
@@ -44,11 +49,22 @@ export default function ReminderNudgeStats() {
           <BellRing className="w-4 h-4 text-[#0A4A1E]" /> Reminder nudge stats
         </h3>
         <span className="text-[11px] text-[#525860]">Monday push reminders · a video finished within 7 days counts as a win</span>
-        <button onClick={sendNow} disabled={sending}
-          className="ml-auto inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs font-medium px-3 py-2 rounded-md disabled:opacity-50"
-          data-testid="nudge-send-now-button">
-          <Send className="w-3.5 h-3.5" /> {sending ? "Sending…" : "Send this week's nudges now"}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <select value={nudgeLang} onChange={(e) => setNudgeLang(e.target.value)}
+            className="bg-white border border-[#E2DFD6] rounded-md px-2.5 py-2 text-xs"
+            data-testid="nudge-lang-select">
+            <option value="all">All languages</option>
+            <option value="en">English</option>
+            <option value="krio">Krio</option>
+            <option value="mende">Mɛnde</option>
+            <option value="temne">Temne</option>
+          </select>
+          <button onClick={sendNow} disabled={sending}
+            className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs font-medium px-3 py-2 rounded-md disabled:opacity-50"
+            data-testid="nudge-send-now-button">
+            <Send className="w-3.5 h-3.5" /> {sending ? "Sending…" : "Send this week's nudges now"}
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-3 divide-x divide-[#E2DFD6] border-b border-[#E2DFD6] text-center">
         <div className="py-4" data-testid="nudge-stat-reminded">

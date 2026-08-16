@@ -63,6 +63,69 @@ async def leave_calendar(month: str = None, user: dict = Depends(get_current_use
     return {"month": m, "leaves": rows}
 
 
+ANNUAL_ENTITLEMENT_DAYS = 21  # Employment Act 2023 minimum
+
+
+@router.get("/balance")
+async def leave_balance(employee_id: str = None, user: dict = Depends(get_current_user)):
+    """Current-year annual leave balance. Employees see their own; admins may
+    pass employee_id."""
+    tf = tenant_filter(user)
+    eid = employee_id if (employee_id and is_admin(user)) else user.get("employee_id")
+    if not eid:
+        raise HTTPException(400, "employee_id required")
+    year = str(now_utc().year)
+    rows = await db.leave_requests.find({
+        **tf, "employee_id": eid, "leave_type": "annual",
+        "status": {"$in": ["approved", "pending"]},
+        "start_date": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"},
+    }, {"_id": 0, "status": 1, "days": 1}).to_list(500)
+    used = sum(r.get("days", 0) for r in rows if r["status"] == "approved")
+    pending = sum(r.get("days", 0) for r in rows if r["status"] == "pending")
+    return {"year": int(year), "entitlement": ANNUAL_ENTITLEMENT_DAYS,
+            "used": used, "pending": pending,
+            "remaining": max(0, ANNUAL_ENTITLEMENT_DAYS - used)}
+
+
+async def _suggest_ranges(tf: dict, staff: list, eid: str, s: datetime, e: datetime,
+                          threshold: int) -> list:
+    """Up to 3 nearest same-duration ranges (never before today) where no day
+    breaches the branch coverage threshold."""
+    from datetime import timedelta
+    duration = (e - s).days + 1
+    today_d = datetime.fromisoformat(now_utc().strftime("%Y-%m-%d"))
+    win_lo = min(s - timedelta(days=60), today_d)
+    win_hi = e + timedelta(days=60)
+    pool = await db.leave_requests.find({
+        **tf, "status": "approved",
+        "employee_id": {"$in": [x["id"] for x in staff if x["id"] != eid]},
+        "start_date": {"$lte": win_hi.strftime("%Y-%m-%d")},
+        "end_date": {"$gte": win_lo.strftime("%Y-%m-%d")},
+    }, {"_id": 0, "employee_id": 1, "start_date": 1, "end_date": 1}).to_list(1000)
+
+    def _clear(cand):
+        for i in range(duration):
+            key = (cand + timedelta(days=i)).strftime("%Y-%m-%d")
+            off = len({o["employee_id"] for o in pool
+                       if o["start_date"] <= key <= o["end_date"]}) + 1
+            if off >= threshold:
+                return False
+        return True
+
+    suggestions = []
+    for dist in range(1, 61):
+        for cand in (s + timedelta(days=dist), s - timedelta(days=dist)):
+            if cand < today_d or len(suggestions) == 3:
+                continue
+            if _clear(cand):
+                suggestions.append({
+                    "start_date": cand.strftime("%Y-%m-%d"),
+                    "end_date": (cand + timedelta(days=duration - 1)).strftime("%Y-%m-%d")})
+        if len(suggestions) == 3:
+            break
+    return suggestions
+
+
 @router.get("/coverage-preview")
 async def coverage_preview(start_date: str, end_date: str, employee_id: str = None,
                            user: dict = Depends(get_current_user)):
@@ -114,36 +177,7 @@ async def coverage_preview(start_date: str, end_date: str, employee_id: str = No
     # Nearest alternative ranges (same duration) where no day breaches — up to 3.
     suggestions = []
     if any(d["breach"] for d in days):
-        duration = (e - s).days + 1
-        today_d = datetime.fromisoformat(now_utc().strftime("%Y-%m-%d"))
-        win_lo = min(s - timedelta(days=60), today_d)
-        win_hi = e + timedelta(days=60)
-        pool = await db.leave_requests.find({
-            **tf, "status": "approved",
-            "employee_id": {"$in": [x["id"] for x in staff if x["id"] != eid]},
-            "start_date": {"$lte": win_hi.strftime("%Y-%m-%d")},
-            "end_date": {"$gte": win_lo.strftime("%Y-%m-%d")},
-        }, {"_id": 0, "employee_id": 1, "start_date": 1, "end_date": 1}).to_list(1000)
-
-        def _clear(cand):
-            for i in range(duration):
-                key = (cand + timedelta(days=i)).strftime("%Y-%m-%d")
-                off = len({o["employee_id"] for o in pool
-                           if o["start_date"] <= key <= o["end_date"]}) + 1
-                if off >= threshold:
-                    return False
-            return True
-
-        for dist in range(1, 61):
-            for cand in (s + timedelta(days=dist), s - timedelta(days=dist)):
-                if cand < today_d or len(suggestions) == 3:
-                    continue
-                if _clear(cand):
-                    suggestions.append({
-                        "start_date": cand.strftime("%Y-%m-%d"),
-                        "end_date": (cand + timedelta(days=duration - 1)).strftime("%Y-%m-%d")})
-            if len(suggestions) == 3:
-                break
+        suggestions = await _suggest_ranges(tf, staff, eid, s, e, threshold)
     return {"warn": any(d["breach"] for d in days), "branch_name": branch.get("name"),
             "headcount": headcount, "threshold": threshold, "days": days,
             "suggestions": suggestions}
@@ -192,9 +226,63 @@ async def leave_conflicts(lid: str, user: dict = Depends(get_current_user)):
             days.append({"date": key, "off_count": off, "already_off": names})
         cur += timedelta(days=1)
         steps += 1
+    suggestions = []
+    if days:
+        suggestions = await _suggest_ranges(
+            tf, staff, lv["employee_id"],
+            datetime.fromisoformat(lv["start_date"]),
+            datetime.fromisoformat(lv["end_date"]), threshold)
     return {"warn": bool(days), "branch_name": branch.get("name"),
             "headcount": headcount, "threshold": threshold,
-            "employee_name": lv["employee_name"], "days": days[:14]}
+            "employee_name": lv["employee_name"], "days": days[:14],
+            "suggestions": suggestions}
+
+
+@router.post("/{lid}/suggest-dates")
+async def suggest_dates(lid: str, user: dict = Depends(get_current_user)):
+    """Push the employee up to 3 better-covered alternative ranges for their
+    pending request. Admin or the employee's direct manager only."""
+    import math
+    tf = tenant_filter(user)
+    lv = await db.leave_requests.find_one({"id": lid, **tf}, {"_id": 0})
+    if not lv:
+        raise HTTPException(404, "Leave request not found")
+    emp = await db.employees.find_one({"id": lv["employee_id"], **tf}, {"_id": 0})
+    if not is_admin(user):
+        if not emp or emp.get("manager_id") != user.get("employee_id"):
+            raise HTTPException(403, "Admin or manager only")
+    branch_id = (emp or {}).get("branch_id")
+    if not branch_id:
+        raise HTTPException(409, "Employee has no branch — no coverage data")
+    staff = await db.employees.find(
+        {"branch_id": branch_id, "status": "active", **tf},
+        {"_id": 0, "id": 1}).to_list(2000)
+    threshold = max(2, math.ceil(0.2 * len(staff)))
+    suggestions = await _suggest_ranges(
+        tf, staff, lv["employee_id"],
+        datetime.fromisoformat(lv["start_date"]),
+        datetime.fromisoformat(lv["end_date"]), threshold)
+    if not suggestions:
+        raise HTTPException(409, "No better-covered dates found nearby")
+
+    def _fmt(r):
+        return r["start_date"] if r["start_date"] == r["end_date"] else f'{r["start_date"]} → {r["end_date"]}'
+
+    target = await db.users.find_one(
+        {"employee_id": lv["employee_id"], **tf}, {"_id": 0, "id": 1})
+    push = {"sent": 0, "skipped": "no_account"}
+    if target:
+        from push_service import fanout_to_user
+        push = await fanout_to_user(target["id"], {
+            "title": "Alternative leave dates suggested",
+            "body": (f'Your {lv["leave_type"]} leave {_fmt(lv)} clashes with team '
+                     f'coverage. Better-covered options: '
+                     f'{"; ".join(_fmt(r) for r in suggestions)}'),
+            "url": "/m/leave", "kind": "leave_date_suggestion",
+            "tag": f"leave-suggest-{lid}"})
+    await audit("leave_dates_suggested", f"leave_requests/{lid}", user,
+                {"employee": lv.get("employee_name"), "suggestions": suggestions})
+    return {"ok": True, "suggestions": suggestions, "push": push}
 
 
 @router.post("")

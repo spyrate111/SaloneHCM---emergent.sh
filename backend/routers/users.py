@@ -239,6 +239,15 @@ async def set_digest_prefs(body: DigestPrefsIn, user: dict = Depends(get_current
     return {"ok": True, **body.model_dump()}
 
 
+@router.get("/me/digest-preview")
+async def digest_preview(user: dict = Depends(get_current_user)):
+    """Snapshot of what today's digest would contain (admin only)."""
+    if user["role"] not in ("admin", "superadmin"):
+        raise HTTPException(403, "Digest is admin-only")
+    from digest import _aggregate_for_tenant
+    return await _aggregate_for_tenant(user["company_id"])
+
+
 @router.get("/unlinked-employees")
 async def unlinked_employees(user: dict = Depends(require_admin)):
     """Employees in this tenant that don't have a user account yet — for the invite form picker."""

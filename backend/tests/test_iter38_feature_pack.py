@@ -353,6 +353,243 @@ class TestCoverageSuggestions:
             _db.leave_requests.delete_many({"id": {"$in": seeded}})
 
 
+class TestLeaveBalance:
+    """iter40 Feature 1 — current-year annual leave balance."""
+
+    def _expected(self, eid, cid):
+        year = str(datetime.now(timezone.utc).year)
+        rows = list(_db.leave_requests.find({
+            "company_id": cid, "employee_id": eid, "leave_type": "annual",
+            "status": {"$in": ["approved", "pending"]},
+            "start_date": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}}))
+        used = sum(r.get("days", 0) for r in rows if r["status"] == "approved")
+        pending = sum(r.get("days", 0) for r in rows if r["status"] == "pending")
+        return used, pending
+
+    def test_employee_sees_own_balance(self):
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        me = _db.employees.find_one({"id": sia["employee_id"]})
+        used, pending = self._expected(me["id"], me["company_id"])
+        r = requests.get(f"{API}/leave/balance", headers=_h(sia["token"]), timeout=15)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["entitlement"] == 21
+        assert body["used"] == used and body["pending"] == pending
+        assert body["remaining"] == max(0, 21 - used)
+
+    def test_approved_annual_reduces_pending_does_not(self):
+        import uuid
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        me = _db.employees.find_one({"id": sia["employee_id"]})
+        year = datetime.now(timezone.utc).year
+        base = requests.get(f"{API}/leave/balance", headers=_h(sia["token"]), timeout=15).json()
+        docs = []
+        for status, days in (("approved", 2), ("pending", 4)):
+            doc = {"id": str(uuid.uuid4()), "company_id": me["company_id"],
+                   "employee_id": me["id"], "employee_name": "Sia Kallon",
+                   "leave_type": "annual", "start_date": f"{year}-12-01",
+                   "end_date": f"{year}-12-0{days}", "days": days,
+                   "reason": "iter40 balance seed", "status": status,
+                   "created_at": datetime.now(timezone.utc).isoformat()}
+            _db.leave_requests.insert_one(doc)
+            docs.append(doc["id"])
+        try:
+            b = requests.get(f"{API}/leave/balance", headers=_h(sia["token"]), timeout=15).json()
+            assert b["used"] == base["used"] + 2
+            assert b["pending"] == base["pending"] + 4
+            assert b["remaining"] == max(0, 21 - base["used"] - 2)
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": docs}})
+
+    def test_non_annual_types_ignored(self):
+        import uuid
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        me = _db.employees.find_one({"id": sia["employee_id"]})
+        year = datetime.now(timezone.utc).year
+        base = requests.get(f"{API}/leave/balance", headers=_h(sia["token"]), timeout=15).json()
+        doc = {"id": str(uuid.uuid4()), "company_id": me["company_id"],
+               "employee_id": me["id"], "employee_name": "Sia Kallon",
+               "leave_type": "sick", "start_date": f"{year}-11-01",
+               "end_date": f"{year}-11-05", "days": 5,
+               "reason": "iter40 sick seed", "status": "approved",
+               "created_at": datetime.now(timezone.utc).isoformat()}
+        _db.leave_requests.insert_one(doc)
+        try:
+            b = requests.get(f"{API}/leave/balance", headers=_h(sia["token"]), timeout=15).json()
+            assert b["used"] == base["used"] and b["remaining"] == base["remaining"]
+        finally:
+            _db.leave_requests.delete_many({"id": doc["id"]})
+
+    def test_admin_queries_for_employee(self, gov_admin):
+        emp = _db.employees.find_one({"company_id": gov_admin["company_id"], "status": "active"})
+        r = requests.get(f"{API}/leave/balance", params={"employee_id": emp["id"]},
+                         headers=_h(gov_admin["token"]), timeout=15)
+        assert r.status_code == 200 and r.json()["entitlement"] == 21
+
+
+class TestCoverageAutoApply:
+    """iter40 Feature 3 — approver sees suggestions in conflicts + can push them."""
+
+    @staticmethod
+    def _future(offset):
+        from datetime import timedelta
+        return (datetime.now(timezone.utc) + timedelta(days=offset)).strftime("%Y-%m-%d")
+
+    def _stage(self, day):
+        """Breach on `day` + a pending leave for sia that overlaps it."""
+        import math
+        import uuid
+        sia_user = _db.users.find_one({"email": "sia.kallon@gov.sl"})
+        me = _db.employees.find_one({"id": sia_user["employee_id"]})
+        staff = list(_db.employees.find({
+            "branch_id": me["branch_id"], "status": "active",
+            "company_id": me["company_id"], "id": {"$ne": me["id"]}}))
+        threshold = max(2, math.ceil(0.2 * (len(staff) + 1)))
+        ids = []
+        for c in staff[:threshold - 1]:
+            doc = {"id": str(uuid.uuid4()), "company_id": me["company_id"],
+                   "employee_id": c["id"],
+                   "employee_name": f'{c["first_name"]} {c["last_name"]}',
+                   "leave_type": "annual", "start_date": day, "end_date": day,
+                   "days": 1, "reason": "iter40 autoapply seed", "status": "approved",
+                   "created_at": datetime.now(timezone.utc).isoformat()}
+            _db.leave_requests.insert_one(doc)
+            ids.append(doc["id"])
+        lv = {"id": str(uuid.uuid4()), "company_id": me["company_id"],
+              "employee_id": me["id"], "employee_name": "Sia Kallon",
+              "leave_type": "annual", "start_date": day, "end_date": day,
+              "days": 1, "reason": "iter40 pending request", "status": "pending",
+              "created_at": datetime.now(timezone.utc).isoformat()}
+        _db.leave_requests.insert_one(lv)
+        ids.append(lv["id"])
+        return lv["id"], ids
+
+    def test_conflicts_include_suggestions(self, gov_admin):
+        day = self._future(160)
+        lid, ids = self._stage(day)
+        try:
+            r = requests.get(f"{API}/leave/{lid}/conflicts",
+                             headers=_h(gov_admin["token"]), timeout=15)
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["warn"] is True
+            assert 1 <= len(body["suggestions"]) <= 3
+            for sug in body["suggestions"]:
+                assert sug["start_date"] != day
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": ids}})
+
+    def test_suggest_dates_sends_and_audits(self, gov_admin):
+        day = self._future(161)
+        lid, ids = self._stage(day)
+        try:
+            r = requests.post(f"{API}/leave/{lid}/suggest-dates",
+                              headers=_h(gov_admin["token"]), timeout=15)
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["ok"] is True and len(body["suggestions"]) >= 1
+            log = _db.audit_logs.find_one({"action": "leave_dates_suggested",
+                                           "resource": f"leave_requests/{lid}"})
+            assert log and log["meta"]["employee"] == "Sia Kallon"
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": ids}})
+            _db.audit_logs.delete_many({"resource": f"leave_requests/{lid}"})
+
+    def test_plain_employee_blocked(self, gov_admin):
+        day = self._future(162)
+        lid, ids = self._stage(day)
+        try:
+            sia = _login("sia.kallon@gov.sl", "Employee@2026")
+            r = requests.post(f"{API}/leave/{lid}/suggest-dates",
+                              headers=_h(sia["token"]), timeout=15)
+            assert r.status_code == 403
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": ids}})
+
+
+class TestScanAlertDigest:
+    """iter40 Feature 4 — flagged payslip scans in the daily admin digest."""
+
+    def _clean(self):
+        _db.digest_runs.delete_many({"iter40_seed": True})
+        _db.payslip_scan_alerts.delete_many(
+            {"verification_id": {"$in": ["iter40-new", "iter40-old"]}})
+
+    def test_only_alerts_since_last_digest_included(self, gov_admin):
+        import uuid
+        from datetime import timedelta
+        cid = gov_admin["company_id"]
+        now = datetime.now(timezone.utc)
+        self._clean()
+        _db.digest_runs.insert_one({"ran_at": (now - timedelta(hours=2)).isoformat(),
+                                    "iter40_seed": True})
+        for vid, hours_ago in (("iter40-new", 1), ("iter40-old", 5)):
+            _db.payslip_scan_alerts.insert_one({
+                "id": str(uuid.uuid4()), "verification_id": vid, "company_id": cid,
+                "employee_name": "Adama Sankoh", "period": "2026-07",
+                "scan_count": 6, "notified": [],
+                "created_at": (now - timedelta(hours=hours_ago)).isoformat()})
+        try:
+            r = requests.get(f"{API}/users/me/digest-preview",
+                             headers=_h(gov_admin["token"]), timeout=15)
+            assert r.status_code == 200, r.text
+            alerts = r.json()["scan_alerts"]
+            vids = {a["verification_id"] for a in alerts}
+            assert "iter40-new" in vids
+            assert "iter40-old" not in vids  # flagged BEFORE the last digest
+            mine = next(a for a in alerts if a["verification_id"] == "iter40-new")
+            assert mine["employee_name"] == "Adama Sankoh"
+            assert mine["period"] == "2026-07"
+            assert mine["scan_count"] == 6
+            assert mine["created_at"]  # time it was flagged
+        finally:
+            self._clean()
+
+    def test_summary_and_email_mention_flagged_scans(self, gov_admin):
+        import uuid
+        from datetime import timedelta
+        cid = gov_admin["company_id"]
+        now = datetime.now(timezone.utc)
+        self._clean()
+        _db.digest_runs.insert_one({"ran_at": (now - timedelta(hours=2)).isoformat(),
+                                    "iter40_seed": True})
+        _db.payslip_scan_alerts.insert_one({
+            "id": str(uuid.uuid4()), "verification_id": "iter40-new", "company_id": cid,
+            "employee_name": "Adama Sankoh", "period": "2026-07",
+            "scan_count": 7, "notified": [],
+            "created_at": (now - timedelta(hours=1)).isoformat()})
+        try:
+            snap = requests.get(f"{API}/users/me/digest-preview",
+                                headers=_h(gov_admin["token"]), timeout=15).json()
+            import subprocess
+            out = subprocess.run(
+                ["python", "-c", (
+                    "import json,sys; sys.path.insert(0,'/app/backend'); "
+                    "from digest import _summarize, _email_items; "
+                    "snap=json.loads(sys.stdin.read()); "
+                    "print(_summarize(snap)); "
+                    "print(json.dumps(_email_items(snap)))")],
+                input=json.dumps(snap), capture_output=True, text=True, timeout=30)
+            assert out.returncode == 0, out.stderr
+            summary, items_json = out.stdout.strip().split("\n", 1)
+            assert "1 flagged payslip scan" in summary
+            items = json.loads(items_json)
+            scan_items = [i for i in items if "Flagged payslip" in i["label"]]
+            assert len(scan_items) == 1
+            lbl = scan_items[0]["label"]
+            assert "Adama Sankoh" in lbl and "2026-07" in lbl and "7 scans" in lbl
+            assert "flagged" in lbl
+            assert "/payroll?flag=iter40-new" in scan_items[0]["url"]
+        finally:
+            self._clean()
+
+    def test_preview_admin_only(self):
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        r = requests.get(f"{API}/users/me/digest-preview",
+                         headers=_h(sia["token"]), timeout=15)
+        assert r.status_code == 403
+
+
 class TestReminderNudgeStats:
     """Feature 4 — admin analytics for weekly training reminder nudges."""
 
@@ -451,6 +688,33 @@ class TestReminderNudgeStats:
             assert {x["lang"] for x in body["languages"]} == {"en", "krio", "mende", "temne"}
         finally:
             self._clean(uids)
+
+    def test_run_now_forced_lang(self, gov_admin):
+        week = datetime.now(timezone.utc).strftime("%G-W%V")
+        cid = gov_admin["company_id"]
+        saved = list(_db.training_reminders.find({"company_id": cid, "week": week}))
+        _db.training_reminders.delete_many({"company_id": cid, "week": week})
+        try:
+            r = requests.post(f"{API}/training-progress/reminders/run-now",
+                              headers=_h(gov_admin["token"]), json={"lang": "krio"},
+                              timeout=60)
+            assert r.status_code == 200, r.text
+            assert r.json()["lang"] == "krio"
+            rows = list(_db.training_reminders.find({"company_id": cid, "week": week}))
+            assert rows and all(x["lang"] == "krio" for x in rows)
+            # invalid language rejected
+            bad = requests.post(f"{API}/training-progress/reminders/run-now",
+                                headers=_h(gov_admin["token"]), json={"lang": "french"},
+                                timeout=15)
+            assert bad.status_code == 422
+            # no body → per-user language (idempotency skips everyone this week)
+            auto = requests.post(f"{API}/training-progress/reminders/run-now",
+                                 headers=_h(gov_admin["token"]), timeout=60)
+            assert auto.status_code == 200 and auto.json()["lang"] == "per-user"
+        finally:
+            _db.training_reminders.delete_many({"company_id": cid, "week": week})
+            if saved:
+                _db.training_reminders.insert_many(saved)
 
     def test_non_admin_blocked(self):
         sia = _login("sia.kallon@gov.sl", "Employee@2026")

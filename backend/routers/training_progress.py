@@ -114,13 +114,20 @@ async def set_training_lang(body: LangIn, user: dict = Depends(get_current_user)
     return {"ok": True, "lang": body.lang}
 
 
+class RunNowIn(BaseModel):
+    lang: Optional[str] = Field(default=None, pattern="^(en|krio|mende|temne)$")
+
+
 @router.post("/reminders/run-now")
-async def reminders_run_now(user: dict = Depends(get_current_user)):
-    """Manually trigger this week's reminder push for my tenant (admin only)."""
+async def reminders_run_now(body: Optional[RunNowIn] = None,
+                            user: dict = Depends(get_current_user)):
+    """Manually trigger this week's reminder push for my tenant (admin only).
+    Optional lang override forces every nudge into that language."""
     if not is_admin(user):
         raise HTTPException(403, "Admins only")
     from training_reminders import run_for_company
-    return await run_for_company(user["company_id"])
+    return await run_for_company(user["company_id"],
+                                 force_lang=body.lang if body else None)
 
 
 @router.get("/reminders/stats")
