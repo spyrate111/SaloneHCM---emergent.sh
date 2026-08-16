@@ -63,6 +63,57 @@ async def leave_calendar(month: str = None, user: dict = Depends(get_current_use
     return {"month": m, "leaves": rows}
 
 
+@router.get("/coverage-preview")
+async def coverage_preview(start_date: str, end_date: str, employee_id: str = None,
+                           user: dict = Depends(get_current_user)):
+    """Live coverage check while drafting a leave request. Employees preview
+    their own branch; admins may preview for any employee. Never blocks."""
+    import math
+    from datetime import timedelta
+    tf = tenant_filter(user)
+    eid = employee_id if (employee_id and is_admin(user)) else user.get("employee_id")
+    if not eid:
+        raise HTTPException(400, "employee_id required")
+    try:
+        s = datetime.fromisoformat(start_date)
+        e = datetime.fromisoformat(end_date)
+        assert s <= e
+    except Exception:
+        raise HTTPException(422, "start_date/end_date must be YYYY-MM-DD with start <= end")
+    emp = await db.employees.find_one({"id": eid, **tf}, {"_id": 0})
+    if not emp:
+        raise HTTPException(404, "Employee not found")
+    branch_id = emp.get("branch_id")
+    if not branch_id:
+        return {"warn": False, "reason": "employee has no branch", "days": [],
+                "branch_name": None, "headcount": 0, "threshold": 0}
+    branch = await db.branches.find_one({"id": branch_id, **tf}, {"_id": 0}) or {}
+    staff = await db.employees.find(
+        {"branch_id": branch_id, "status": "active", **tf},
+        {"_id": 0, "id": 1}).to_list(2000)
+    headcount = len(staff)
+    threshold = max(2, math.ceil(0.2 * headcount))
+    others = await db.leave_requests.find({
+        **tf, "status": "approved",
+        "employee_id": {"$in": [x["id"] for x in staff if x["id"] != eid]},
+        "start_date": {"$lte": end_date}, "end_date": {"$gte": start_date},
+    }, {"_id": 0, "employee_name": 1, "start_date": 1, "end_date": 1}).to_list(500)
+
+    days = []
+    cur, steps = s, 0
+    while cur <= e and steps < 62:
+        key = cur.strftime("%Y-%m-%d")
+        names = sorted({o["employee_name"] for o in others
+                        if o["start_date"] <= key <= o["end_date"]})
+        off = len(names) + 1  # + this draft request
+        days.append({"date": key, "off_count": off, "already_off": names,
+                     "breach": off >= threshold})
+        cur += timedelta(days=1)
+        steps += 1
+    return {"warn": any(d["breach"] for d in days), "branch_name": branch.get("name"),
+            "headcount": headcount, "threshold": threshold, "days": days}
+
+
 @router.get("/{lid}/conflicts")
 async def leave_conflicts(lid: str, user: dict = Depends(get_current_user)):
     """Pre-approval coverage check: warn when approving would put >= 20% of the

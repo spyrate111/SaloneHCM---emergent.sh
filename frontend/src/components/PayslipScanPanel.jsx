@@ -15,7 +15,21 @@ export default function PayslipScanPanel() {
   const [history, setHistory] = useState({});
 
   useEffect(() => {
-    api.get("/payroll/verification-scans").then((r) => setRows(r.data)).catch(() => setRows(null));
+    api.get("/payroll/verification-scans").then((r) => {
+      setRows(r.data);
+      // deep link from the fraud-alert push: /payroll?flag={vid}
+      const flag = new URLSearchParams(window.location.search).get("flag");
+      if (flag && r.data.some((x) => x.verification_id === flag)) {
+        setOpen(flag);
+        api.get(`/payroll/verification-scans/${flag}`)
+          .then((h) => setHistory((prev) => ({ ...prev, [flag]: h.data.scans })))
+          .catch(() => {});
+        setTimeout(() => {
+          document.querySelector(`[data-testid="payslip-scan-row-${flag}"]`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 400);
+      }
+    }).catch(() => setRows(null));
   }, []);
 
   const toggle = async (vid) => {

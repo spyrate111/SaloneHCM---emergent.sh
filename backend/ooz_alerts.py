@@ -42,6 +42,8 @@ def _push_payload(punch: dict) -> dict:
         "url": "/m/clock",
         "kind": "ooz_alert",
         "tag": f"ooz-{punch['id']}",
+        "employee_id": punch.get("employee_id"),
+        "employee_name": punch.get("employee_name"),
     }
 
 

@@ -27,6 +27,18 @@ export default function Leave() {
     setOpen(false); setForm({ employee_id: "", leave_type: "annual", start_date: "", end_date: "", reason: "" }); load();
   };
 
+  // Coverage planner — live preview of branch coverage while drafting
+  const [coverage, setCoverage] = useState(null);
+  useEffect(() => {
+    const { start_date, end_date, employee_id } = form;
+    if (!open || !start_date || !end_date || start_date > end_date) { setCoverage(null); return; }
+    if (user?.role === "admin" && !employee_id) { setCoverage(null); return; }
+    const params = { start_date, end_date };
+    if (user?.role === "admin") params.employee_id = employee_id;
+    api.get("/leave/coverage-preview", { params })
+      .then((r) => setCoverage(r.data)).catch(() => setCoverage(null));
+  }, [open, form, user]);
+
   const [conflict, setConflict] = useState(null); // {lid, ...conflictData}
   const doDecide = async (id, status) => { await api.put(`/leave/${id}/decision`, { status }); load(); };
   const decide = async (id, status) => {
@@ -159,6 +171,32 @@ export default function Leave() {
                   <DatePicker data-testid="leave-end-date" value={form.end_date} onChange={(v) => setForm({ ...form, end_date: v })} />
                 </div>
               </div>
+              {coverage && coverage.headcount > 0 && (
+                <div data-testid="leave-coverage-preview"
+                  className={`rounded-md border px-3 py-2.5 text-xs ${coverage.warn ? "bg-[#FBF1DE] border-[#EAD9AE]" : "bg-[#E4F7E7] border-[#BFE5C6]"}`}>
+                  <div className={`flex items-center gap-1.5 font-semibold ${coverage.warn ? "text-[#8B6A14]" : "text-[#17A035]"}`}>
+                    <AlertTriangle className={`w-3.5 h-3.5 ${coverage.warn ? "" : "hidden"}`} />
+                    {coverage.warn ? "Thin coverage on these days" : "Coverage looks fine"}
+                    <span className="ml-auto font-normal text-[#525860]">{coverage.branch_name} · {coverage.headcount} staff · limit {coverage.threshold}</span>
+                  </div>
+                  {coverage.warn ? (
+                    <div className="mt-1.5 space-y-1 max-h-28 overflow-y-auto">
+                      {coverage.days.filter((d) => d.breach).slice(0, 7).map((d) => (
+                        <div key={d.date} data-testid={`leave-coverage-day-${d.date}`}>
+                          <span className="font-data font-semibold">{d.date}</span>
+                          <span className="text-[#B03A2E] font-semibold"> — {d.off_count} off</span>
+                          {d.already_off.length > 0 && <span className="text-[#525860]"> ({d.already_off.join(", ")})</span>}
+                        </div>
+                      ))}
+                      <div className="text-[#8B6A14]">You can still submit — the approver will see this warning too.</div>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[#525860]">
+                      At most {Math.max(...coverage.days.map((d) => d.off_count))} of {coverage.headcount} teammates off on any requested day.
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Reason</label>
                 <textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} rows={3} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />

@@ -121,3 +121,48 @@ async def reminders_run_now(user: dict = Depends(get_current_user)):
         raise HTTPException(403, "Admins only")
     from training_reminders import run_for_company
     return await run_for_company(user["company_id"])
+
+
+@router.get("/reminders/stats")
+async def reminder_stats(user: dict = Depends(get_current_user)):
+    """Weekly nudge analytics: reminders sent per ISO week and the share of
+    recipients who completed a video within 7 days of the nudge. Admin only."""
+    if not is_admin(user):
+        raise HTTPException(403, "Admins only")
+    from datetime import datetime, timedelta
+    tf = tenant_filter(user)
+    reminders = await db.training_reminders.find(
+        tf, {"_id": 0, "user_id": 1, "week": 1, "push_sent": 1, "created_at": 1}
+    ).to_list(5000)
+    if not reminders:
+        return {"weeks": [], "totals": {"reminded": 0, "delivered": 0,
+                                        "completed_after": 0, "nudge_rate": 0}}
+    progress = await db.training_progress.find(
+        {"user_id": {"$in": list({r["user_id"] for r in reminders})}},
+        {"_id": 0, "user_id": 1, "completed_at": 1}).to_list(10000)
+    completions: dict[str, list] = {}
+    for p in progress:
+        if p.get("completed_at"):
+            completions.setdefault(p["user_id"], []).append(p["completed_at"])
+
+    weeks: dict[str, dict] = {}
+    for r in reminders:
+        w = weeks.setdefault(r["week"], {"week": r["week"], "reminded": 0,
+                                         "delivered": 0, "completed_after": 0})
+        w["reminded"] += 1
+        w["delivered"] += 1 if r.get("push_sent") else 0
+        sent_at = datetime.fromisoformat(r["created_at"])
+        cutoff = sent_at + timedelta(days=7)
+        if any(sent_at < datetime.fromisoformat(c) <= cutoff
+               for c in completions.get(r["user_id"], [])):
+            w["completed_after"] += 1
+    out = sorted(weeks.values(), key=lambda x: x["week"], reverse=True)[:12]
+    for w in out:
+        w["nudge_rate"] = round(100 * w["completed_after"] / w["reminded"], 1) if w["reminded"] else 0.0
+    tot_r = sum(w["reminded"] for w in out)
+    tot_c = sum(w["completed_after"] for w in out)
+    return {"weeks": out,
+            "totals": {"reminded": tot_r,
+                       "delivered": sum(w["delivered"] for w in out),
+                       "completed_after": tot_c,
+                       "nudge_rate": round(100 * tot_c / tot_r, 1) if tot_r else 0.0}}

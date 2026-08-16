@@ -41,6 +41,18 @@ export default function MobileClock() {
       });
   useEffect(() => { loadTeam(); }, []);
 
+  // Deep link from the OOZ push notification's "Snooze" action:
+  // /m/clock?snooze={employee_id}&name={employee_name}
+  const [snoozeFor, setSnoozeFor] = useState(null); // {employee_id, name}
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const eid = q.get("snooze");
+    if (eid) {
+      setSnoozeFor({ employee_id: eid, name: q.get("name") || "this employee" });
+      window.history.replaceState({}, "", "/m/clock");
+    }
+  }, []);
+
   // Ask the service worker for its current queue snapshot on mount
   useEffect(() => {
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
@@ -358,6 +370,75 @@ export default function MobileClock() {
           )}
         </section>
       )}
+      {snoozeFor && (
+        <QuickSnoozeSheet target={snoozeFor} onClose={() => setSnoozeFor(null)} />
+      )}
+    </div>
+  );
+}
+
+/** Bottom-sheet snooze form opened by the push notification's Snooze action.
+ *  Same rules as the Attendance-page panel (backend enforces RBAC). */
+function QuickSnoozeSheet({ target, onClose }) {
+  const today = new Date().toISOString().split("T")[0];
+  const [form, setForm] = useState({ start_date: today, end_date: today, reason: "" });
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const save = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.post("/mobile/ooz-snoozes", { employee_id: target.employee_id, ...form });
+      toast.success(`Alerts snoozed for ${target.name} until ${form.end_date}`);
+      onClose();
+    } catch (err) {
+      const d = err?.response?.data?.detail;
+      toast.error(typeof d === "string" ? d : "Could not create snooze");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[1100] flex items-end" onClick={onClose} data-testid="mobile-quick-snooze-sheet">
+      <form onSubmit={save} onClick={(e) => e.stopPropagation()} className="bg-white w-full rounded-t-2xl p-4 space-y-3">
+        <div>
+          <div className="text-sm font-bold text-[#0A4A1E]">Snooze out-of-zone alerts</div>
+          <p className="text-[11px] text-[#525860] mt-0.5">
+            {target.name} — punches still log and show red on the map, but nobody gets pinged while the snooze is active.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-[#525860]">From</span>
+            <input required type="date" value={form.start_date} onChange={set("start_date")}
+              className="mt-1 w-full bg-white border border-[#E2DFD6] rounded-lg px-3 py-2 text-sm font-data"
+              data-testid="quick-snooze-start" />
+          </label>
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-widest text-[#525860]">To</span>
+            <input required type="date" value={form.end_date} onChange={set("end_date")}
+              className="mt-1 w-full bg-white border border-[#E2DFD6] rounded-lg px-3 py-2 text-sm font-data"
+              data-testid="quick-snooze-end" />
+          </label>
+        </div>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-widest text-[#525860]">Reason</span>
+          <input required minLength={3} maxLength={200} value={form.reason} onChange={set("reason")}
+            placeholder="Approved field assignment"
+            className="mt-1 w-full bg-white border border-[#E2DFD6] rounded-lg px-3 py-2 text-sm"
+            data-testid="quick-snooze-reason" />
+        </label>
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose}
+            className="flex-1 text-xs font-semibold border border-[#E2DFD6] py-2.5 rounded-lg"
+            data-testid="quick-snooze-cancel">Cancel</button>
+          <button type="submit" disabled={busy}
+            className="flex-1 text-xs font-semibold bg-[#0A4A1E] text-white py-2.5 rounded-lg disabled:opacity-50"
+            data-testid="quick-snooze-save">{busy ? "Saving…" : "Snooze alerts"}</button>
+        </div>
+      </form>
     </div>
   );
 }

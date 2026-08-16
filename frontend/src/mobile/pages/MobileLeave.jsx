@@ -278,6 +278,14 @@ function LeaveForm({ onClose, onSaved }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Coverage planner — live branch coverage preview while picking dates
+  const [coverage, setCoverage] = useState(null);
+  useEffect(() => {
+    if (!start || !end || start > end) { setCoverage(null); return; }
+    api.get("/leave/coverage-preview", { params: { start_date: start, end_date: end } })
+      .then((r) => setCoverage(r.data)).catch(() => setCoverage(null));
+  }, [start, end]);
+
   const submit = async (e) => {
     e.preventDefault();
     if (!start || !end) return toast.error("Pick start and end dates");
@@ -329,6 +337,32 @@ function LeaveForm({ onClose, onSaved }) {
                    data-testid="mobile-leave-form-end" />
           </label>
         </div>
+        {coverage && coverage.headcount > 0 && (
+          <div data-testid="mobile-leave-coverage"
+            className={`rounded-lg border px-3 py-2 text-[11px] ${coverage.warn ? "bg-[#F6EDD8] border-[#EAD9AE]" : "bg-[#E4F7E7] border-[#BFE5C6]"}`}>
+            <div className={`flex items-center gap-1 font-semibold ${coverage.warn ? "text-[#8B6A14]" : "text-[#0A4A1E]"}`}>
+              {coverage.warn && <AlertTriangle className="w-3 h-3 flex-shrink-0" />}
+              {coverage.warn ? "Thin coverage on these days" : "Coverage looks fine"}
+              <span className="ml-auto font-normal text-[#525860]">{coverage.headcount} staff · limit {coverage.threshold}</span>
+            </div>
+            {coverage.warn ? (
+              <div className="mt-1 space-y-0.5 max-h-20 overflow-y-auto">
+                {coverage.days.filter((d) => d.breach).slice(0, 4).map((d) => (
+                  <div key={d.date} data-testid={`mobile-leave-coverage-day-${d.date}`}>
+                    <span className="font-data font-semibold">{d.date}</span>
+                    <span className="text-[#B03A2E] font-semibold"> — {d.off_count} off</span>
+                    {d.already_off.length > 0 && <span className="text-[#8A8F96]"> ({d.already_off.join(", ")})</span>}
+                  </div>
+                ))}
+                <div className="text-[#8B6A14]">You can still submit — your approver sees this too.</div>
+              </div>
+            ) : (
+              <div className="mt-0.5 text-[#525860]">
+                At most {Math.max(...coverage.days.map((d) => d.off_count))} of {coverage.headcount} teammates off on any day.
+              </div>
+            )}
+          </div>
+        )}
         <label className="block">
           <span className="text-[11px] uppercase tracking-widest text-[#525860]">Reason (optional)</span>
           <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)}

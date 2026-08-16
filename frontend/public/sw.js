@@ -396,16 +396,29 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
-    data: { url: data.url || "/m", kind: data.kind || "info" },
+    data: {
+      url: data.url || "/m",
+      kind: data.kind || "info",
+      employee_id: data.employee_id || null,
+      employee_name: data.employee_name || null,
+    },
     tag: data.tag || data.kind || "salonehcm",
     renotify: true,
   };
+  // Out-of-zone alerts get an inline "Snooze" action for legitimate field work.
+  if (data.kind === "ooz_alert" && data.employee_id) {
+    options.actions = [{ action: "snooze", title: "Snooze alerts for this employee" }];
+  }
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/m";
+  const d = event.notification.data || {};
+  let url = d.url || "/m";
+  if (event.action === "snooze" && d.employee_id) {
+    url = `/m/clock?snooze=${encodeURIComponent(d.employee_id)}&name=${encodeURIComponent(d.employee_name || "")}`;
+  }
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((all) => {
       for (const c of all) {

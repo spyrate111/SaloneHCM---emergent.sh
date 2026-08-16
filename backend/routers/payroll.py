@@ -412,11 +412,8 @@ async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_a
 # ---------------------------------------------------------------------------
 def _flag_scans(times: list[str]) -> bool:
     """Flag when 5+ scans fall within ANY 24-hour window."""
-    from datetime import datetime as _dt, timedelta as _td
-    for i in range(len(times) - 4):
-        if _dt.fromisoformat(times[i + 4]) - _dt.fromisoformat(times[i]) <= _td(hours=24):
-            return True
-    return False
+    from scan_alerts import flag_scans
+    return flag_scans(times)
 
 
 @router.get("/verification-scans")

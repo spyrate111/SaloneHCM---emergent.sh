@@ -305,14 +305,19 @@ def _with_active(row: dict) -> dict:
 
 @router.post("/ooz-snoozes")
 async def create_snooze(body: SnoozeIn, user: dict = Depends(get_current_user)):
-    if not is_admin(user):
-        raise HTTPException(403, "Admins only")
     if body.end_date < body.start_date:
         raise HTTPException(422, "end_date is before start_date")
     emp = await db.employees.find_one(
         {"id": body.employee_id, **tenant_filter(user)}, {"_id": 0})
     if not emp:
         raise HTTPException(404, "Employee not found")
+    if not is_admin(user):
+        # branch supervisors may snooze employees of their OWN branches
+        supervises = await db.branches.find_one({
+            "id": emp.get("branch_id"), **tenant_filter(user),
+            "supervisor_user_id": user["id"]})
+        if not supervises:
+            raise HTTPException(403, "Admins or the employee's branch supervisor only")
     doc = {
         "id": str(uuid.uuid4()), "company_id": user["company_id"],
         "employee_id": emp["id"],

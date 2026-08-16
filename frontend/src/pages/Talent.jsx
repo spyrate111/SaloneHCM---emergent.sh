@@ -11,6 +11,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import TrainingProgressPanel from "../components/TrainingProgressPanel";
+import ReminderNudgeStats from "../components/ReminderNudgeStats";
 import PostJobModal from "../components/PostJobModal";
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
@@ -54,6 +55,7 @@ export default function Talent() {
         <>
           <Learning isAdmin={isAdmin} />
           <TrainingProgressPanel />
+          <ReminderNudgeStats />
         </>
       )}
     </div>

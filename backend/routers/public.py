@@ -31,6 +31,9 @@ async def public_payslip_verify(vid: str, request: Request):
             "scanned_at": iso(now_utc()), "ip": ip[:64],
             "user_agent": (request.headers.get("user-agent") or "")[:160],
         })
+        import asyncio
+        from scan_alerts import check_and_alert
+        asyncio.create_task(check_and_alert(ver))
     except Exception:
         pass
     company = await db.companies.find_one({"id": ver.get("company_id")}, {"_id": 0}) or {}
