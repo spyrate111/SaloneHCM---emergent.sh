@@ -130,13 +130,16 @@ async def reminder_stats(user: dict = Depends(get_current_user)):
     if not is_admin(user):
         raise HTTPException(403, "Admins only")
     from datetime import datetime, timedelta
+    LANGS = ("en", "krio", "mende", "temne")
     tf = tenant_filter(user)
     reminders = await db.training_reminders.find(
-        tf, {"_id": 0, "user_id": 1, "week": 1, "push_sent": 1, "created_at": 1}
+        tf, {"_id": 0, "user_id": 1, "week": 1, "lang": 1, "push_sent": 1, "created_at": 1}
     ).to_list(5000)
     if not reminders:
         return {"weeks": [], "totals": {"reminded": 0, "delivered": 0,
-                                        "completed_after": 0, "nudge_rate": 0}}
+                                        "completed_after": 0, "nudge_rate": 0},
+                "languages": [{"lang": l, "reminded": 0, "completed_after": 0,
+                               "nudge_rate": 0.0} for l in LANGS]}
     progress = await db.training_progress.find(
         {"user_id": {"$in": list({r["user_id"] for r in reminders})}},
         {"_id": 0, "user_id": 1, "completed_at": 1}).to_list(10000)
@@ -145,24 +148,43 @@ async def reminder_stats(user: dict = Depends(get_current_user)):
         if p.get("completed_at"):
             completions.setdefault(p["user_id"], []).append(p["completed_at"])
 
+    def _rate(c, n):
+        return round(100 * c / n, 1) if n else 0.0
+
     weeks: dict[str, dict] = {}
     for r in reminders:
-        w = weeks.setdefault(r["week"], {"week": r["week"], "reminded": 0,
-                                         "delivered": 0, "completed_after": 0})
+        w = weeks.setdefault(r["week"], {
+            "week": r["week"], "reminded": 0, "delivered": 0, "completed_after": 0,
+            "_langs": {l: {"reminded": 0, "completed_after": 0} for l in LANGS}})
+        lang = r.get("lang") if r.get("lang") in LANGS else "en"
         w["reminded"] += 1
         w["delivered"] += 1 if r.get("push_sent") else 0
+        w["_langs"][lang]["reminded"] += 1
         sent_at = datetime.fromisoformat(r["created_at"])
         cutoff = sent_at + timedelta(days=7)
         if any(sent_at < datetime.fromisoformat(c) <= cutoff
                for c in completions.get(r["user_id"], [])):
             w["completed_after"] += 1
+            w["_langs"][lang]["completed_after"] += 1
     out = sorted(weeks.values(), key=lambda x: x["week"], reverse=True)[:12]
+    lang_totals = {l: {"reminded": 0, "completed_after": 0} for l in LANGS}
     for w in out:
-        w["nudge_rate"] = round(100 * w["completed_after"] / w["reminded"], 1) if w["reminded"] else 0.0
+        w["nudge_rate"] = _rate(w["completed_after"], w["reminded"])
+        langs = w.pop("_langs")
+        for l in LANGS:
+            lang_totals[l]["reminded"] += langs[l]["reminded"]
+            lang_totals[l]["completed_after"] += langs[l]["completed_after"]
+        w["languages"] = [{"lang": l, **langs[l],
+                           "nudge_rate": _rate(langs[l]["completed_after"], langs[l]["reminded"])}
+                          for l in LANGS]
     tot_r = sum(w["reminded"] for w in out)
     tot_c = sum(w["completed_after"] for w in out)
     return {"weeks": out,
             "totals": {"reminded": tot_r,
                        "delivered": sum(w["delivered"] for w in out),
                        "completed_after": tot_c,
-                       "nudge_rate": round(100 * tot_c / tot_r, 1) if tot_r else 0.0}}
+                       "nudge_rate": _rate(tot_c, tot_r)},
+            "languages": [{"lang": l, **lang_totals[l],
+                           "nudge_rate": _rate(lang_totals[l]["completed_after"],
+                                               lang_totals[l]["reminded"])}
+                          for l in LANGS]}

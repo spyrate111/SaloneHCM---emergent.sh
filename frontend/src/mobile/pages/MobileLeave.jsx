@@ -355,6 +355,21 @@ function LeaveForm({ onClose, onSaved }) {
                   </div>
                 ))}
                 <div className="text-[#8B6A14]">You can still submit — your approver sees this too.</div>
+                {coverage.suggestions?.length > 0 && (
+                  <div className="pt-1 mt-1 border-t border-[#EAD9AE]" data-testid="mobile-leave-coverage-suggestions">
+                    <div className="font-semibold text-[#8B6A14] mb-1">Nearby dates with full coverage:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {coverage.suggestions.map((sug) => (
+                        <button type="button" key={sug.start_date}
+                          onClick={() => { setStart(sug.start_date); setEnd(sug.end_date); }}
+                          className="border border-[#8B6A14]/40 bg-white text-[#8B6A14] font-data px-2 py-1 rounded-md active:bg-[#FDF8EC]"
+                          data-testid={`mobile-leave-coverage-suggestion-${sug.start_date}`}>
+                          {sug.start_date === sug.end_date ? sug.start_date : `${sug.start_date} → ${sug.end_date}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mt-0.5 text-[#525860]">

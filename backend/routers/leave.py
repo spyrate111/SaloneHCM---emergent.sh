@@ -110,8 +110,43 @@ async def coverage_preview(start_date: str, end_date: str, employee_id: str = No
                      "breach": off >= threshold})
         cur += timedelta(days=1)
         steps += 1
+
+    # Nearest alternative ranges (same duration) where no day breaches — up to 3.
+    suggestions = []
+    if any(d["breach"] for d in days):
+        duration = (e - s).days + 1
+        today_d = datetime.fromisoformat(now_utc().strftime("%Y-%m-%d"))
+        win_lo = min(s - timedelta(days=60), today_d)
+        win_hi = e + timedelta(days=60)
+        pool = await db.leave_requests.find({
+            **tf, "status": "approved",
+            "employee_id": {"$in": [x["id"] for x in staff if x["id"] != eid]},
+            "start_date": {"$lte": win_hi.strftime("%Y-%m-%d")},
+            "end_date": {"$gte": win_lo.strftime("%Y-%m-%d")},
+        }, {"_id": 0, "employee_id": 1, "start_date": 1, "end_date": 1}).to_list(1000)
+
+        def _clear(cand):
+            for i in range(duration):
+                key = (cand + timedelta(days=i)).strftime("%Y-%m-%d")
+                off = len({o["employee_id"] for o in pool
+                           if o["start_date"] <= key <= o["end_date"]}) + 1
+                if off >= threshold:
+                    return False
+            return True
+
+        for dist in range(1, 61):
+            for cand in (s + timedelta(days=dist), s - timedelta(days=dist)):
+                if cand < today_d or len(suggestions) == 3:
+                    continue
+                if _clear(cand):
+                    suggestions.append({
+                        "start_date": cand.strftime("%Y-%m-%d"),
+                        "end_date": (cand + timedelta(days=duration - 1)).strftime("%Y-%m-%d")})
+            if len(suggestions) == 3:
+                break
     return {"warn": any(d["breach"] for d in days), "branch_name": branch.get("name"),
-            "headcount": headcount, "threshold": threshold, "days": days}
+            "headcount": headcount, "threshold": threshold, "days": days,
+            "suggestions": suggestions}
 
 
 @router.get("/{lid}/conflicts")

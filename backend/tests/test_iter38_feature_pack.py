@@ -254,6 +254,105 @@ class TestCoveragePlanner:
         assert r.status_code == 422
 
 
+class TestCoverageSuggestions:
+    """iter39 Feature 3 — nearest breach-free alternative ranges on breach."""
+
+    @staticmethod
+    def _future(offset):
+        from datetime import timedelta
+        return (datetime.now(timezone.utc) + timedelta(days=offset)).strftime("%Y-%m-%d")
+
+    def _seed_breach(self, me, day):
+        import math
+        import uuid
+        staff = list(_db.employees.find({
+            "branch_id": me["branch_id"], "status": "active",
+            "company_id": me["company_id"], "id": {"$ne": me["id"]}}))
+        threshold = max(2, math.ceil(0.2 * (len(staff) + 1)))
+        seeded = []
+        for c in staff[:threshold - 1]:
+            doc = {"id": str(uuid.uuid4()), "company_id": me["company_id"],
+                   "employee_id": c["id"],
+                   "employee_name": f'{c["first_name"]} {c["last_name"]}',
+                   "leave_type": "annual", "start_date": day, "end_date": day,
+                   "days": 1, "reason": "iter39 suggestion seed", "status": "approved",
+                   "created_at": datetime.now(timezone.utc).isoformat()}
+            _db.leave_requests.insert_one(doc)
+            seeded.append(doc["id"])
+        return seeded
+
+    def test_suggestions_returned_on_breach(self):
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        me = _db.employees.find_one({"id": sia["employee_id"]})
+        day = self._future(130)
+        seeded = self._seed_breach(me, day)
+        try:
+            r = requests.get(f"{API}/leave/coverage-preview",
+                             params={"start_date": day, "end_date": day},
+                             headers=_h(sia["token"]), timeout=15)
+            body = r.json()
+            assert body["warn"] is True
+            sugs = body["suggestions"]
+            assert 1 <= len(sugs) <= 3
+            for sug in sugs:
+                assert sug["start_date"] == sug["end_date"]  # same 1-day duration
+                assert sug["start_date"] != day
+                # each suggested range must itself preview clean
+                chk = requests.get(f"{API}/leave/coverage-preview",
+                                   params={"start_date": sug["start_date"],
+                                           "end_date": sug["end_date"]},
+                                   headers=_h(sia["token"]), timeout=15).json()
+                assert chk["warn"] is False
+            # nearest-first: first suggestion is 1 day away
+            from datetime import timedelta
+            near = {self._future(131), self._future(129)}
+            assert sugs[0]["start_date"] in near
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": seeded}})
+
+    def test_multi_day_duration_preserved(self):
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        me = _db.employees.find_one({"id": sia["employee_id"]})
+        day = self._future(140)
+        seeded = self._seed_breach(me, day)
+        try:
+            start, end = self._future(139), self._future(141)  # 3-day request over breach day
+            r = requests.get(f"{API}/leave/coverage-preview",
+                             params={"start_date": start, "end_date": end},
+                             headers=_h(sia["token"]), timeout=15)
+            body = r.json()
+            assert body["warn"] is True
+            for sug in body["suggestions"]:
+                d0 = datetime.fromisoformat(sug["start_date"])
+                d1 = datetime.fromisoformat(sug["end_date"])
+                assert (d1 - d0).days == 2  # same 3-day duration
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": seeded}})
+
+    def test_no_suggestions_when_no_breach(self):
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        day = self._future(150)
+        r = requests.get(f"{API}/leave/coverage-preview",
+                         params={"start_date": day, "end_date": day},
+                         headers=_h(sia["token"]), timeout=15)
+        body = r.json()
+        assert body["warn"] is False and body["suggestions"] == []
+
+    def test_suggestions_never_in_the_past(self):
+        sia = _login("sia.kallon@gov.sl", "Employee@2026")
+        me = _db.employees.find_one({"id": sia["employee_id"]})
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        seeded = self._seed_breach(me, today)
+        try:
+            r = requests.get(f"{API}/leave/coverage-preview",
+                             params={"start_date": today, "end_date": today},
+                             headers=_h(sia["token"]), timeout=15)
+            for sug in r.json()["suggestions"]:
+                assert sug["start_date"] >= today
+        finally:
+            _db.leave_requests.delete_many({"id": {"$in": seeded}})
+
+
 class TestReminderNudgeStats:
     """Feature 4 — admin analytics for weekly training reminder nudges."""
 
@@ -316,6 +415,42 @@ class TestReminderNudgeStats:
             assert week and week["completed_after"] == 0 and week["nudge_rate"] == 0.0
         finally:
             self._clean([u["id"]])
+
+    def test_language_breakdown(self, gov_admin):
+        import uuid
+        users = list(_db.users.find({"company_id": gov_admin["company_id"]}).limit(2))
+        uids = [u["id"] for u in users]
+        self._clean(uids)
+        sent_at = "2020-01-01T09:00:00+00:00"
+        specs = [(uids[0], "en"), (uids[1], "krio")]
+        for uid, lang in specs:
+            _db.training_reminders.insert_one({
+                "id": str(uuid.uuid4()), "user_id": uid,
+                "company_id": gov_admin["company_id"], "week": self.WEEK,
+                "lang": lang, "remaining": 2, "push_sent": 1,
+                "created_at": sent_at})
+        # only the EN recipient completes within 7 days
+        _db.training_progress.insert_one({
+            "user_id": uids[0], "base_slug": "iter38-nudge-seed",
+            "company_id": gov_admin["company_id"], "lang": "en",
+            "completed_at": "2020-01-02T10:00:00+00:00"})
+        try:
+            r = requests.get(f"{API}/training-progress/reminders/stats",
+                             headers=_h(gov_admin["token"]), timeout=15)
+            body = r.json()
+            week = next(w for w in body["weeks"] if w["week"] == self.WEEK)
+            langs = {x["lang"]: x for x in week["languages"]}
+            assert set(langs) == {"en", "krio", "mende", "temne"}
+            assert langs["en"] == {"lang": "en", "reminded": 1,
+                                   "completed_after": 1, "nudge_rate": 100.0}
+            assert langs["krio"] == {"lang": "krio", "reminded": 1,
+                                     "completed_after": 0, "nudge_rate": 0.0}
+            assert langs["mende"]["reminded"] == 0
+            assert langs["temne"]["reminded"] == 0
+            # overall rollup present with all 4 languages
+            assert {x["lang"] for x in body["languages"]} == {"en", "krio", "mende", "temne"}
+        finally:
+            self._clean(uids)
 
     def test_non_admin_blocked(self):
         sia = _login("sia.kallon@gov.sl", "Employee@2026")
