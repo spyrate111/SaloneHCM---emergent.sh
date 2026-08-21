@@ -624,3 +624,10 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Minor fixes**: `/m/pay` now redirects to `/m/payslips` (docs/muscle-memory alias); `GET /api/payroll/my-payslips` dedupes to the latest run per period (was showing 3× 2026-08 rows from test-created duplicate runs).
 - **Scans**: no hardcoded localhost in frontend; backend uses env-first values with dev fallbacks only; no secrets in code (Twilio/Resend/Stripe/VAPID/JWT all env-based).
 - Full backend regression after all fixes: **517 passed, 7 skipped**.
+
+## v1.39.1 (Aug 21, 2026) — Publish-eve smoke re-verification (no code changes)
+- Re-ran core flows live in preview: clock-in (Sia, 0m in-zone punch + toast), punch map (admin /attendance — tiles, 6 markers, Sia's fresh punch shown IN ZONE 0m), payslips (2026-08 renders), leave form (balance strip + coverage widget). All PASS.
+- Offline punch sync unchanged since iteration_37 PASS (queued → drained → no duplicates).
+- Secrets audit (names only): backend .env has TWILIO_{ACCOUNT_SID,AUTH_TOKEN,FROM_NUMBER}, RESEND_API_KEY, SENDER_EMAIL, VAPID_{PUBLIC_KEY,PRIVATE_KEY,CONTACT}, MONGO_URL, DB_NAME, JWT_SECRET, STRIPE_API_KEY, EMERGENT_LLM_KEY, SUPERADMIN_TOTP_SECRET, FRONTEND_URL, CORS_ORIGINS; frontend has REACT_APP_BACKEND_URL, REACT_APP_VAPID_PUBLIC_KEY.
+- Post-publish reminders for user: set FRONTEND_URL to the production domain (drives WebAuthn RP host, onboarding links, digest deep links), include prod origin in CORS_ORIGINS, and REACT_APP_VAPID_PUBLIC_KEY must equal backend VAPID_PUBLIC_KEY.
+- localhost scan: frontend 0 hits; backend only env-first dev fallbacks (never used when env vars are set). Safe.
