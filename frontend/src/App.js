@@ -118,6 +118,7 @@ export default function App() {
           <Route path="/m" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
             <Route index element={<MobileHome />} />
             <Route path="payslips" element={<MobilePayslips />} />
+            <Route path="pay" element={<Navigate to="/m/payslips" replace />} />
             <Route path="leave" element={<MobileLeave />} />
             <Route path="clock" element={<MobileClock />} />
             <Route path="vouchers" element={<MobileVouchers />} />

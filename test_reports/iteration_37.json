@@ -1,0 +1,49 @@
+{
+  "summary": "Pre-deployment frontend E2E of 4 core flows + offline sync. RESULTS: Flow 1 Clock-in (PASS), Flow 2 Punch map desktop + mobile team map (PASS), Flow 3 Mobile leave request (FAIL — 422 + React crash), Flow 4 Mobile payslip view (PASS at /m/payslips; note request said '/m/pay' which redirects to marketing landing), Offline punch sync (PASS end-to-end incl. SW registration, IndexedDB queue toast+banner, drain on reconnect, no duplicate rows). Login smoke: email/password fields empty (prefill correctly removed for prod). Two frontend defects found — see critical bugs.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/leave", "issue": "LeaveIn requires `employee_id` (Pydantic validation runs before the router's is_admin override), so the mobile form (which only sends leave_type/start_date/end_date/reason) always fails with 422. Either mark employee_id Optional[str]=None in models.LeaveIn OR have MobileLeave.jsx send employee_id (current user's employee_id).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/payroll/my-payslips", "issue": "Response contains duplicate period rows for sia.kallon (e.g. 2026-08 appears 3 times, 2027-02 twice, 2026-01 twice within first 20 rows) — 50 runs reported but many are duplicates. Likely duplicated payroll_runs rows for gov tenant seed, or endpoint missing DISTINCT/dedupe. Verify seed and/or add dedupe in endpoint."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MobileLeave.jsx (LeaveForm.submit catch block)", "issue": "toast.error(err?.response?.data?.detail || ...) passes the FastAPI 422 detail array of objects directly to sonner, triggering React runtime error: 'Objects are not valid as a React child (found: object with keys {type, loc, msg, input, url})'. Uncaught error breaks the SPA — after this, subsequent client-side nav to /m/payslips redirected to marketing '/'. Fix: coerce detail to string (e.g., Array.isArray(detail) ? detail.map(d=>d.msg).join(', ') : String(detail)).", "selector": "[data-testid=mobile-leave-form-submit]", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Mobile leave create", "issue": "Backend 422 (missing employee_id in payload) → toast fails to render → React error overlay → SPA state corrupted (subsequent /m/payslips navigation loads marketing landing until manual reload).", "affected_selectors": ["[data-testid=mobile-leave-form-submit]", "[data-testid=mobile-leave-mine]"]}
+    ],
+    "design_issues": []
+  },
+  "verified_features": {
+    "SMOKE_login": "PASS — /login shows empty email + password fields (prefill removed); demo-accounts info panel still shown (per spec).",
+    "FLOW_1_clock_in_mobile": "PASS — sia.kallon on 390x844 /m/clock with granted geo (8.4657,-13.2317): GPS chip shows '8.46570,-13.23170 accuracy ±0m', tapping Clock in produces toast 'Clocked in ✓', punch row 'IN 03:43 AM · 0m from Ministry of Finance HQ' added, button flips to 'Clock out'. Clock out cycle also completed. Team map hidden for employee role (correct RBAC).",
+    "FLOW_2_punch_map": "PASS — admin@gov.sl on desktop 1920x900 /attendance shows Leaflet map with loaded OSM tiles, stats chips '1 In-zone · 8 out-of-zone · 0 no GPS', date picker Aug 16 2026, All employees filter, CSV export, punch table with columns Employee/Kind/Time/Branch/Distance/Zone. Sia Kallon's punch is the 1 in-zone entry. On mobile /m/clock as admin, collapsible [data-testid=mobile-clock-team-map] renders with same 1/8/0 stats and lists out-of-zone punches.",
+    "FLOW_3_mobile_leave": "FAIL — [data-testid=mobile-leave-new] opens form; [data-testid=mobile-leave-balance] shows 'Annual balance 2026: 15/21d left'; filling start=2026-09-10 end=2026-09-11 triggers [data-testid=mobile-leave-coverage] 'Coverage looks fine · 6 staff · limit 2 · At most 1 of 6 teammates off on any day.'; submit → POST /api/leave 422; toast never rendered; React error overlay appears with 'Objects are not valid as a React child'. Request NOT persisted (not in My requests).",
+    "FLOW_4_mobile_payslip": "PASS at /m/payslips (NOT /m/pay — that path is not routed and falls through to marketing landing). Route displays [data-testid=mobile-payslips] list, first row [data-testid=mobile-payslip-row-2026-08] shows 'Gross SLE 8,322.50 · PAYE SLE 1,770.25 · Net SLE 6,244.75', download control [data-testid=mobile-payslip-download-2026-08] is present. API GET /api/payroll/my-payslips returned 200 twice.",
+    "OFFLINE_PUNCH_SYNC": "PASS — After 2 loads, sw.js reports active + controlled=true. context.set_offline(True); Clock in → header shows 'Offline' badge, banner '1 punch queued · Waiting for signal to sync automatically', toast 'Punch queued — will sync when you're back online'. context.set_offline(False) + wait 8s + reload → punch appears as real row (IN 03:47 AM · 0m from Ministry of Finance HQ). No duplicate rows (backend 15s idempotency + SW drain mutex worked)."
+  },
+  "test_report_links": [],
+  "action_items": [
+    "CRITICAL: Fix POST /api/leave 422 for mobile employee flow — make employee_id Optional in models.LeaveIn (server already overrides for non-admins) OR patch MobileLeave.jsx LeaveForm.submit to send employee_id (from /auth/me or current user context).",
+    "CRITICAL: Harden MobileLeave.jsx error handling — coerce err.response.data.detail to string before toast.error to prevent React 'Objects are not valid as a React child' crashes when backend returns pydantic 422 arrays. Consider a shared apiErrorMessage(err) util (also check other mobile forms — MobileClock, MobileVouchers — for the same anti-pattern).",
+    "MINOR: /api/payroll/my-payslips for sia.kallon returns duplicate period entries (2026-08 x3, 2027-02 x2, etc.). Investigate seed data or add dedupe by (employee_id, period) in the endpoint.",
+    "DOC: Update deployment checklist — mobile payslip route is /m/payslips, not /m/pay. /m/pay currently falls through to marketing landing (no route match)."
+  ],
+  "critical_code_review_comments": [
+    "backend/models.py LeaveIn.employee_id being required forces every non-admin mobile client to also send it — violates least-surprise since the router later reassigns it from the JWT for non-admins. Make it Optional[str]=None.",
+    "MobileLeave.jsx line 337: toast.error(err?.response?.data?.detail || 'Could not submit') — detail may be a list of pydantic errors. This pattern is common and dangerous; add a global apiErrorMessage() helper.",
+    "MobileClock queued banner + drain path work as documented (sw.js IndexedDB queue + _drainInFlight mutex + invalidateMobileApiCache); no duplication after online. Good.",
+    "Route registration: consider adding /m/pay as an alias of /m/payslips (many docs/tests refer to /m/pay) or return a 404 UI instead of silently falling through to the marketing landing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request; 1 API defect surfaced)", "frontend": "80% (4/5 flows PASS; Flow 3 leave FAIL)"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 ; sia.kallon@gov.sl / Employee@2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None persisted intentionally by tests: Flow 1 created real punches (IN 03:43, OUT 03:47 today) and Offline flow created 1 more IN (03:47) for sia — these are legitimate attendance rows, not test seed. Flow 3 leave FAILED so nothing to clean.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Retest after main agent fixes LeaveIn.employee_id and MobileLeave error handling. Reproduce Flow 3: mobile 390x844, login sia.kallon@gov.sl, /m/leave → mobile-leave-new → set start=2026-09-10 end=2026-09-11 → submit. Expected: 201 leave with status='pending' appearing in [data-testid=mobile-leave-mine]. Payslip route is /m/payslips (not /m/pay). Offline sync test requires 2 page loads for SW to control; then use ctx.set_offline(True/False).",
+  "rca of the issue": "Flow 3 root cause: MobileLeave.jsx LeaveForm.submit posts {leave_type,start_date,end_date,reason} but backend models.LeaveIn declares employee_id as required (str, no default). FastAPI/Pydantic returns 422 before routers/leave.py:create_leave can override employee_id from the JWT for non-admins. The frontend catch block then calls toast.error(err.response.data.detail) where detail is an array of pydantic error objects, which sonner tries to render as a React child → 'Objects are not valid as a React child' overlay. Mitigation: (a) mark employee_id Optional in LeaveIn (backwards compatible — admins can still pass it), (b) stringify detail in MobileLeave catch (defensive)."
+}

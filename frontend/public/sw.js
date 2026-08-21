@@ -199,13 +199,15 @@ async function _drainQueue() {
   return synced;
 }
 
-/** Drop cached /api/mobile/ GETs so post-sync refreshes fetch fresh data. */
+/** Drop cached /api/mobile/ + /api/leave GETs so post-sync refreshes fetch fresh data. */
 async function invalidateMobileApiCache() {
   const cache = await caches.open(PAYSLIP_CACHE);
   const keys = await cache.keys();
   await Promise.all(
-    keys.filter((r) => new URL(r.url).pathname.startsWith("/api/mobile/"))
-        .map((r) => cache.delete(r))
+    keys.filter((r) => {
+      const p = new URL(r.url).pathname;
+      return p.startsWith("/api/mobile/") || p === "/api/leave";
+    }).map((r) => cache.delete(r))
   );
 }
 
@@ -256,7 +258,19 @@ self.addEventListener("fetch", (event) => {
       QUEUEABLE_POST_PATTERNS.some((re) => re.test(url.pathname))) {
     event.respondWith((async () => {
       try {
-        return await fetch(request.clone());
+        const res = await fetch(request.clone());
+        // Write succeeded — drop any cached GET for the same path so the very
+        // next list refresh reflects it instead of a stale-while-revalidate copy.
+        if (res && res.ok) {
+          try {
+            const cache = await caches.open(PAYSLIP_CACHE);
+            const keys = await cache.keys();
+            await Promise.all(
+              keys.filter((r) => new URL(r.url).pathname === url.pathname)
+                  .map((r) => cache.delete(r)));
+          } catch (_) { /* cache bust is best-effort */ }
+        }
+        return res;
       } catch (e) {
         const headers = {};
         request.headers.forEach((v, k) => { headers[k] = v; });

@@ -119,10 +119,14 @@ async def my_payslips(user: dict = Depends(get_current_user)):
         return []
     runs = await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(50)
     out = []
+    seen_periods = set()
     for r in runs:
+        if r["period"] in seen_periods:
+            continue  # keep only the latest run per period
         slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
         if slip:
             out.append({"run_id": r["id"], "period": r["period"], "slip": slip})
+            seen_periods.add(r["period"])
     return out
 
 

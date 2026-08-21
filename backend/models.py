@@ -43,7 +43,7 @@ class EmployeeIn(BaseModel):
 
 # ---------- Leave ----------
 class LeaveIn(BaseModel):
-    employee_id: str
+    employee_id: Optional[str] = None  # non-admins: taken from their own account
     leave_type: Literal["annual", "sick", "maternity", "paternity", "unpaid"]
     start_date: str
     end_date: str
