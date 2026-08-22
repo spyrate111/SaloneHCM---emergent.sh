@@ -43,15 +43,14 @@ export default instance;
 
 // Normalize FastAPI/Pydantic error payloads: 422 responses carry `detail` as an
 // array of error objects, which crashes React when passed straight to a toast.
-// Coerce to a readable string so every call site can safely render it.
+// Coerce ARRAYS to a readable string; leave plain-object details (e.g. auth's
+// {code, message} for totp_required / invite_expired) intact — Login handles those.
 instance.interceptors.response.use(
   (r) => r,
   (error) => {
     const d = error?.response?.data?.detail;
-    if (d && typeof d !== "string") {
-      error.response.data.detail = Array.isArray(d)
-        ? d.map((x) => (x && x.msg) || JSON.stringify(x)).join("; ")
-        : JSON.stringify(d);
+    if (Array.isArray(d)) {
+      error.response.data.detail = d.map((x) => (x && x.msg) || JSON.stringify(x)).join("; ");
     }
     return Promise.reject(error);
   }

@@ -631,3 +631,9 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - Secrets audit (names only): backend .env has TWILIO_{ACCOUNT_SID,AUTH_TOKEN,FROM_NUMBER}, RESEND_API_KEY, SENDER_EMAIL, VAPID_{PUBLIC_KEY,PRIVATE_KEY,CONTACT}, MONGO_URL, DB_NAME, JWT_SECRET, STRIPE_API_KEY, EMERGENT_LLM_KEY, SUPERADMIN_TOTP_SECRET, FRONTEND_URL, CORS_ORIGINS; frontend has REACT_APP_BACKEND_URL, REACT_APP_VAPID_PUBLIC_KEY.
 - Post-publish reminders for user: set FRONTEND_URL to the production domain (drives WebAuthn RP host, onboarding links, digest deep links), include prod origin in CORS_ORIGINS, and REACT_APP_VAPID_PUBLIC_KEY must equal backend VAPID_PUBLIC_KEY.
 - localhost scan: frontend 0 hits; backend only env-first dev fallbacks (never used when env vars are set). Safe.
+
+## v1.39.2 (Aug 2026) — 2FA login prompt fix (post-deploy bug report)
+- **Root cause**: the v1.39 axios interceptor stringified ALL non-string error `detail`s, so auth's structured `{"code":"totp_required"}` reached Login.jsx as a JSON string — the existing TOTP branch (`d.code === "totp_required"`) never matched and the raw error text rendered instead of the 6-digit input.
+- **Fix**: interceptor now normalizes ONLY pydantic validation ARRAYS; plain-object details (totp_required/totp_invalid/invite_invalid/invite_expired — all in auth.py, all safely handled by Login.jsx) pass through untouched. Login.jsx already had the full TOTP UI (login-totp-block / login-totp-input), no changes needed there.
+- **Verified in preview E2E**: enabled temp 2FA on admin@salonehcm.sl → password submit showed the 2FA CODE field (no raw error) → wrong code showed "Invalid 2FA code — please try again" → valid pyotp code logged into /dashboard. Temp 2FA removed after test (preview DB restored).
+- NOTE: production (salonehcm.com) still runs the broken build — user must REDEPLOY to push this fix live.
