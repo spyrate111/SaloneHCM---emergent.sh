@@ -1,6 +1,17 @@
+import { useState } from "react";
 import { Mail, KeyRound, UserPlus, X } from "lucide-react";
 
-export const InviteUserModal = ({ inviteMode, setInviteMode, unlinked, onInvite, onClose }) => (
+const ROLE_OPTIONS = [
+  { value: "employee", label: "Employee", hint: "Self-service only — own payslips, leave, attendance and training." },
+  { value: "manager", label: "Manager", hint: "Self-service plus their team — approves direct reports' leave, sees team attendance." },
+  { value: "hr", label: "HR Manager", hint: "Employees, leave, training, performance & benefits — no payroll money or user management." },
+  { value: "payroll", label: "Payroll Officer", hint: "Payroll runs, vouchers, payslips & compliance filings — read-only employees." },
+  { value: "admin", label: "Company Admin", hint: "Full control of everything in the company." },
+];
+
+export const InviteUserModal = ({ inviteMode, setInviteMode, unlinked, onInvite, onClose }) => {
+  const [role, setRole] = useState("employee");
+  return (
   <div className="fixed inset-0 z-40 bg-black/40 grid place-items-center p-4" data-testid="invite-modal">
     <form onSubmit={onInvite} className="bg-white rounded-lg border border-[#E2DFD6] w-full max-w-md p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -25,10 +36,14 @@ export const InviteUserModal = ({ inviteMode, setInviteMode, unlinked, onInvite,
       <Field label="Full name"><input data-testid="invite-name" required name="name" placeholder="Jane Doe" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
       <Field label="Email"><input data-testid="invite-email" required type="email" name="email" placeholder="jane@company.sl" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
       <Field label="Role">
-        <select data-testid="invite-role" required name="role" defaultValue="employee" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-          <option value="employee">Employee</option>
-          <option value="admin">Admin</option>
+        <select data-testid="invite-role" required name="role" value={role} onChange={(e) => setRole(e.target.value)} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
         </select>
+        <div className="text-[11px] text-[#525860] mt-1" data-testid="invite-role-hint">
+          {ROLE_OPTIONS.find((r) => r.value === role)?.hint}
+        </div>
       </Field>
       <Field label="Initial password (share securely)">
         <input
@@ -61,7 +76,8 @@ export const InviteUserModal = ({ inviteMode, setInviteMode, unlinked, onInvite,
       </div>
     </form>
   </div>
-);
+  );
+};
 
 function Field({ label, children }) {
   return (

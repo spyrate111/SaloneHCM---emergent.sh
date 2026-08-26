@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
 from payroll_engine import PAYE_BANDS, NASSIT_EMPLOYEE, NASSIT_EMPLOYER
 
+from core import require_roles
+
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 
 
@@ -85,7 +87,7 @@ async def compliance_summary(user: dict = Depends(get_current_user)):
 
 
 @router.get("/nra-export/{rid}")
-async def nra_export(rid: str, user: dict = Depends(require_admin)):
+async def nra_export(rid: str, user: dict = Depends(require_roles("payroll"))):
     """Original JSON export — kept for backwards compatibility with the UI table."""
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
@@ -243,7 +245,7 @@ async def mark_nra_filed(rid: str, user: dict = Depends(require_feature("nra_exp
 
 
 @router.get("/filings")
-async def list_filings(user: dict = Depends(require_admin)):
+async def list_filings(user: dict = Depends(require_roles("payroll"))):
     return await db.nra_filings.find(tenant_filter(user), {"_id": 0}).sort("filed_at", -1).to_list(500)
 
 

@@ -35,6 +35,8 @@ from core import db, tenant_filter, require_admin, require_feature, audit, now_u
 
 log = logging.getLogger(__name__)
 
+from core import require_roles
+
 router = APIRouter(
     prefix="/payroll-budget",
     tags=["payroll-budget"],
@@ -62,7 +64,7 @@ class OverrideIn(BaseModel):
 # ---------- Balances ----------
 
 @router.get("/balances")
-async def list_balances(period: str, user: dict = Depends(require_admin)):
+async def list_balances(period: str, user: dict = Depends(require_roles("payroll"))):
     if not period or len(period) != 7:
         raise HTTPException(422, "period must be YYYY-MM")
     tf = tenant_filter(user)
@@ -72,7 +74,7 @@ async def list_balances(period: str, user: dict = Depends(require_admin)):
 
 
 @router.put("/balances/{code}")
-async def upsert_balance(code: str, body: BalanceIn, user: dict = Depends(require_admin)):
+async def upsert_balance(code: str, body: BalanceIn, user: dict = Depends(require_roles("payroll"))):
     if not code.strip():
         raise HTTPException(422, "budget code required")
     tf = tenant_filter(user)
@@ -176,7 +178,7 @@ def _verdict_row(code: str, projected: float, allocated: float, spent_prior: flo
 
 
 @router.post("/check")
-async def run_budget_check(body: CheckIn, user: dict = Depends(require_admin)) -> dict:
+async def run_budget_check(body: CheckIn, user: dict = Depends(require_roles("payroll"))) -> dict:
     """Project current payroll gross by budget code and verdict against allocations.
     Persists a snapshot in `payroll_budget_checks` for audit."""
     tf = tenant_filter(user)
@@ -237,7 +239,7 @@ async def run_budget_check(body: CheckIn, user: dict = Depends(require_admin)) -
 
 
 @router.get("/checks")
-async def list_checks(period: Optional[str] = None, user: dict = Depends(require_admin)):
+async def list_checks(period: Optional[str] = None, user: dict = Depends(require_roles("payroll"))):
     q = tenant_filter(user)
     if period:
         q["period"] = period
@@ -246,7 +248,7 @@ async def list_checks(period: Optional[str] = None, user: dict = Depends(require
 
 
 @router.get("/checks/{cid}")
-async def get_check(cid: str, user: dict = Depends(require_admin)):
+async def get_check(cid: str, user: dict = Depends(require_roles("payroll"))):
     doc = await db.payroll_budget_checks.find_one({"id": cid, **tenant_filter(user)}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "check not found")
@@ -282,7 +284,7 @@ async def _notify_mof_approvers_of_override(company_id: str, check: dict, overri
 
 
 @router.post("/override")
-async def apply_override(body: OverrideIn, user: dict = Depends(require_admin)):
+async def apply_override(body: OverrideIn, user: dict = Depends(require_roles("payroll"))):
     """Sign off on running payroll despite over-budget / unallocated verdict.
     Requires `mof_approver` role flag or superadmin. Reason must be ≥20 chars.
     Fires SMS to every MoF approver in the tenant."""

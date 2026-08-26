@@ -5,6 +5,8 @@ from core import db, get_current_user, require_admin, audit, now_utc, iso, tenan
 from models import EmployeeIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
+from core import require_roles
+
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
@@ -14,7 +16,7 @@ async def list_employees(user: dict = Depends(get_current_user)):
 
 
 @router.post("")
-async def create_employee(body: EmployeeIn, user: dict = Depends(require_admin)):
+async def create_employee(body: EmployeeIn, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "hiring a new employee")
     eid = str(uuid.uuid4())
     doc = with_tenant({**body.model_dump(), "id": eid, "created_at": iso(now_utc())}, user)
@@ -33,7 +35,7 @@ async def get_employee(eid: str, user: dict = Depends(get_current_user)):
 
 
 @router.put("/{eid}")
-async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(require_admin)):
+async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(require_roles("hr"))):
     # Salary changes during cutoff lock are the #1 fraud vector — block them.
     existing = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
     if existing:
@@ -57,7 +59,7 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
 
 
 @router.delete("/{eid}")
-async def delete_employee(eid: str, user: dict = Depends(require_admin)):
+async def delete_employee(eid: str, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "terminating/deleting an employee")
     await db.employees.delete_one({"id": eid, **tenant_filter(user)})
     await audit("delete", f"employees/{eid}", user)

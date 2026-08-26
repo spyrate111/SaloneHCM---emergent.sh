@@ -2,8 +2,11 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from core import db, get_current_user, audit, now_utc, iso, tenant_filter, with_tenant, is_admin
 from models import LeaveIn, LeaveDecision
+
+from core import can_role
 
 router = APIRouter(prefix="/leave", tags=["leave"])
 
@@ -11,7 +14,7 @@ router = APIRouter(prefix="/leave", tags=["leave"])
 @router.get("")
 async def list_leaves(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    if is_admin(user):
+    if can_role(user, "hr"):
         return await db.leave_requests.find(tf, {"_id": 0}).sort("created_at", -1).to_list(1000)
     # Employee: their own + their direct reports' (if they're a manager)
     my_eid = user.get("employee_id")
@@ -43,7 +46,7 @@ async def leave_calendar(month: str = None, user: dict = Depends(get_current_use
     ny, nm = (y + 1, 1) if mm == 12 else (y, mm + 1)
     end = f"{ny}-{nm:02d}-01"
 
-    if is_admin(user):
+    if can_role(user, "hr"):
         scope = tf
     else:
         my_eid = user.get("employee_id")
@@ -71,7 +74,7 @@ async def leave_balance(employee_id: str = None, user: dict = Depends(get_curren
     """Current-year annual leave balance. Employees see their own; admins may
     pass employee_id."""
     tf = tenant_filter(user)
-    eid = employee_id if (employee_id and is_admin(user)) else user.get("employee_id")
+    eid = employee_id if (employee_id and can_role(user, "hr")) else user.get("employee_id")
     if not eid:
         raise HTTPException(400, "employee_id required")
     year = str(now_utc().year)
@@ -134,7 +137,7 @@ async def coverage_preview(start_date: str, end_date: str, employee_id: str = No
     import math
     from datetime import timedelta
     tf = tenant_filter(user)
-    eid = employee_id if (employee_id and is_admin(user)) else user.get("employee_id")
+    eid = employee_id if (employee_id and can_role(user, "hr")) else user.get("employee_id")
     if not eid:
         raise HTTPException(400, "employee_id required")
     try:
@@ -194,7 +197,7 @@ async def leave_conflicts(lid: str, user: dict = Depends(get_current_user)):
     if not lv:
         raise HTTPException(404, "Leave request not found")
     emp = await db.employees.find_one({"id": lv["employee_id"], **tf}, {"_id": 0})
-    if not is_admin(user):
+    if not can_role(user, "hr"):
         if not emp or emp.get("manager_id") != user.get("employee_id"):
             raise HTTPException(403, "Admin or manager only")
     branch_id = (emp or {}).get("branch_id")
@@ -248,7 +251,7 @@ async def suggest_dates(lid: str, user: dict = Depends(get_current_user)):
     if not lv:
         raise HTTPException(404, "Leave request not found")
     emp = await db.employees.find_one({"id": lv["employee_id"], **tf}, {"_id": 0})
-    if not is_admin(user):
+    if not can_role(user, "hr"):
         if not emp or emp.get("manager_id") != user.get("employee_id"):
             raise HTTPException(403, "Admin or manager only")
     branch_id = (emp or {}).get("branch_id")
@@ -282,12 +285,80 @@ async def suggest_dates(lid: str, user: dict = Depends(get_current_user)):
             "tag": f"leave-suggest-{lid}"})
     await audit("leave_dates_suggested", f"leave_requests/{lid}", user,
                 {"employee": lv.get("employee_name"), "suggestions": suggestions})
+    # Persist for the employee's "suggested dates" inbox (supersede older ones)
+    await db.leave_suggestions.update_many(
+        {**tf, "leave_id": lid, "status": "open"},
+        {"$set": {"status": "superseded"}})
+    await db.leave_suggestions.insert_one(with_tenant({
+        "id": str(uuid.uuid4()), "leave_id": lid,
+        "employee_id": lv["employee_id"], "employee_name": lv.get("employee_name"),
+        "leave_type": lv["leave_type"],
+        "original": {"start_date": lv["start_date"], "end_date": lv["end_date"]},
+        "suggestions": suggestions, "suggested_by": user.get("name") or "Approver",
+        "status": "open", "created_at": iso(now_utc()),
+    }, user))
     return {"ok": True, "suggestions": suggestions, "push": push}
+
+
+@router.get("/suggestions/mine")
+async def my_date_suggestions(user: dict = Depends(get_current_user)):
+    """Open alternative-date suggestions an approver sent to me."""
+    eid = user.get("employee_id")
+    if not eid:
+        return []
+    return await db.leave_suggestions.find(
+        {**tenant_filter(user), "employee_id": eid, "status": "open"},
+        {"_id": 0}).sort("created_at", -1).to_list(20)
+
+
+class AcceptSuggestionIn(BaseModel):
+    start_date: str
+    end_date: str
+
+
+@router.post("/suggestions/{sid}/accept")
+async def accept_date_suggestion(sid: str, body: AcceptSuggestionIn,
+                                 user: dict = Depends(get_current_user)):
+    """One-tap re-submit: new request with the chosen suggested range; the
+    original pending request is withdrawn."""
+    tf = tenant_filter(user)
+    sug = await db.leave_suggestions.find_one({"id": sid, **tf}, {"_id": 0})
+    if not sug or sug["status"] != "open":
+        raise HTTPException(404, "Suggestion not found or already handled")
+    if sug["employee_id"] != user.get("employee_id"):
+        raise HTTPException(403, "Not your suggestion")
+    if not any(r["start_date"] == body.start_date and r["end_date"] == body.end_date
+               for r in sug["suggestions"]):
+        raise HTTPException(422, "Chosen range is not one of the suggested options")
+    emp = await db.employees.find_one({"id": sug["employee_id"], **tf}, {"_id": 0})
+    days = (datetime.fromisoformat(body.end_date)
+            - datetime.fromisoformat(body.start_date)).days + 1
+    doc = with_tenant({
+        "id": str(uuid.uuid4()),
+        "employee_id": sug["employee_id"],
+        "employee_name": f'{emp["first_name"]} {emp["last_name"]}',
+        "leave_type": sug["leave_type"],
+        "start_date": body.start_date,
+        "end_date": body.end_date,
+        "days": max(1, days),
+        "reason": "Re-submitted with approver-suggested dates",
+        "status": "pending",
+        "created_at": iso(now_utc()),
+    }, user)
+    await db.leave_requests.insert_one(doc)
+    doc.pop("_id", None)
+    await db.leave_requests.update_one(
+        {"id": sug["leave_id"], **tf, "status": "pending"},
+        {"$set": {"status": "withdrawn"}})
+    await db.leave_suggestions.update_one({"id": sid}, {"$set": {"status": "accepted"}})
+    await audit("leave_suggestion_accepted", f"leave_requests/{doc['id']}", user,
+                {"from_suggestion": sid, "range": [body.start_date, body.end_date]})
+    return doc
 
 
 @router.post("")
 async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
-    eid = body.employee_id if is_admin(user) else user.get("employee_id")
+    eid = body.employee_id if can_role(user, "hr") else user.get("employee_id")
     if not eid:
         raise HTTPException(400, "employee_id required")
     emp = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
@@ -317,7 +388,7 @@ async def decide_leave(lid: str, body: LeaveDecision, user: dict = Depends(get_c
     if not lv:
         raise HTTPException(404, "Not found")
     # Authorization: admin/superadmin, or the requesting employee's direct manager
-    if user.get("role") not in ("admin", "superadmin"):
+    if not can_role(user, "hr"):
         if not user.get("employee_id"):
             raise HTTPException(403, "Admin or manager only")
         emp = await db.employees.find_one({"id": lv["employee_id"]}, {"_id": 0})
@@ -329,6 +400,6 @@ async def decide_leave(lid: str, body: LeaveDecision, user: dict = Depends(get_c
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
-    action = f"leave_{body.status}" if is_admin(user) else f"manager_leave_{body.status}"
+    action = f"leave_{body.status}" if can_role(user, "hr") else f"manager_leave_{body.status}"
     await audit(action, f"leave_requests/{lid}", user, {"employee": lv.get("employee_name")})
     return {"ok": True, "status": body.status}

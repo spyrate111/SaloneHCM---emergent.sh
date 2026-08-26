@@ -25,6 +25,8 @@ from core import (
     tenant_filter, with_tenant, audit, now_utc, iso,
 )
 
+from core import require_roles
+
 router = APIRouter(
     prefix="/promotion",
     tags=["promotion"],
@@ -138,7 +140,7 @@ class ApproveIn(BaseModel):
 
 
 @router.get("/eligible")
-async def list_eligible(user: dict = Depends(require_admin),
+async def list_eligible(user: dict = Depends(require_roles("hr")),
                         min_tenure_days: int = DEFAULT_MIN_TENURE_DAYS,
                         min_rating: float = DEFAULT_MIN_RATING):
     """List all employees with their eligibility status + reasons. Filter on the frontend."""
@@ -160,7 +162,7 @@ async def list_eligible(user: dict = Depends(require_admin),
 
 
 @router.post("/recommendations", status_code=201)
-async def create_recommendation(body: RecommendIn, user: dict = Depends(require_admin)):
+async def create_recommendation(body: RecommendIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     emp = await db.employees.find_one({"id": body.employee_id, **tf}, {"_id": 0})
     if not emp:
@@ -200,7 +202,7 @@ async def create_recommendation(body: RecommendIn, user: dict = Depends(require_
 
 
 @router.get("/recommendations")
-async def list_recommendations(user: dict = Depends(require_admin),
+async def list_recommendations(user: dict = Depends(require_roles("hr")),
                                status: Optional[str] = None):
     tf = tenant_filter(user)
     q = {**tf}
@@ -210,7 +212,7 @@ async def list_recommendations(user: dict = Depends(require_admin),
 
 
 @router.post("/recommendations/{rid}/approve")
-async def approve_recommendation(rid: str, body: ApproveIn, user: dict = Depends(require_admin)):
+async def approve_recommendation(rid: str, body: ApproveIn, user: dict = Depends(require_roles("hr"))):
     """Admin/MoF approver: apply the step promotion + flip recommendation to approved."""
     tf = tenant_filter(user)
     if not (user.get("mof_approver") or user.get("role") == "superadmin"):
@@ -254,7 +256,7 @@ async def approve_recommendation(rid: str, body: ApproveIn, user: dict = Depends
 
 
 @router.post("/recommendations/{rid}/reject")
-async def reject_recommendation(rid: str, body: ApproveIn, user: dict = Depends(require_admin)):
+async def reject_recommendation(rid: str, body: ApproveIn, user: dict = Depends(require_roles("hr"))):
     if not (user.get("mof_approver") or user.get("role") == "superadmin"):
         raise HTTPException(403, "MoF approver flag required")
     tf = tenant_filter(user)

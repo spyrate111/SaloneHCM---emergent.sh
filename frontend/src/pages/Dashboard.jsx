@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { fmtSLE, fmtNum } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import RoleTour from "../components/RoleTourCard";
 import { useFeatures } from "../lib/features";
 import ComplianceScoreWidget from "../components/ComplianceScoreWidget";
 import { Users, Wallet, Receipt, CalendarClock, ArrowUpRight } from "lucide-react";
@@ -50,6 +51,7 @@ export default function Dashboard() {
       </div>
 
       {isAdmin && <ComplianceScoreWidget />}
+      <RoleTour user={user} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <KPI label="Headcount" value={fmtNum(data.headcount)} sub={`${data.total_employees} total records`} icon={Users} accent="bg-[#0A4A1E]" />

@@ -12,6 +12,8 @@ from core import db, require_admin, audit, now_utc, iso, tenant_filter, with_ten
 from payroll_engine import calc_payslip
 from . import _decision_brief  # see helpers module below
 
+from core import require_roles
+
 router = APIRouter(
     prefix="/payroll",
     tags=["payroll-sim"],
@@ -87,7 +89,7 @@ def _totals(slips: List[dict]) -> dict:
 
 # ---------- Simulate ----------
 @router.post("/simulate")
-async def simulate(body: SimIn, user: dict = Depends(require_admin)):
+async def simulate(body: SimIn, user: dict = Depends(require_roles("payroll"))):
     return await _do_simulate(body, user)
 
 
@@ -152,7 +154,7 @@ def _by_department(emps, cur_slips, proj_slips):
 
 # ---------- Saved scenarios ----------
 @router.post("/scenarios")
-async def save_scenario(body: ScenarioIn, user: dict = Depends(require_admin)):
+async def save_scenario(body: ScenarioIn, user: dict = Depends(require_roles("payroll"))):
     sid = str(uuid.uuid4())
     doc = with_tenant({
         "id": sid,
@@ -199,12 +201,12 @@ async def save_scenario(body: ScenarioIn, user: dict = Depends(require_admin)):
 
 
 @router.get("/scenarios")
-async def list_scenarios(user: dict = Depends(require_admin)):
+async def list_scenarios(user: dict = Depends(require_roles("payroll"))):
     return await db.payroll_scenarios.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(200)
 
 
 @router.get("/scenarios/{sid}")
-async def get_scenario(sid: str, user: dict = Depends(require_admin)):
+async def get_scenario(sid: str, user: dict = Depends(require_roles("payroll"))):
     s = await db.payroll_scenarios.find_one({"id": sid, **tenant_filter(user)}, {"_id": 0})
     if not s:
         raise HTTPException(404, "Not found")
@@ -214,7 +216,7 @@ async def get_scenario(sid: str, user: dict = Depends(require_admin)):
 
 
 @router.patch("/scenarios/{sid}/decide")
-async def decide_scenario(sid: str, body: ScenarioDecision, user: dict = Depends(require_admin)):
+async def decide_scenario(sid: str, body: ScenarioDecision, user: dict = Depends(require_roles("payroll"))):
     tf = tenant_filter(user)
     s = await db.payroll_scenarios.find_one({"id": sid, **tf}, {"_id": 0})
     if not s:
@@ -301,12 +303,12 @@ async def _do_apply_scenario(sid: str, user: dict) -> dict:
 
 
 @router.post("/scenarios/{sid}/apply")
-async def apply_scenario(sid: str, user: dict = Depends(require_admin)):
+async def apply_scenario(sid: str, user: dict = Depends(require_roles("payroll"))):
     return await _do_apply_scenario(sid, user)
 
 
 @router.delete("/scenarios/{sid}")
-async def delete_scenario(sid: str, user: dict = Depends(require_admin)):
+async def delete_scenario(sid: str, user: dict = Depends(require_roles("payroll"))):
     res = await db.payroll_scenarios.delete_one({"id": sid, **tenant_filter(user)})
     if not res.deleted_count:
         raise HTTPException(404, "Not found")
@@ -316,7 +318,7 @@ async def delete_scenario(sid: str, user: dict = Depends(require_admin)):
 
 # ---------- Compare ----------
 @router.post("/scenarios/compare")
-async def compare_scenarios(body: CompareIn, user: dict = Depends(require_admin)):
+async def compare_scenarios(body: CompareIn, user: dict = Depends(require_roles("payroll"))):
     return await _do_compare(body, user)
 
 

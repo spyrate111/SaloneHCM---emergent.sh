@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant
 
 
+from core import require_roles
+
 router = APIRouter(prefix="/performance", tags=["performance"])
 
 ReviewStatus = Literal["pending_self", "pending_manager", "completed", "cancelled"]
@@ -42,7 +44,7 @@ class AcknowledgeIn(BaseModel):
 # ---------- Cycles (admin / manager driven) ----------
 
 @router.post("/cycles")
-async def create_cycle(body: CycleCreateIn, user: dict = Depends(require_admin)):
+async def create_cycle(body: CycleCreateIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     cid = str(uuid.uuid4())
     employees = await db.employees.find(
@@ -102,7 +104,7 @@ async def create_cycle(body: CycleCreateIn, user: dict = Depends(require_admin))
 
 
 @router.get("/cycles")
-async def list_cycles(user: dict = Depends(require_admin)):
+async def list_cycles(user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     cycles = await db.review_cycles.find(tf, {"_id": 0}).sort("created_at", -1).to_list(200)
     # Attach progress counts
@@ -116,7 +118,7 @@ async def list_cycles(user: dict = Depends(require_admin)):
 
 
 @router.get("/cycles/{cid}/reviews")
-async def cycle_reviews(cid: str, user: dict = Depends(require_admin)):
+async def cycle_reviews(cid: str, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     return await db.performance_reviews_v2.find(
         {"cycle_id": cid, **tf}, {"_id": 0}
@@ -403,7 +405,7 @@ def _reviews_table(reviews: list):
 
 
 @router.get("/cycles/{cid}/summary.pdf")
-async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
+async def cycle_summary_pdf(cid: str, user: dict = Depends(require_roles("hr"))):
     """Download a PDF summary of an entire review cycle (analytics + table)."""
     from fastapi.responses import StreamingResponse
     import io as _io
@@ -454,7 +456,7 @@ async def cycle_summary_pdf(cid: str, user: dict = Depends(require_admin)):
 
 
 @router.get("/cycles/{cid}/analytics")
-async def cycle_analytics(cid: str, user: dict = Depends(require_admin)):
+async def cycle_analytics(cid: str, user: dict = Depends(require_roles("hr"))):
     """Aggregated metrics for a single review cycle: avg rating, distribution, completion."""
     tf = tenant_filter(user)
     cycle = await db.review_cycles.find_one({"id": cid, **tf}, {"_id": 0})

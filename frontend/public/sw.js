@@ -1,9 +1,9 @@
 /* SaloneHCM service worker — enterprise offline shell + queue with status tracking. */
 
 // Cache version — bump when strategy changes; old caches get purged on activate.
-const APP_SHELL_CACHE = "salonehcm-shell-v5";
-const RUNTIME_CACHE = "salonehcm-runtime-v5";
-const PAYSLIP_CACHE = "salonehcm-payslip-v5";
+const APP_SHELL_CACHE = "salonehcm-shell-v6";
+const RUNTIME_CACHE = "salonehcm-runtime-v6";
+const PAYSLIP_CACHE = "salonehcm-payslip-v6";
 const ALL_CACHES = [APP_SHELL_CACHE, RUNTIME_CACHE, PAYSLIP_CACHE];
 // Caches that must SURVIVE version bumps (user-saved offline payslip pack).
 const PERSISTENT_PREFIX = "salonehcm-payslip-pack";
@@ -293,6 +293,25 @@ self.addEventListener("fetch", (event) => {
           status: 202, headers: { "Content-Type": "application/json" },
         });
       }
+    })());
+    return;
+  }
+
+  // === other state-changing /api/leave writes (suggestion accepts, decisions)
+  //     — bust the cached GET /api/leave list so the next refresh is fresh ===
+  if (request.method !== "GET" && url.pathname.startsWith("/api/leave")) {
+    event.respondWith((async () => {
+      const res = await fetch(request);
+      if (res && res.ok) {
+        try {
+          const cache = await caches.open(PAYSLIP_CACHE);
+          const keys = await cache.keys();
+          await Promise.all(
+            keys.filter((r) => new URL(r.url).pathname === "/api/leave")
+                .map((r) => cache.delete(r)));
+        } catch (_) { /* cache bust is best-effort */ }
+      }
+      return res;
     })());
     return;
   }

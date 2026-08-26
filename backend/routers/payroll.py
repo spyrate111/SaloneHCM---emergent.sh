@@ -13,6 +13,10 @@ from models import PayrollRunIn
 from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf
 from sms import send_payslip_batch, is_configured as sms_is_configured
 
+from core import require_roles
+
+from core import can_role
+
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
 
@@ -21,7 +25,7 @@ class SendSmsIn(BaseModel):
 
 
 @router.post("/preview")
-async def preview_payroll(user: dict = Depends(require_admin)):
+async def preview_payroll(user: dict = Depends(require_roles("payroll"))):
     emps = await db.employees.find(
         {"status": "active", **tenant_filter(user)},
         {"_id": 0},
@@ -39,7 +43,7 @@ async def preview_payroll(user: dict = Depends(require_admin)):
 
 
 @router.post("/run")
-async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
+async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_roles("payroll"))):
     """Run payroll for the given period.
 
     Guardrail (Gov tier only): re-runs the pre-payroll budget check against
@@ -88,13 +92,13 @@ async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
 
 
 @router.get("/runs")
-async def list_runs(user: dict = Depends(get_current_user)):
+async def list_runs(user: dict = Depends(require_roles("hr", "payroll"))):
     return await db.payroll_runs.find(
         tenant_filter(user), {"_id": 0, "slips": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.get("/runs/{rid}")
-async def get_run(rid: str, user: dict = Depends(get_current_user)):
+async def get_run(rid: str, user: dict = Depends(require_roles("hr", "payroll"))):
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Not found")
@@ -132,7 +136,7 @@ async def my_payslips(user: dict = Depends(get_current_user)):
 
 @router.get("/runs/{rid}/payslip/{eid}.pdf")
 async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "superadmin") and user.get("employee_id") != eid:
+    if not can_role(user, "payroll") and user.get("employee_id") != eid:
         raise HTTPException(403, "Forbidden")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
@@ -167,7 +171,7 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
 
 
 @router.get("/runs/{rid}/bank-file")
-async def bank_file(rid: str, user: dict = Depends(require_admin)):
+async def bank_file(rid: str, user: dict = Depends(require_roles("payroll"))):
     """NRC clearing CSV — bank_name, account_no, beneficiary, amount, reference."""
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
@@ -195,7 +199,7 @@ async def bank_file(rid: str, user: dict = Depends(require_admin)):
 
 
 @router.get("/sms/status")
-async def sms_status(_: dict = Depends(require_admin)):
+async def sms_status(_: dict = Depends(require_roles("payroll"))):
     """Tell the frontend whether Twilio creds are wired so it can warn the admin."""
     return {"twilio_configured": sms_is_configured()}
 
@@ -206,8 +210,8 @@ async def send_payslip_sms(
     body: SendSmsIn,
     user: dict = Depends(require_feature("bulk_sms_payslips")),
 ):
-    if user.get("role") not in ("admin", "superadmin"):
-        raise HTTPException(403, "Admin only")
+    if not can_role(user, "payroll"):
+        raise HTTPException(403, "Admin or payroll officer only")
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Payroll run not found")
@@ -234,7 +238,7 @@ async def list_sms_logs(
     period: Optional[str] = None,
     status: Optional[str] = None,
     batch_id: Optional[str] = None,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     q: dict = {**tenant_filter(user)}
     if period:
@@ -248,7 +252,7 @@ async def list_sms_logs(
 
 
 @router.get("/sms/batches")
-async def list_sms_batches(user: dict = Depends(require_admin)):
+async def list_sms_batches(user: dict = Depends(require_roles("payroll"))):
     """Distinct SMS batches with aggregate counts per status — for the audit page header view."""
     pipeline = [
         {"$match": tenant_filter(user)},
@@ -287,7 +291,7 @@ async def list_sms_batches(user: dict = Depends(require_admin)):
 
 
 @router.get("/sms/summary")
-async def sms_summary(user: dict = Depends(require_admin)):
+async def sms_summary(user: dict = Depends(require_roles("payroll"))):
     """High-level KPIs for the audit page header."""
     tf = tenant_filter(user)
     pipeline = [
@@ -310,7 +314,7 @@ async def export_sms_logs_csv(
     period: Optional[str] = None,
     status: Optional[str] = None,
     batch_id: Optional[str] = None,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     """Forensic CSV export of SMS deliveries — for Auditor General submissions."""
     q: dict = {**tenant_filter(user)}
@@ -377,7 +381,7 @@ class EmailExportIn(BaseModel):
 
 
 @router.post("/sms/logs.csv/email")
-async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_admin)):
+async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_roles("payroll"))):
     """Email the audit CSV to the requester (or another email)."""
     from email_service import send_csv_attachment, is_configured as _ec
     if not _ec():
@@ -421,7 +425,7 @@ def _flag_scans(times: list[str]) -> bool:
 
 
 @router.get("/verification-scans")
-async def verification_scans(user: dict = Depends(require_admin)):
+async def verification_scans(user: dict = Depends(require_roles("payroll"))):
     vers = await db.payslip_verifications.find(
         tenant_filter(user), {"_id": 0}).to_list(2000)
     out = []
@@ -443,7 +447,7 @@ async def verification_scans(user: dict = Depends(require_admin)):
 
 
 @router.get("/verification-scans/{vid}")
-async def verification_scan_history(vid: str, user: dict = Depends(require_admin)):
+async def verification_scan_history(vid: str, user: dict = Depends(require_roles("payroll"))):
     ver = await db.payslip_verifications.find_one(
         {"id": vid, **tenant_filter(user)}, {"_id": 0})
     if not ver:

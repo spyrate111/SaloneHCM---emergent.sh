@@ -14,6 +14,10 @@ from core import (
     audit, now_utc, iso, is_admin,
 )
 
+from core import require_roles
+
+from core import can_role
+
 router = APIRouter(
     prefix="/loans",
     tags=["loans"],
@@ -62,7 +66,7 @@ def _annotate(loan: dict) -> dict:
 async def list_loans(user: dict = Depends(get_current_user)):
     """Admin sees all, employee sees only their own."""
     tf = tenant_filter(user)
-    q = {**tf} if is_admin(user) else {"employee_id": user.get("employee_id"), **tf}
+    q = {**tf} if can_role(user, "payroll") else {"employee_id": user.get("employee_id"), **tf}
     loans = await db.loans.find(q, {"_id": 0}).sort("issued_at", -1).to_list(1000)
     return [_annotate(loan) for loan in loans]
 
@@ -73,13 +77,13 @@ async def get_loan(lid: str, user: dict = Depends(get_current_user)):
     loan = await db.loans.find_one({"id": lid, **tf}, {"_id": 0})
     if not loan:
         raise HTTPException(404, "Loan not found")
-    if not is_admin(user) and loan["employee_id"] != user.get("employee_id"):
+    if not can_role(user, "payroll") and loan["employee_id"] != user.get("employee_id"):
         raise HTTPException(403, "Not allowed")
     return _annotate(loan)
 
 
 @router.post("", status_code=201)
-async def issue_loan(body: LoanIn, user: dict = Depends(require_admin)):
+async def issue_loan(body: LoanIn, user: dict = Depends(require_roles("payroll"))):
     tf = tenant_filter(user)
     emp = await db.employees.find_one({"id": body.employee_id, **tf},
                                       {"_id": 0, "first_name": 1, "last_name": 1, "basic_salary_sle": 1})
@@ -118,7 +122,7 @@ async def issue_loan(body: LoanIn, user: dict = Depends(require_admin)):
 
 
 @router.patch("/{lid}")
-async def patch_loan(lid: str, body: LoanPatch, user: dict = Depends(require_admin)):
+async def patch_loan(lid: str, body: LoanPatch, user: dict = Depends(require_roles("payroll"))):
     tf = tenant_filter(user)
     loan = await db.loans.find_one({"id": lid, **tf}, {"_id": 0})
     if not loan:
@@ -141,7 +145,7 @@ async def schedule(lid: str, user: dict = Depends(get_current_user)):
     loan = await db.loans.find_one({"id": lid, **tf}, {"_id": 0})
     if not loan:
         raise HTTPException(404, "Loan not found")
-    if not is_admin(user) and loan["employee_id"] != user.get("employee_id"):
+    if not can_role(user, "payroll") and loan["employee_id"] != user.get("employee_id"):
         raise HTTPException(403, "Not allowed")
     remaining = float(loan["remaining_balance_sle"])
     monthly = float(loan["monthly_deduction_sle"])
@@ -170,7 +174,7 @@ async def schedule(lid: str, user: dict = Depends(get_current_user)):
 @router.get("/employee/{eid}/active")
 async def active_loan_for_employee(eid: str, user: dict = Depends(get_current_user)):
     """Convenience helper used by the ESS payslip page."""
-    if not is_admin(user) and eid != user.get("employee_id"):
+    if not can_role(user, "payroll") and eid != user.get("employee_id"):
         raise HTTPException(403, "Not allowed")
     tf = tenant_filter(user)
     loan = await db.loans.find_one(

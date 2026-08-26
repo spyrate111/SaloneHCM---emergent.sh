@@ -5,11 +5,15 @@ import { toast } from "sonner";
 import { InviteUserModal } from "../components/InviteUserModal";
 import {
   Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search, Clock, Banknote,
+  Briefcase, Calculator, UserCheck,
 } from "lucide-react";
 
 const ROLE_PILL = {
   superadmin: { label: "Super-admin", icon: Crown, color: "bg-[#FBE9DF] text-[#B84F2F]" },
   admin: { label: "Admin", icon: ShieldCheck, color: "bg-[#E5EEF6] text-[#26547C]" },
+  hr: { label: "HR Manager", icon: Briefcase, color: "bg-[#E4F7E7] text-[#0A4A1E]" },
+  payroll: { label: "Payroll Officer", icon: Calculator, color: "bg-[#FBF3D9] text-[#8B6A14]" },
+  manager: { label: "Manager", icon: UserCheck, color: "bg-[#EFE9F7] text-[#6B4FA1]" },
   employee: { label: "Employee", icon: UserIcon, color: "bg-[#EBE8E0] text-[#525860]" },
 };
 
@@ -102,6 +106,37 @@ export default function Users() {
     }
   };
 
+  const [staleCount, setStaleCount] = useState(null); // null = dialog closed
+  const askClearStale = async () => {
+    try {
+      const { data } = await api.get("/users/invites/stale-count");
+      setStaleCount(data.count);
+    } catch {
+      toast.error("Could not check stale invitations");
+    }
+  };
+  const clearStale = async () => {
+    try {
+      const { data } = await api.delete("/users/invites/stale");
+      toast.success(`Deleted ${data.deleted} stale invitation${data.deleted === 1 ? "" : "s"}`);
+      setStaleCount(null);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Cleanup failed");
+    }
+  };
+
+  const changeRole = async (u, role) => {
+    if (role === u.role) return;
+    try {
+      await api.patch(`/users/${u.id}/role`, { role });
+      toast.success(`${u.name} is now ${ROLE_PILL[role]?.label || role}`);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Role change failed");
+    }
+  };
+
   const filtered = users.filter((u) => {
     if (!q) return true;
     const t = q.toLowerCase();
@@ -121,6 +156,7 @@ export default function Users() {
         <button
           data-testid="users-invite-open"
           onClick={() => setOpen(true)}
+          data-testid="users-invite-button"
           className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
         >
           <UserPlus className="w-4 h-4" strokeWidth={1.5} /> Invite user
@@ -132,6 +168,15 @@ export default function Users() {
           <div className="px-5 py-3 border-b border-[#E2DFD6] flex items-center gap-2">
             <Clock className="w-4 h-4 text-[#8B6A14]" strokeWidth={1.5} />
             <h3 className="font-heading text-sm font-semibold">Pending invitations · {invites.length}</h3>
+            {me?.role === "superadmin" && (
+              <button
+                onClick={askClearStale}
+                className="ml-auto text-xs font-medium border border-[#B03A2E]/40 text-[#B03A2E] px-3 py-1.5 rounded-md hover:bg-[#FBE9E9]"
+                data-testid="clear-stale-invites-button"
+              >
+                Clear stale invitations
+              </button>
+            )}
           </div>
           <table className="w-full text-sm">
             <tbody>
@@ -202,6 +247,21 @@ export default function Users() {
                       )}
                       {u.mof_approver && (
                         <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF3D9] text-[#8B6A14]">MoF</span>
+                      )}
+                      {u.role !== "superadmin" && u.id !== me?.id && (
+                        <select
+                          value={u.role}
+                          onChange={(e) => changeRole(u, e.target.value)}
+                          className="text-[11px] border border-[#E2DFD6] rounded-md px-1.5 py-1 bg-white text-[#525860] cursor-pointer"
+                          data-testid={`user-role-select-${u.id}`}
+                          title="Change role"
+                        >
+                          <option value="employee">Employee</option>
+                          <option value="manager">Manager</option>
+                          <option value="hr">HR Manager</option>
+                          <option value="payroll">Payroll Officer</option>
+                          <option value="admin">Admin</option>
+                        </select>
                       )}
                     </div>
                   </td>
@@ -278,6 +338,30 @@ export default function Users() {
               <button type="submit" data-testid="reset-submit" className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md">Save</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {staleCount !== null && (
+        <div className="fixed inset-0 z-40 bg-black/40 grid place-items-center p-4" data-testid="stale-invites-dialog">
+          <div className="bg-white rounded-lg border border-[#E2DFD6] w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading text-lg font-semibold">Clear stale invitations</h3>
+              <button type="button" onClick={() => setStaleCount(null)} className="text-[#525860]"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-sm text-[#525860]" data-testid="stale-invites-count">
+              {staleCount === 0
+                ? "No pending invitations older than 7 days — nothing to clear."
+                : <><span className="font-data font-bold text-[#B03A2E]">{staleCount}</span> pending invitation{staleCount === 1 ? "" : "s"} older than 7 days will be permanently deleted.</>}
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setStaleCount(null)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
+              {staleCount > 0 && (
+                <button onClick={clearStale} data-testid="stale-invites-confirm" className="text-sm bg-[#B03A2E] text-white px-4 py-2 rounded-md hover:bg-[#8E2E24]">
+                  Delete {staleCount}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

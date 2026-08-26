@@ -14,6 +14,7 @@ const STATUS_STYLE = {
   pending:  { cls: "bg-[#F6EDD8] text-[#8B6A14]", icon: Clock },
   approved: { cls: "bg-[#E4F7E7] text-[#0A4A1E]", icon: CheckCircle2 },
   rejected: { cls: "bg-[#FBE9E9] text-[#B03A2E]", icon: XCircle },
+  withdrawn: { cls: "bg-[#EFEEE9] text-[#686D76]", icon: XCircle },
 };
 
 export default function MobileLeave() {
@@ -85,6 +86,8 @@ export default function MobileLeave() {
           <Plus className="w-4 h-4" /> New
         </button>
       </div>
+
+      <SuggestionsInbox onAccepted={refresh} />
 
       <TeamCalendar />
 
@@ -199,6 +202,75 @@ export default function MobileLeave() {
       )}
       {showForm && <LeaveForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); refresh(); }} />}
     </div>
+  );
+}
+
+/** Alternative-date suggestions from an approver — 1-tap resubmit. */
+function SuggestionsInbox({ onAccepted }) {
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(null); // `${sid}:${start}`
+
+  const load = () => {
+    api.get("/leave/suggestions/mine").then((r) => setItems(r.data || [])).catch(() => {});
+  };
+  useEffect(load, []);
+
+  const accept = async (sug, range) => {
+    const key = `${sug.id}:${range.start_date}`;
+    setBusy(key);
+    try {
+      await api.post(`/leave/suggestions/${sug.id}/accept`, {
+        start_date: range.start_date, end_date: range.end_date,
+      });
+      toast.success("Leave re-submitted with the new dates");
+      setItems((prev) => prev.filter((s) => s.id !== sug.id));
+      onAccepted?.();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not re-submit — try again");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (items.length === 0) return null;
+  const fmt = (r) => (r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`);
+
+  return (
+    <section className="bg-[#FDF8EC] border border-[#EAD9AE] rounded-xl p-3 space-y-3" data-testid="mobile-leave-suggestions-inbox">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="w-4 h-4 text-[#8B6A14] flex-shrink-0 mt-0.5" />
+        <div>
+          <div className="text-sm font-bold text-[#8B6A14]">Alternative dates suggested</div>
+          <p className="text-[11px] text-[#8B6A14]/80 mt-0.5">
+            Your approver proposed better-covered dates. Tap one to re-submit instantly.
+          </p>
+        </div>
+      </div>
+      {items.map((sug) => (
+        <div key={sug.id} className="bg-white border border-[#EAD9AE] rounded-lg p-2.5 space-y-2"
+             data-testid={`mobile-leave-suggestion-${sug.id}`}>
+          <div className="text-[11px] text-[#525860]">
+            <span className="capitalize font-semibold">{sug.leave_type}</span> leave{" "}
+            <span className="font-data">{fmt(sug.original)}</span> · from {sug.suggested_by}
+          </div>
+          <div className="space-y-1.5">
+            {(sug.suggestions || []).map((r) => {
+              const key = `${sug.id}:${r.start_date}`;
+              return (
+                <button key={r.start_date} onClick={() => accept(sug, r)} disabled={!!busy}
+                  className="w-full flex items-center justify-between text-xs border border-[#0A4A1E]/30 text-[#0A4A1E] font-semibold px-2.5 py-2 rounded-lg active:bg-[#E4F7E7] disabled:opacity-50"
+                  data-testid={`mobile-leave-suggestion-accept-${r.start_date}`}>
+                  <span className="font-data">{fmt(r)}</span>
+                  <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide">
+                    {busy === key ? "Re-submitting…" : <><CheckCircle2 className="w-3.5 h-3.5" /> Use these dates</>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
 

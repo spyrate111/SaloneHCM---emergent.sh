@@ -33,6 +33,8 @@ log = logging.getLogger(__name__)
 # Option C — Retro-pay engine
 # ============================================================
 
+from core import require_roles
+
 retro_router = APIRouter(
     prefix="/retro-pay",
     tags=["retro-pay"],
@@ -66,7 +68,7 @@ def _months_between(a: str, b: str) -> int:
 @retro_router.get("")
 async def list_retro_pay(status: Optional[str] = None,
                          employee_id: Optional[str] = None,
-                         user: dict = Depends(require_admin)):
+                         user: dict = Depends(require_roles("payroll"))):
     q = tenant_filter(user)
     if status:
         q["status"] = status
@@ -77,7 +79,7 @@ async def list_retro_pay(status: Optional[str] = None,
 
 
 @retro_router.post("")
-async def create_retro_pay(body: RetroPayIn, user: dict = Depends(require_admin)):
+async def create_retro_pay(body: RetroPayIn, user: dict = Depends(require_roles("payroll"))):
     emp = await db.employees.find_one({"id": body.employee_id, "company_id": user["company_id"]}, {"_id": 0})
     if not emp:
         raise HTTPException(404, "Employee not found")
@@ -119,7 +121,7 @@ async def create_retro_pay(body: RetroPayIn, user: dict = Depends(require_admin)
 
 
 @retro_router.post("/{rid}/approve")
-async def approve_retro_pay(rid: str, body: RetroPayApproval, user: dict = Depends(require_admin)):
+async def approve_retro_pay(rid: str, body: RetroPayApproval, user: dict = Depends(require_roles("payroll"))):
     if user["role"] != "superadmin" and not user.get("mof_approver"):
         raise HTTPException(403, "Only MoF approvers can approve retro-pay adjustments")
     tf = tenant_filter(user)
@@ -144,7 +146,7 @@ async def approve_retro_pay(rid: str, body: RetroPayApproval, user: dict = Depen
 
 
 @retro_router.delete("/{rid}")
-async def delete_retro_pay(rid: str, user: dict = Depends(require_admin)):
+async def delete_retro_pay(rid: str, user: dict = Depends(require_roles("payroll"))):
     tf = tenant_filter(user)
     doc = await db.retro_pay_adjustments.find_one({"id": rid, **tf}, {"_id": 0})
     if not doc:
@@ -195,13 +197,13 @@ class SigConfig(BaseModel):
 
 
 @signatures_router.get("/config")
-async def get_mof_config(user: dict = Depends(require_admin)):
+async def get_mof_config(user: dict = Depends(require_roles("payroll"))):
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "mof_signatures_required": 1})
     return {"signatures_required": (company or {}).get("mof_signatures_required", 1)}
 
 
 @signatures_router.put("/config")
-async def set_mof_config(body: SigConfig, user: dict = Depends(require_admin)):
+async def set_mof_config(body: SigConfig, user: dict = Depends(require_roles("payroll"))):
     if user["role"] != "superadmin":
         raise HTTPException(403, "Only superadmin can change MoF signature requirements")
     await db.companies.update_one(
@@ -214,7 +216,7 @@ async def set_mof_config(body: SigConfig, user: dict = Depends(require_admin)):
 
 
 @signatures_router.get("/runs/{run_id}/signatures")
-async def list_signatures(run_id: str, user: dict = Depends(require_admin)):
+async def list_signatures(run_id: str, user: dict = Depends(require_roles("payroll"))):
     tf = tenant_filter(user)
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0, "mof_signatures": 1, "mof_status": 1})
     if not run:
@@ -265,7 +267,7 @@ def _resolve_sign_status(sigs: list, required: int, user: dict) -> tuple[str, di
 
 
 @signatures_router.post("/runs/{run_id}/sign")
-async def sign_run(run_id: str, body: SignAction, user: dict = Depends(require_admin)):
+async def sign_run(run_id: str, body: SignAction, user: dict = Depends(require_roles("payroll"))):
     """Record one signature. When count of approves ≥ signatures_required → run flips to 'approved'.
     Any reject immediately flips to 'rejected'. An approver cannot sign the same run twice."""
     run = await _validate_signing(run_id, user)
@@ -315,7 +317,7 @@ class CutoffConfig(BaseModel):
 
 
 @cutoff_router.get("/config")
-async def get_cutoff_config(user: dict = Depends(require_admin)):
+async def get_cutoff_config(user: dict = Depends(require_roles("payroll"))):
     company = await db.companies.find_one(
         {"id": user["company_id"]},
         {"_id": 0, "payroll_cutoff_day": 1, "payroll_cutoff_enabled": 1},
@@ -327,7 +329,7 @@ async def get_cutoff_config(user: dict = Depends(require_admin)):
 
 
 @cutoff_router.put("/config")
-async def set_cutoff_config(body: CutoffConfig, user: dict = Depends(require_admin)):
+async def set_cutoff_config(body: CutoffConfig, user: dict = Depends(require_roles("payroll"))):
     await db.companies.update_one(
         {"id": user["company_id"]},
         {"$set": {
@@ -341,7 +343,7 @@ async def set_cutoff_config(body: CutoffConfig, user: dict = Depends(require_adm
 
 
 @cutoff_router.get("/status")
-async def get_cutoff_status(user: dict = Depends(require_admin)):
+async def get_cutoff_status(user: dict = Depends(require_roles("payroll"))):
     """Current lock status — used by the frontend banner + before-mutation checks."""
     company = await db.companies.find_one(
         {"id": user["company_id"]},

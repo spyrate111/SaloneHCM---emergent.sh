@@ -25,6 +25,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from core import db, tenant_filter, require_admin, iso, now_utc
 
+from core import require_roles
+
 router = APIRouter(prefix="/payroll", tags=["payroll-variance"])
 
 # ---- Tunable thresholds ----
@@ -183,7 +185,7 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
 
 
 @router.get("/runs/{rid}/variance")
-async def payroll_variance(rid: str, user: dict = Depends(require_admin)):
+async def payroll_variance(rid: str, user: dict = Depends(require_roles("payroll"))):
     """Compute variance for a payroll run vs the previous period's run.
     Returns headline totals, by-ministry deltas, and a list of anomalies."""
     tf = tenant_filter(user)

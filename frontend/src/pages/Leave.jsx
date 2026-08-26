@@ -17,9 +17,11 @@ export default function Leave() {
   const [form, setForm] = useState({ employee_id: "", leave_type: "annual", start_date: "", end_date: "", reason: "" });
 
   const load = useCallback(() => api.get("/leave").then((r) => setList(r.data)), []);
+  const canManage = ["admin", "superadmin", "hr"].includes(user?.role);
   useEffect(() => {
     load();
-    if (user?.role === "admin") api.get("/employees").then((r) => setEmps(r.data));
+    if (canManage) api.get("/employees").then((r) => setEmps(r.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, load]);
 
   const submit = async (e) => {
@@ -33,9 +35,9 @@ export default function Leave() {
   useEffect(() => {
     const { start_date, end_date, employee_id } = form;
     if (!open || !start_date || !end_date || start_date > end_date) { setCoverage(null); return; }
-    if (user?.role === "admin" && !employee_id) { setCoverage(null); return; }
+    if (canManage && !employee_id) { setCoverage(null); return; }
     const params = { start_date, end_date };
-    if (user?.role === "admin") params.employee_id = employee_id;
+    if (canManage) params.employee_id = employee_id;
     api.get("/leave/coverage-preview", { params })
       .then((r) => setCoverage(r.data)).catch(() => setCoverage(null));
   }, [open, form, user]);
@@ -44,8 +46,8 @@ export default function Leave() {
   const [balance, setBalance] = useState(null);
   useEffect(() => {
     if (!open) { setBalance(null); return; }
-    if (user?.role === "admin" && !form.employee_id) { setBalance(null); return; }
-    const params = user?.role === "admin" ? { employee_id: form.employee_id } : {};
+    if (canManage && !form.employee_id) { setBalance(null); return; }
+    const params = canManage ? { employee_id: form.employee_id } : {};
     api.get("/leave/balance", { params })
       .then((r) => setBalance(r.data)).catch(() => setBalance(null));
   }, [open, form.employee_id, user]);
@@ -118,7 +120,7 @@ export default function Leave() {
                 <td className="py-3 px-4 text-[#686D76] text-xs max-w-xs truncate">{l.reason || "—"}</td>
                 <td className="py-3 px-4"><span className={`text-[11px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wider ${STATUS_BG[l.status]}`}>{l.status}</span></td>
                 <td className="py-3 px-4 text-right">
-                  {user?.role === "admin" && l.status === "pending" && (
+                  {(canManage || (user?.role === "manager" && l.employee_id !== user?.employee_id)) && l.status === "pending" && (
                     <div className="inline-flex gap-1.5">
                       <button data-testid={`approve-${l.id}`} onClick={() => decide(l.id, "approved")} className="p-1.5 rounded bg-[#E4F7E7] text-[#17A035] hover:bg-[#C9EED1]"><Check className="w-3.5 h-3.5" /></button>
                       <button data-testid={`reject-${l.id}`} onClick={() => decide(l.id, "rejected")} className="p-1.5 rounded bg-[#E9F2FB] text-[#3A7CB8] hover:bg-[#D5E5F4]"><X className="w-3.5 h-3.5" /></button>
@@ -190,7 +192,7 @@ export default function Leave() {
           <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="bg-white rounded-lg w-full max-w-lg p-6">
             <h2 className="font-heading text-xl font-semibold mb-4">New leave request</h2>
             <div className="space-y-4">
-              {user?.role === "admin" && (
+              {canManage && (
                 <div>
                   <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Employee</label>
                   <select required value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">

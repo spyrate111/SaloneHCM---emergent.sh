@@ -32,6 +32,8 @@ from core import (
 
 FEATURE = "payroll_vouchers"
 
+from core import require_roles
+
 branches_router = APIRouter(
     prefix="/branches", tags=["branches"],
     dependencies=[Depends(require_feature(FEATURE))],
@@ -112,7 +114,7 @@ async def list_branches(user: dict = Depends(get_current_user)):
 
 
 @branches_router.post("")
-async def create_branch(body: BranchIn, user: dict = Depends(require_admin)):
+async def create_branch(body: BranchIn, user: dict = Depends(require_roles("hr", "payroll"))):
     code = body.code.strip().upper()
     if await db.branches.find_one({**tenant_filter(user), "code": code}):
         raise HTTPException(409, f"Branch code '{code}' already exists")
@@ -133,7 +135,7 @@ async def create_branch(body: BranchIn, user: dict = Depends(require_admin)):
 
 
 @branches_router.patch("/{bid}")
-async def update_branch(bid: str, body: BranchPatch, user: dict = Depends(require_admin)):
+async def update_branch(bid: str, body: BranchPatch, user: dict = Depends(require_roles("hr", "payroll"))):
     b = await db.branches.find_one({"id": bid, **tenant_filter(user)}, {"_id": 0})
     if not b:
         raise HTTPException(404, "Branch not found")
@@ -148,7 +150,7 @@ async def update_branch(bid: str, body: BranchPatch, user: dict = Depends(requir
 
 
 @branches_router.delete("/{bid}")
-async def delete_branch(bid: str, user: dict = Depends(require_admin)):
+async def delete_branch(bid: str, user: dict = Depends(require_roles("hr", "payroll"))):
     b = await db.branches.find_one({"id": bid, **tenant_filter(user)}, {"_id": 0})
     if not b:
         raise HTTPException(404, "Branch not found")
@@ -166,7 +168,7 @@ class AssignIn(BaseModel):
 
 
 @branches_router.post("/{bid}/assign")
-async def assign_employees(bid: str, body: AssignIn, user: dict = Depends(require_admin)):
+async def assign_employees(bid: str, body: AssignIn, user: dict = Depends(require_roles("hr", "payroll"))):
     b = await db.branches.find_one({"id": bid, **tenant_filter(user)}, {"_id": 0})
     if not b:
         raise HTTPException(404, "Branch not found")
@@ -399,14 +401,14 @@ class PackConfigIn(BaseModel):
 
 
 @vouchers_router.get("/pack-config")
-async def get_pack_config(user: dict = Depends(require_admin)):
+async def get_pack_config(user: dict = Depends(require_roles("hr", "payroll"))):
     c = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "mof_pack_email": 1})
     last = await db.mof_pack_emails.find_one(tenant_filter(user), {"_id": 0}, sort=[("sent_at", -1)])
     return {"email": (c or {}).get("mof_pack_email") or "", "last_sent": last}
 
 
 @vouchers_router.put("/pack-config")
-async def set_pack_config(body: PackConfigIn, user: dict = Depends(require_admin)):
+async def set_pack_config(body: PackConfigIn, user: dict = Depends(require_roles("payroll"))):
     email = (body.email or "").strip().lower()
     if email and ("@" not in email or "." not in email.split("@")[-1]):
         raise HTTPException(422, "Invalid email address")
@@ -423,7 +425,7 @@ async def pack_history(user: dict = Depends(get_current_user)):
 
 
 @vouchers_router.post("/nudge/send-now")
-async def nudge_send_now(period: Optional[str] = None, user: dict = Depends(require_admin)):
+async def nudge_send_now(period: Optional[str] = None, user: dict = Depends(require_roles("hr", "payroll"))):
     """Manually fire a nudge to every branch missing a voucher for `period`
     (defaults to current month)."""
     from voucher_nudge import run_for_tenant
@@ -445,7 +447,7 @@ async def nudge_history(period: Optional[str] = None,
 
 
 @vouchers_router.post("/nudge/digest/send-now")
-async def nudge_digest_send_now(user: dict = Depends(require_admin)):
+async def nudge_digest_send_now(user: dict = Depends(require_roles("hr", "payroll"))):
     """Fire the daily supervisor digest immediately for this tenant. Uses the
     same idempotency guard as the 06:00 UTC cron — one digest per supervisor
     per calendar day, so calling twice in a day is a no-op."""
@@ -465,7 +467,7 @@ async def nudge_digest_history(user: dict = Depends(get_current_user)):
 
 
 @vouchers_router.post("/pack-config/send-now")
-async def send_pack_now(period: str, user: dict = Depends(require_admin)):
+async def send_pack_now(period: str, user: dict = Depends(require_roles("hr", "payroll"))):
     result = await _send_period_pack(user, period, force=True)
     if not result.get("attempted"):
         raise HTTPException(409, result.get("reason", "Pack not ready to send"))

@@ -82,34 +82,34 @@ export default function App() {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/directory" element={<FeatureDirectory />} />
-            <Route path="/employees" element={<ProtectedRoute adminOnly><Employees /></ProtectedRoute>} />
-            <Route path="/employees/:id" element={<ProtectedRoute adminOnly><EmployeeDetail /></ProtectedRoute>} />
-            <Route path="/payroll" element={<ProtectedRoute adminOnly><Payroll /></ProtectedRoute>} />
-            <Route path="/schedules" element={<ProtectedRoute adminOnly><Schedules /></ProtectedRoute>} />
+            <Route path="/employees" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><Employees /></ProtectedRoute>} />
+            <Route path="/employees/:id" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><EmployeeDetail /></ProtectedRoute>} />
+            <Route path="/payroll" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Payroll /></ProtectedRoute>} />
+            <Route path="/schedules" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Schedules /></ProtectedRoute>} />
             <Route path="/vouchers" element={<Vouchers />} />
-            <Route path="/simulator" element={<ProtectedRoute adminOnly><Simulator /></ProtectedRoute>} />
-            <Route path="/compliance" element={<ProtectedRoute adminOnly><Compliance /></ProtectedRoute>} />
+            <Route path="/simulator" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Simulator /></ProtectedRoute>} />
+            <Route path="/compliance" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/benefits" element={<Benefits />} />
             <Route path="/talent" element={<Talent />} />
             <Route path="/performance" element={<Performance />} />
-            <Route path="/civil-service" element={<CivilService />} />
-            <Route path="/establishment" element={<ProtectedRoute adminOnly><Establishment /></ProtectedRoute>} />
+            <Route path="/civil-service" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><CivilService /></ProtectedRoute>} />
+            <Route path="/establishment" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Establishment /></ProtectedRoute>} />
             <Route path="/loans" element={<Loans />} />
             <Route path="/billing" element={<ProtectedRoute adminOnly><Billing /></ProtectedRoute>} />
-            <Route path="/sector-presets" element={<ProtectedRoute adminOnly><SectorPresets /></ProtectedRoute>} />
-            <Route path="/promotion" element={<ProtectedRoute adminOnly><Promotion /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
+            <Route path="/sector-presets" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><SectorPresets /></ProtectedRoute>} />
+            <Route path="/promotion" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Promotion /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><Analytics /></ProtectedRoute>} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />
             <Route path="/audit" element={<ProtectedRoute adminOnly><AuditLog /></ProtectedRoute>} />
             <Route path="/team" element={<Team />} />
-            <Route path="/team/:eid" element={<ProtectedRoute adminOnly><Team /></ProtectedRoute>} />
+            <Route path="/team/:eid" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Team /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
-            <Route path="/sms-logs" element={<ProtectedRoute adminOnly><SmsLogs /></ProtectedRoute>} />
-            <Route path="/ministry" element={<ProtectedRoute adminOnly><Ministry /></ProtectedRoute>} />
+            <Route path="/sms-logs" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><SmsLogs /></ProtectedRoute>} />
+            <Route path="/ministry" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Ministry /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute superAdminOnly><Companies /></ProtectedRoute>} />
             <Route path="/admin/videos" element={<ProtectedRoute superAdminOnly><AdminVideos /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />

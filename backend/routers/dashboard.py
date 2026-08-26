@@ -3,11 +3,13 @@ from fastapi import APIRouter, Depends
 from core import db, get_current_user, require_admin, tenant_filter
 from compliance_score import compute as compute_compliance_score
 
+from core import require_roles
+
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/compliance-score")
-async def compliance_score(user: dict = Depends(require_admin)):
+async def compliance_score(user: dict = Depends(require_roles("hr", "payroll"))):
     return await compute_compliance_score(user)
 
 

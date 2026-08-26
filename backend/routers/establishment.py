@@ -21,6 +21,8 @@ from establishment_ats_sync import (
     sync_all_positions_for_tenant,
 )
 
+from core import require_roles
+
 router = APIRouter(
     prefix="/establishment",
     tags=["establishment"],
@@ -90,7 +92,7 @@ def _annotate(pos: dict, filled: int) -> dict:
 # ---------- CRUD ----------
 
 @router.get("/positions")
-async def list_positions(user: dict = Depends(require_admin)):
+async def list_positions(user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     positions = await db.establishment_positions.find(tf, {"_id": 0}).to_list(5000)
     filled = await _filled_counts(user["company_id"])
@@ -98,7 +100,7 @@ async def list_positions(user: dict = Depends(require_admin)):
 
 
 @router.post("/positions", status_code=201)
-async def create_position(body: PositionIn, user: dict = Depends(require_admin)):
+async def create_position(body: PositionIn, user: dict = Depends(require_roles("hr"))):
     pid = str(uuid.uuid4())
     doc = with_tenant({
         "id": pid,
@@ -115,7 +117,7 @@ async def create_position(body: PositionIn, user: dict = Depends(require_admin))
 
 
 @router.patch("/positions/{pid}")
-async def patch_position(pid: str, body: PositionPatch, user: dict = Depends(require_admin)):
+async def patch_position(pid: str, body: PositionPatch, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     pos = await db.establishment_positions.find_one({"id": pid, **tf}, {"_id": 0})
     if not pos:
@@ -137,7 +139,7 @@ async def patch_position(pid: str, body: PositionPatch, user: dict = Depends(req
 
 
 @router.delete("/positions/{pid}")
-async def delete_position(pid: str, user: dict = Depends(require_admin)):
+async def delete_position(pid: str, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     pos = await db.establishment_positions.find_one({"id": pid, **tf}, {"_id": 0, "position_title": 1})
     if not pos:
@@ -155,7 +157,7 @@ async def delete_position(pid: str, user: dict = Depends(require_admin)):
 # ---------- Hierarchy & analytics ----------
 
 @router.get("/tree")
-async def tree(user: dict = Depends(require_admin)):
+async def tree(user: dict = Depends(require_roles("hr"))):
     """Return Ministry → Directorate → Unit → Positions nested structure."""
     positions = await list_positions(user)
     out: dict = {}
@@ -202,13 +204,13 @@ async def tree(user: dict = Depends(require_admin)):
 
 
 @router.get("/vacancies")
-async def vacancies(user: dict = Depends(require_admin)):
+async def vacancies(user: dict = Depends(require_roles("hr"))):
     positions = await list_positions(user)
     return [p for p in positions if p["vacancy_count"] > 0 and p["status"] == "active"]
 
 
 @router.get("/overruns")
-async def overruns(user: dict = Depends(require_admin)):
+async def overruns(user: dict = Depends(require_roles("hr"))):
     """Positions where filled headcount exceeds approved — payroll-fraud signal."""
     positions = await list_positions(user)
     return [p for p in positions if p["overrun_count"] > 0]
@@ -217,7 +219,7 @@ async def overruns(user: dict = Depends(require_admin)):
 # ---------- Assignment ----------
 
 @router.post("/positions/{pid}/assign")
-async def assign_employee(pid: str, body: AssignIn, user: dict = Depends(require_admin)):
+async def assign_employee(pid: str, body: AssignIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     pos = await db.establishment_positions.find_one({"id": pid, **tf}, {"_id": 0})
     if not pos:
@@ -272,7 +274,7 @@ async def assign_employee(pid: str, body: AssignIn, user: dict = Depends(require
 
 
 @router.post("/positions/{pid}/unassign")
-async def unassign_employee(pid: str, body: AssignIn, user: dict = Depends(require_admin)):
+async def unassign_employee(pid: str, body: AssignIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     emp = await db.employees.find_one(
         {"id": body.employee_id, "position_id": pid, **tf},
@@ -313,7 +315,7 @@ async def unassign_employee(pid: str, body: AssignIn, user: dict = Depends(requi
 # ---------- Talent ATS sync (batch backfill) ----------
 
 @router.post("/sync-vacancies")
-async def sync_vacancies_to_ats(user: dict = Depends(require_admin)):
+async def sync_vacancies_to_ats(user: dict = Depends(require_roles("hr"))):
     """Idempotent batch: reconcile every establishment_position → job_posting for this tenant.
     Useful after bulk imports or as a super-admin audit tool. Returns counts of
     postings created / updated / closed."""

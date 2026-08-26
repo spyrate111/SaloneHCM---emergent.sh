@@ -134,6 +134,20 @@ async def require_superadmin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+def can_role(user: dict, *roles: str) -> bool:
+    """Admin & superadmin always pass; otherwise the user's role must be listed."""
+    return user.get("role") in ("admin", "superadmin") + roles
+
+
+def require_roles(*roles: str):
+    """Dependency factory — admits admin/superadmin plus the given roles."""
+    async def dep(user: dict = Depends(get_current_user)) -> dict:
+        if user.get("role") not in ("admin", "superadmin") + roles:
+            raise HTTPException(403, f"Requires role: admin or {'/'.join(roles)}")
+        return user
+    return dep
+
+
 def is_admin(user: dict) -> bool:
     """True for both tenant admins ('admin') and platform superadmins.
 

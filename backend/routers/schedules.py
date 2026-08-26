@@ -8,6 +8,8 @@ from core import db, require_admin, audit, now_utc, iso, tenant_filter, with_ten
 from scheduler import compute_next_run
 from payroll_engine import run_payroll
 
+from core import require_roles
+
 router = APIRouter(prefix="/payroll/schedules", tags=["payroll-schedules"])
 
 Cadence = Literal["monthly", "biweekly", "weekly"]
@@ -30,12 +32,12 @@ class ScheduleUpdate(BaseModel):
 
 
 @router.get("")
-async def list_schedules(user: dict = Depends(require_admin)):
+async def list_schedules(user: dict = Depends(require_roles("payroll"))):
     return await db.payroll_schedules.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(200)
 
 
 @router.post("")
-async def create_schedule(body: ScheduleIn, user: dict = Depends(require_admin)):
+async def create_schedule(body: ScheduleIn, user: dict = Depends(require_roles("payroll"))):
     sid = str(uuid.uuid4())
     next_run_at = compute_next_run(body.cadence, body.day_of_month, last_run_at=None)
     doc = with_tenant({
@@ -62,7 +64,7 @@ async def create_schedule(body: ScheduleIn, user: dict = Depends(require_admin))
 
 
 @router.patch("/{sid}")
-async def update_schedule(sid: str, body: ScheduleUpdate, user: dict = Depends(require_admin)):
+async def update_schedule(sid: str, body: ScheduleUpdate, user: dict = Depends(require_roles("payroll"))):
     tf = tenant_filter(user)
     schedule = await db.payroll_schedules.find_one({"id": sid, **tf}, {"_id": 0})
     if not schedule:
@@ -82,7 +84,7 @@ async def update_schedule(sid: str, body: ScheduleUpdate, user: dict = Depends(r
 
 
 @router.delete("/{sid}")
-async def delete_schedule(sid: str, user: dict = Depends(require_admin)):
+async def delete_schedule(sid: str, user: dict = Depends(require_roles("payroll"))):
     res = await db.payroll_schedules.delete_one({"id": sid, **tenant_filter(user)})
     if not res.deleted_count:
         raise HTTPException(404, "Not found")
@@ -91,7 +93,7 @@ async def delete_schedule(sid: str, user: dict = Depends(require_admin)):
 
 
 @router.post("/{sid}/run-now")
-async def run_now(sid: str, user: dict = Depends(require_admin)):
+async def run_now(sid: str, user: dict = Depends(require_roles("payroll"))):
     """Manually fire the schedule for the current month."""
     tf = tenant_filter(user)
     schedule = await db.payroll_schedules.find_one({"id": sid, **tf}, {"_id": 0})

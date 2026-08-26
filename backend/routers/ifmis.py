@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field
 from core import db, tenant_filter, require_admin, require_feature, audit, now_utc, iso
 from bank_formats import render_bank_file, available_formats
 
+from core import require_roles
+
 router = APIRouter(
     prefix="/ifmis",
     tags=["ifmis"],
@@ -31,13 +33,13 @@ router = APIRouter(
 # ---------- Bank disbursement files ----------
 
 @router.get("/formats")
-async def list_formats(_: dict = Depends(require_admin)):
+async def list_formats(_: dict = Depends(require_roles("payroll"))):
     """List available bank-specific disbursement formats for this tenant."""
     return {"formats": available_formats()}
 
 
 @router.get("/runs/{rid}/disbursement/{bank_code}")
-async def disbursement_file(rid: str, bank_code: str, user: dict = Depends(require_admin)):
+async def disbursement_file(rid: str, bank_code: str, user: dict = Depends(require_roles("payroll"))):
     """Download a bank-specific disbursement file."""
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
@@ -96,7 +98,7 @@ def _reconciliation_rows(run: dict, emp_map: dict) -> tuple[list[dict], dict]:
 
 
 @router.get("/runs/{rid}/reconciliation")
-async def reconciliation_json(rid: str, user: dict = Depends(require_admin)):
+async def reconciliation_json(rid: str, user: dict = Depends(require_roles("payroll"))):
     """Return treasury reconciliation as JSON for the UI."""
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
@@ -119,7 +121,7 @@ async def reconciliation_json(rid: str, user: dict = Depends(require_admin)):
 
 
 @router.get("/runs/{rid}/reconciliation.csv")
-async def reconciliation_csv(rid: str, user: dict = Depends(require_admin)):
+async def reconciliation_csv(rid: str, user: dict = Depends(require_roles("payroll"))):
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Run not found")
@@ -153,7 +155,7 @@ class ReconcileIn(BaseModel):
 
 
 @router.post("/runs/{rid}/mark-reconciled")
-async def mark_reconciled(rid: str, body: ReconcileIn, user: dict = Depends(require_admin)):
+async def mark_reconciled(rid: str, body: ReconcileIn, user: dict = Depends(require_roles("payroll"))):
     """Lock a payroll run as reconciled against IFMIS with the given transaction reference."""
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:

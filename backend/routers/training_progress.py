@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 
 from core import db, get_current_user, now_utc, iso, tenant_filter, is_admin
 
+from core import can_role
+
 router = APIRouter(prefix="/training-progress", tags=["training-progress"])
 
 
@@ -57,7 +59,7 @@ async def team_progress(branch_id: Optional[str] = None,
                         user: dict = Depends(get_current_user)):
     """Completion matrix. Admins: whole tenant. Branch supervisors: their branches."""
     tf = tenant_filter(user)
-    if is_admin(user):
+    if can_role(user, "hr"):
         emp_q = dict(tf)
     else:
         my_branches = await db.branches.find(
@@ -123,7 +125,7 @@ async def reminders_run_now(body: Optional[RunNowIn] = None,
                             user: dict = Depends(get_current_user)):
     """Manually trigger this week's reminder push for my tenant (admin only).
     Optional lang override forces every nudge into that language."""
-    if not is_admin(user):
+    if not can_role(user, "hr"):
         raise HTTPException(403, "Admins only")
     from training_reminders import run_for_company
     return await run_for_company(user["company_id"],
@@ -134,7 +136,7 @@ async def reminders_run_now(body: Optional[RunNowIn] = None,
 async def reminder_stats(user: dict = Depends(get_current_user)):
     """Weekly nudge analytics: reminders sent per ISO week and the share of
     recipients who completed a video within 7 days of the nudge. Admin only."""
-    if not is_admin(user):
+    if not can_role(user, "hr"):
         raise HTTPException(403, "Admins only")
     from datetime import datetime, timedelta
     LANGS = ("en", "krio", "mende", "temne")
