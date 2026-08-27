@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import api from "../../lib/api";
-import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, AlertTriangle, X } from "lucide-react";
 import { ymNow, shiftMonth, daysInMonth, firstDow, monthLabel, buildDayMap, todayKey } from "../../lib/leaveCal";
 
 const CACHE_KEY = "salonehcm_m_leave";
@@ -36,6 +36,13 @@ export default function MobileLeave() {
 
   const mine = rows.filter((r) => r.employee_id === me?.employee_id);
   const reports = rows.filter((r) => r.employee_id !== me?.employee_id && r.status === "pending");
+
+  const focusId = useMemo(() => new URLSearchParams(window.location.search).get("focus"), []);
+  useEffect(() => {
+    if (!focusId || rows.length === 0) return;
+    const el = document.getElementById(`leave-req-${focusId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId, rows.length]);
 
   const [conflict, setConflict] = useState(null); // {lid, ...conflictData}
   const [suggesting, setSuggesting] = useState(false);
@@ -96,7 +103,8 @@ export default function MobileLeave() {
           <div className="text-[10px] uppercase tracking-widest text-[#8B6A14] mb-2">Waiting on you</div>
           <div className="space-y-2">
             {reports.map((lv) => (
-              <div key={lv.id} className="bg-white border border-[#E2DFD6] rounded-xl p-3">
+              <div key={lv.id} id={`leave-req-${lv.id}`}
+                   className={`bg-white border rounded-xl p-3 ${focusId === lv.id ? "border-[#D1603D] ring-2 ring-[#D1603D]/40" : "border-[#E2DFD6]"}`}>
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{lv.employee_name}</div>
@@ -232,6 +240,16 @@ function SuggestionsInbox({ onAccepted }) {
     }
   };
 
+  const dismiss = async (sug) => {
+    try {
+      await api.post(`/leave/suggestions/${sug.id}/dismiss`);
+      setItems((prev) => prev.filter((s) => s.id !== sug.id));
+      toast("Suggestion dismissed — your original request is unchanged");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not dismiss — try again");
+    }
+  };
+
   if (items.length === 0) return null;
   const fmt = (r) => (r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`);
 
@@ -249,9 +267,16 @@ function SuggestionsInbox({ onAccepted }) {
       {items.map((sug) => (
         <div key={sug.id} className="bg-white border border-[#EAD9AE] rounded-lg p-2.5 space-y-2"
              data-testid={`mobile-leave-suggestion-${sug.id}`}>
-          <div className="text-[11px] text-[#525860]">
-            <span className="capitalize font-semibold">{sug.leave_type}</span> leave{" "}
-            <span className="font-data">{fmt(sug.original)}</span> · from {sug.suggested_by}
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[11px] text-[#525860]">
+              <span className="capitalize font-semibold">{sug.leave_type}</span> leave{" "}
+              <span className="font-data">{fmt(sug.original)}</span> · from {sug.suggested_by}
+            </div>
+            <button onClick={() => dismiss(sug)} aria-label="Dismiss suggestion"
+              className="p-1 -m-1 text-[#8A8F96] active:text-[#B03A2E] flex-shrink-0"
+              data-testid={`mobile-leave-suggestion-dismiss-${sug.id}`}>
+              <X className="w-4 h-4" />
+            </button>
           </div>
           <div className="space-y-1.5">
             {(sug.suggestions || []).map((r) => {

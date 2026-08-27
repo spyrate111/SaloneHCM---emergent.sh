@@ -48,6 +48,17 @@ async def _aggregate_for_tenant(company_id: str) -> dict:
         {"_id": 0, "verification_id": 1, "employee_name": 1, "period": 1,
          "scan_count": 1, "created_at": 1},
     ).sort("created_at", -1).to_list(20)
+
+    # Out-of-zone punches since the last digest
+    ooz_punches = await db.ooz_alerts.find(
+        {"company_id": company_id, "created_at": {"$gt": since}},
+        {"_id": 0, "employee_name": 1, "branch_name": 1, "kind": 1,
+         "distance_from_branch_m": 1, "clocked_at": 1},
+    ).sort("created_at", -1).to_list(20)
+
+    # Training reminder nudges pushed since the last digest
+    training_nudges_sent = await db.training_reminders.count_documents(
+        {"company_id": company_id, "created_at": {"$gt": since}})
     return {
         "pending_leaves": pending_leaves,
         "employee_count": employee_count,
@@ -55,6 +66,9 @@ async def _aggregate_for_tenant(company_id: str) -> dict:
         "outstanding_filings": outstanding,
         "pending_manager_reviews": pending_perf,
         "scan_alerts": scan_alerts,
+        "ooz_punches": ooz_punches,
+        "training_nudges_sent": training_nudges_sent,
+        "since": since,
         "generated_at": iso(now),
     }
 
@@ -73,6 +87,12 @@ def _summarize(snap: dict) -> str:
     if snap.get("scan_alerts"):
         n = len(snap["scan_alerts"])
         parts.append(f"{n} flagged payslip scan{'s' if n != 1 else ''}")
+    if snap.get("ooz_punches"):
+        n = len(snap["ooz_punches"])
+        parts.append(f"{n} out-of-zone punch{'es' if n != 1 else ''}")
+    if snap.get("training_nudges_sent"):
+        n = snap["training_nudges_sent"]
+        parts.append(f"{n} training nudge{'s' if n != 1 else ''} sent")
     return " · ".join(parts) or "All clear — no pending actions."
 
 
@@ -112,6 +132,20 @@ def _email_items(snap: dict) -> list[dict]:
                       f'flagged {flagged_at} UTC'),
             "url": f"{frontend}/payroll?flag={al['verification_id']}",
             "cta": "View scan log",
+        })
+    if snap.get("ooz_punches"):
+        n = len(snap["ooz_punches"])
+        items.append({
+            "label": f"<strong>{n}</strong> out-of-zone punch{'es' if n != 1 else ''} since the last digest",
+            "url": f"{frontend}/attendance",
+            "cta": "View punch map",
+        })
+    if snap.get("training_nudges_sent"):
+        n = snap["training_nudges_sent"]
+        items.append({
+            "label": f"<strong>{n}</strong> training reminder{'s' if n != 1 else ''} nudged to staff",
+            "url": f"{frontend}/dashboard",
+            "cta": "Open dashboard",
         })
     return items
 

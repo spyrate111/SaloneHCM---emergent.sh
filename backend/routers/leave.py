@@ -295,6 +295,7 @@ async def suggest_dates(lid: str, user: dict = Depends(get_current_user)):
         "leave_type": lv["leave_type"],
         "original": {"start_date": lv["start_date"], "end_date": lv["end_date"]},
         "suggestions": suggestions, "suggested_by": user.get("name") or "Approver",
+        "suggested_by_user_id": user["id"],
         "status": "open", "created_at": iso(now_utc()),
     }, user))
     return {"ok": True, "suggestions": suggestions, "push": push}
@@ -353,7 +354,36 @@ async def accept_date_suggestion(sid: str, body: AcceptSuggestionIn,
     await db.leave_suggestions.update_one({"id": sid}, {"$set": {"status": "accepted"}})
     await audit("leave_suggestion_accepted", f"leave_requests/{doc['id']}", user,
                 {"from_suggestion": sid, "range": [body.start_date, body.end_date]})
-    return doc
+    push = {"sent": 0, "skipped": "no_approver"}
+    approver_uid = sug.get("suggested_by_user_id")
+    if approver_uid:
+        from push_service import fanout_to_user
+        rng = (body.start_date if body.start_date == body.end_date
+               else f"{body.start_date} → {body.end_date}")
+        push = await fanout_to_user(approver_uid, {
+            "title": "Suggested dates accepted",
+            "body": f'{doc["employee_name"]} accepted your suggested dates ({rng}). Tap to approve.',
+            "url": f"/m/leave?focus={doc['id']}",
+            "kind": "leave_suggestion_accepted",
+            "tag": f"leave-accept-{sid}",
+        })
+    return {**doc, "push": push}
+
+
+@router.post("/suggestions/{sid}/dismiss")
+async def dismiss_date_suggestion(sid: str, user: dict = Depends(get_current_user)):
+    """Employee dismisses an approver's alternative-date suggestion; the
+    original request stays pending and the card never reappears."""
+    tf = tenant_filter(user)
+    sug = await db.leave_suggestions.find_one({"id": sid, **tf}, {"_id": 0})
+    if not sug or sug["status"] != "open":
+        raise HTTPException(404, "Suggestion not found or already handled")
+    if sug["employee_id"] != user.get("employee_id"):
+        raise HTTPException(403, "Not your suggestion")
+    await db.leave_suggestions.update_one({"id": sid}, {"$set": {"status": "dismissed"}})
+    await audit("leave_suggestion_dismissed", f"leave_suggestions/{sid}", user,
+                {"leave_id": sug["leave_id"]})
+    return {"ok": True}
 
 
 @router.post("")

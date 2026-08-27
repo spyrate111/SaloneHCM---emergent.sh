@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import RoleTour from "../components/RoleTourCard";
 import { useFeatures } from "../lib/features";
 import ComplianceScoreWidget from "../components/ComplianceScoreWidget";
+import DigestPreviewCard from "../components/DigestPreviewCard";
 import { Users, Wallet, Receipt, CalendarClock, ArrowUpRight } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar,
@@ -51,6 +52,7 @@ export default function Dashboard() {
       </div>
 
       {isAdmin && <ComplianceScoreWidget />}
+      {isAdmin && <DigestPreviewCard />}
       <RoleTour user={user} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
