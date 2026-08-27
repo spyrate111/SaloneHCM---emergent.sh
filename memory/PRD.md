@@ -676,3 +676,10 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Seeds**: seed_test_accounts.py auditor rows now role "auditor" (re-run; auditor1..10 live).
 - **Tests**: `tests/test_iter44_auditor_wipe.py` (17 tests: read matrix, export formats, write denials, wipe lifecycle w/ backup+restore, real-account safety). Full suite **564 passed, 7 skipped**.
 - NOTE: production needs REDEPLOY.
+
+## v1.43.1 (Aug 2026) — Production 404 investigation + deploy blocker fix
+- Probed live salonehcm.com from pod: SPA routes (/, /login, /dashboard, /scan-logs) 200, /static assets 200, APIs alive (405/401 as expected), www→308 redirect OK, sw.js v6 live. NO systemic routing 404 — React Router SPA fallback works on prod.
+- Diagnosis: deployed build is a STALE checkpoint (~v1.41): prod bundle lacks scan-logs page/wipe card/audit exports; /api/audit/export.csv 404s on prod. User's 404s = new-feature endpoints/pages missing from the old deployed build. Production DB is separate — the 70 test accounts do NOT exist there.
+- FIXED deploy blocker: /app/.gitignore had 8 malformed "-e " shell-artifact lines + duplicated credential blocks (could break deploy pipeline git ops). Rewritten clean; deployment_agent re-check = PASS.
+- No hardcoded localhost in frontend; backend localhost values are env-first fallbacks only.
+- User must REDEPLOY to ship latest commit (7a29e02) to production.
