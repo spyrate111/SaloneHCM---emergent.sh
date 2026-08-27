@@ -663,3 +663,8 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Digest Preview Card**: digest.py `_aggregate_for_tenant` extended with `ooz_punches` (since last digest), `training_nudges_sent`, `since`; `_summarize` + `_email_items` include both (digest email now truly contains them). New `components/DigestPreviewCard.jsx` on admin Dashboard — "Tonight's digest preview" with live pulse + 60s polling, three stat tiles (flagged scans w/ names, OOZ punches w/ names, training nudges). Admin-only (`digest-preview-card` testids). Uses existing GET /users/me/digest-preview.
 - **Tests**: `tests/test_iter43_notify_dismiss_digest.py` (9 tests incl. push_logs payload assert via fake subscription, tenant scoping, 403/404 edges; login helper retries on 429). Full suite **540 passed, 7 skipped** (7 transient 429 setup errors from concurrent browser logins — fixed with retry, re-verified green). E2E verified: digest card live on dashboard, dismiss persists across reload, focus deep-link highlights card.
 - NOTE: production needs REDEPLOY to receive all three features.
+
+## v1.42.1 (Aug 2026) — Bulk test account seeding
+- New idempotent script `/app/backend/seed_test_accounts.py`: 70 accounts (10 × 7 patterns) on Demo Salone Ltd., all flagged `test_account: true`, employee_id None, no 2FA. Login verified per role via external URL.
+- Auditor accounts are role `employee` + `auditor: true` flag — a real auditor RBAC role is NOT built yet (candidate P1 task).
+- Full list in /app/memory/test_credentials.md.
