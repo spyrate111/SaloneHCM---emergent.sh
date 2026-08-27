@@ -390,7 +390,7 @@ async def todays_punches(user: dict = Depends(get_current_user)):
 async def _team_branches(user: dict):
     """Branches visible on the team map, or None when the user has no access."""
     tf = tenant_filter(user)
-    if can_role(user, "hr"):
+    if can_role(user, "hr", "auditor"):
         return await db.branches.find(tf, {"_id": 0}).to_list(200)
     rows = await db.branches.find(
         {**tf, "supervisor_user_id": user["id"]}, {"_id": 0}).to_list(200)
@@ -402,7 +402,7 @@ async def _team_data(user: dict, day: str, employee_id: Optional[str]) -> dict:
     if branches is None:
         raise HTTPException(403, "Supervisors and admins only")
     q = {**tenant_filter(user), "date": day, "kind": {"$in": ["in", "out"]}}
-    if not can_role(user, "hr"):
+    if not can_role(user, "hr", "auditor"):
         q["branch_id"] = {"$in": [b["id"] for b in branches]}
     if employee_id:
         q["employee_id"] = employee_id

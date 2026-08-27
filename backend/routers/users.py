@@ -11,7 +11,7 @@ from core import (
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-Role = Literal["admin", "hr", "payroll", "manager", "employee"]
+Role = Literal["admin", "hr", "payroll", "manager", "employee", "auditor"]
 
 ROLE_DESCRIPTIONS = {
     "admin": "Full control of everything in the company",
@@ -19,6 +19,7 @@ ROLE_DESCRIPTIONS = {
     "payroll": "Payroll runs, vouchers, payslips & compliance filings — read-only employees",
     "manager": "Self-service plus their own team: approve reports' leave, see team attendance",
     "employee": "Self-service only — own payslips, leave, attendance and training",
+    "auditor": "Read-only oversight — audit logs, compliance reports, scan logs, punch maps and leave records. Cannot change anything",
 }
 
 
@@ -223,6 +224,18 @@ async def set_user_flags(uid: str, body: FlagsIn, user: dict = Depends(require_a
 async def list_roles(user: dict = Depends(require_admin)):
     """Assignable roles with plain-language permission summaries."""
     return [{"role": r, "description": d} for r, d in ROLE_DESCRIPTIONS.items()]
+
+
+@router.delete("/test-accounts")
+async def wipe_test_accounts(user: dict = Depends(require_superadmin)):
+    """Permanently delete all seeded test accounts (flagged test_account=true
+    on a salonehcm domain). Superadmin only, audited."""
+    q = {"test_account": True, "email": {"$regex": r"@salonehcm\.(com|sl)$"}}
+    count = await db.users.count_documents(q)
+    if count:
+        await db.users.delete_many(q)
+    await audit("test_accounts_wiped", "users/test-accounts", user, {"deleted": count})
+    return {"ok": True, "deleted": count}
 
 
 @router.patch("/{uid}/role")

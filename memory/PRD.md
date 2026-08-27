@@ -668,3 +668,11 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - New idempotent script `/app/backend/seed_test_accounts.py`: 70 accounts (10 × 7 patterns) on Demo Salone Ltd., all flagged `test_account: true`, employee_id None, no 2FA. Login verified per role via external URL.
 - Auditor accounts are role `employee` + `auditor: true` flag — a real auditor RBAC role is NOT built yet (candidate P1 task).
 - Full list in /app/memory/test_credentials.md.
+
+## v1.43 (Aug 2026) — Auditor role + test-account wipe (iter44)
+- **Wipe test accounts**: DELETE /users/test-accounts (require_superadmin, registered BEFORE /users/{uid} to avoid route shadowing) — deletes users with `test_account: true` + email @salonehcm.(com|sl), audits `test_accounts_wiped` with count. Settings page: superadmin-only red "Danger zone" card (`WipeTestAccountsCard.jsx`) with shadcn AlertDialog confirm. E2E verified (toast "Deleted 70 test accounts"); accounts re-seeded after.
+- **Auditor role (read-only)**: Role literal + ROLE_DESCRIPTIONS include "auditor". Read access added via can_role/require_roles("...","auditor") to: GET /audit (+ new /audit/export.csv + /audit/export.pdf reportlab), /payroll/verification-scans(+/{vid}), /mobile/punch/team(+.csv) (all branches), GET /leave (all tenant records), GET /attendance (all rows), /compliance nra-export + filings + nra-paye-return.csv + nassit-schedule.csv (inline admin-only checks → can_role payroll/auditor). NO write endpoints touched — auditors 403 on employee create, leave decision, role change, wipe (all tested).
+- **Frontend**: nav.js AUD group → auditor sees Dashboard, Compliance & Tax, Leave, Time & Attendance, Audit Log, Scan Logs. New /scan-logs page (`ScanLogs.jsx` wrapping PayslipScanPanel, also open to payroll/admin). AuditLog.jsx: Export CSV + Export PDF buttons (`audit-export-csv/pdf`). Compliance.jsx: "Email me" + "Mark filed" hidden for auditors (downloads remain).
+- **Seeds**: seed_test_accounts.py auditor rows now role "auditor" (re-run; auditor1..10 live).
+- **Tests**: `tests/test_iter44_auditor_wipe.py` (17 tests: read matrix, export formats, write denials, wipe lifecycle w/ backup+restore, real-account safety). Full suite **564 passed, 7 skipped**.
+- NOTE: production needs REDEPLOY.

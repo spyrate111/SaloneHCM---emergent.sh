@@ -15,7 +15,7 @@ ROLES = [
     ("payroll",    "payroll",    "Test@Payroll",    "Payroll Officer"),
     ("manager",    "manager",    "Test@Manager",    "Manager"),
     ("employee",   "employee",   "Test@Employee",   "Employee"),
-    ("auditor",    "employee",   "Test@Auditor",    "Auditor"),  # no auditor role yet — employee + flag
+    ("auditor",    "auditor",    "Test@Auditor",    "Auditor"),
     ("admin",      "admin",      "Test@Admin",      "Admin"),
 ]
 

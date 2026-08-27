@@ -425,7 +425,7 @@ def _flag_scans(times: list[str]) -> bool:
 
 
 @router.get("/verification-scans")
-async def verification_scans(user: dict = Depends(require_roles("payroll"))):
+async def verification_scans(user: dict = Depends(require_roles("payroll", "auditor"))):
     vers = await db.payslip_verifications.find(
         tenant_filter(user), {"_id": 0}).to_list(2000)
     out = []
@@ -447,7 +447,7 @@ async def verification_scans(user: dict = Depends(require_roles("payroll"))):
 
 
 @router.get("/verification-scans/{vid}")
-async def verification_scan_history(vid: str, user: dict = Depends(require_roles("payroll"))):
+async def verification_scan_history(vid: str, user: dict = Depends(require_roles("payroll", "auditor"))):
     ver = await db.payslip_verifications.find_one(
         {"id": vid, **tenant_filter(user)}, {"_id": 0})
     if not ver:

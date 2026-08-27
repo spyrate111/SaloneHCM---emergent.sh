@@ -14,7 +14,7 @@ router = APIRouter(prefix="/leave", tags=["leave"])
 @router.get("")
 async def list_leaves(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    if can_role(user, "hr"):
+    if can_role(user, "hr", "auditor"):
         return await db.leave_requests.find(tf, {"_id": 0}).sort("created_at", -1).to_list(1000)
     # Employee: their own + their direct reports' (if they're a manager)
     my_eid = user.get("employee_id")

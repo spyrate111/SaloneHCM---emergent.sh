@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
 from payroll_engine import PAYE_BANDS, NASSIT_EMPLOYEE, NASSIT_EMPLOYER
 
-from core import require_roles
+from core import require_roles, can_role
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 
@@ -87,7 +87,7 @@ async def compliance_summary(user: dict = Depends(get_current_user)):
 
 
 @router.get("/nra-export/{rid}")
-async def nra_export(rid: str, user: dict = Depends(require_roles("payroll"))):
+async def nra_export(rid: str, user: dict = Depends(require_roles("payroll", "auditor"))):
     """Original JSON export — kept for backwards compatibility with the UI table."""
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
@@ -110,8 +110,8 @@ async def nra_export(rid: str, user: dict = Depends(require_roles("payroll"))):
 async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nra_export"))):
     """NRA PAYE Return CSV — the layout the Sierra Leone NRA accepts at their portal.
     Each row = one employee; final row is the period total per NRA convention."""
-    if user.get("role") not in ("admin", "superadmin"):
-        raise HTTPException(403, "Admin only")
+    if not can_role(user, "payroll", "auditor"):
+        raise HTTPException(403, "Payroll, auditor or admin only")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
@@ -168,8 +168,8 @@ async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nr
 @router.get("/nassit-schedule.csv/{rid}")
 async def nassit_schedule_csv(rid: str, user: dict = Depends(require_feature("nra_export"))):
     """NASSIT contribution schedule CSV — per-employee employee + employer NASSIT for the period."""
-    if user.get("role") not in ("admin", "superadmin"):
-        raise HTTPException(403, "Admin only")
+    if not can_role(user, "payroll", "auditor"):
+        raise HTTPException(403, "Payroll, auditor or admin only")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
@@ -245,7 +245,7 @@ async def mark_nra_filed(rid: str, user: dict = Depends(require_feature("nra_exp
 
 
 @router.get("/filings")
-async def list_filings(user: dict = Depends(require_roles("payroll"))):
+async def list_filings(user: dict = Depends(require_roles("payroll", "auditor"))):
     return await db.nra_filings.find(tenant_filter(user), {"_id": 0}).sort("filed_at", -1).to_list(500)
 
 

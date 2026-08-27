@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Download, ShieldCheck, FileCheck, Receipt, AlertCircle, Mail } from "lucide-react";
 
 export default function Compliance() {
   const { has } = useFeatures();
+  const { user } = useAuth();
+  const readOnly = user?.role === "auditor";
   const hasNraExport = has("nra_export");
   const [summary, setSummary] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -143,6 +146,7 @@ export default function Compliance() {
                           onClick={() => emailNra(r.run_id, r.period)}
                           className="inline-flex items-center gap-1 text-xs bg-white border border-[#26547C] text-[#26547C] hover:bg-[#E5EEF6] px-2.5 py-1.5 rounded"
                           title="Email this NRA PAYE Return CSV to your inbox"
+                          style={readOnly ? { display: "none" } : undefined}
                         >
                           <Mail className="w-3.5 h-3.5" /> Email me
                         </button>
@@ -154,7 +158,7 @@ export default function Compliance() {
                         >
                           <Download className="w-3.5 h-3.5" /> NASSIT
                         </button>
-                        {!r.nra_filed && (
+                        {!r.nra_filed && !readOnly && (
                           <button
                             data-testid={`mark-filed-${r.run_id}`}
                             onClick={() => markFiled(r.run_id)}

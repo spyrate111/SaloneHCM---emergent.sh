@@ -6,6 +6,8 @@ import TwoFactorCard from "../components/TwoFactorCard";
 import TransparencyCard from "../components/TransparencyCard";
 import PushSetupCard from "../components/PushSetupCard";
 import DigestPrefsCard from "../components/DigestPrefsCard";
+import WipeTestAccountsCard from "../components/WipeTestAccountsCard";
+import { useAuth } from "../context/AuthContext";
 
 const FEATURE_LABELS = {
   employees: "Employee directory & profiles",
@@ -36,6 +38,7 @@ const FEATURE_LABELS = {
 const ALL_FEATURE_ORDER = Object.keys(FEATURE_LABELS);
 
 export default function Settings() {
+  const { user } = useAuth();
   const { company: authCompany, tier: authTier, has: authHas } = useFeatures();
   const [allTiers, setAllTiers] = useState([]);
   const [company, setCompany] = useState(authCompany || null);
@@ -166,6 +169,8 @@ export default function Settings() {
       <DigestPrefsCard />
 
       {has("ministry_reports") && <TransparencyCard />}
+
+      {user?.role === "superadmin" && <WipeTestAccountsCard />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6" data-testid="company-card">

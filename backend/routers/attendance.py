@@ -12,7 +12,7 @@ router = APIRouter(prefix="/attendance", tags=["attendance"])
 @router.get("")
 async def list_attendance(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    if can_role(user, "hr"):
+    if can_role(user, "hr", "auditor"):
         return await db.attendance.find(tf, {"_id": 0}).sort("date", -1).to_list(1000)
     if user.get("role") == "manager" and user.get("employee_id"):
         reports = await db.employees.find(

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { ScrollText, User } from "lucide-react";
+import { toast } from "sonner";
+import { ScrollText, User, Download } from "lucide-react";
 
 const ACTION_COLORS = {
   create: "bg-[#E4F7E7] text-[#17A035]",
@@ -15,8 +16,22 @@ const ACTION_COLORS = {
 export default function AuditLog() {
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(null);
 
   useEffect(() => { api.get("/audit").then((r) => setRows(r.data)); }, []);
+
+  const exportAs = async (ext) => {
+    setBusy(ext);
+    try {
+      const resp = await api.get(`/audit/export.${ext}`, { responseType: "blob" });
+      const url = URL.createObjectURL(resp.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = `audit-log.${ext}`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error("Export failed — try again");
+    } finally { setBusy(null); }
+  };
 
   const filtered = rows.filter((r) => {
     if (!filter) return true;
@@ -25,10 +40,24 @@ export default function AuditLog() {
 
   return (
     <div className="space-y-6" data-testid="audit-page">
-      <div>
-        <div className="text-[11px] uppercase tracking-[0.18em] text-[#525860]">Audit & Activity</div>
-        <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">Audit log</h1>
-        <p className="text-[#525860] text-sm mt-1">Every mutation across employees, payroll, leave, and exports — with actor and timestamp.</p>
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-[#525860]">Audit & Activity</div>
+          <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">Audit log</h1>
+          <p className="text-[#525860] text-sm mt-1">Every mutation across employees, payroll, leave, and exports — with actor and timestamp.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => exportAs("csv")} disabled={busy === "csv"}
+            className="inline-flex items-center gap-1.5 text-xs bg-[#26547C] hover:bg-[#1D4363] text-white px-3 py-2 rounded disabled:opacity-50"
+            data-testid="audit-export-csv">
+            <Download className="w-3.5 h-3.5" /> {busy === "csv" ? "Exporting…" : "Export CSV"}
+          </button>
+          <button onClick={() => exportAs("pdf")} disabled={busy === "pdf"}
+            className="inline-flex items-center gap-1.5 text-xs bg-[#0A4A1E] hover:bg-[#063514] text-white px-3 py-2 rounded disabled:opacity-50"
+            data-testid="audit-export-pdf">
+            <Download className="w-3.5 h-3.5" /> {busy === "pdf" ? "Exporting…" : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">

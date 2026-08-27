@@ -12,20 +12,21 @@ const HR = ["admin", "superadmin", "hr"];
 const PAY = ["admin", "superadmin", "payroll"];
 const STAFF = ["admin", "superadmin", "hr", "payroll"]; // employees directory
 const INSIGHT = ["admin", "superadmin", "hr", "payroll"];
+const AUD = ["auditor"]; // read-only oversight role
 
 // Single source-of-truth for the app sidebar navigation.
 // Each entry: { to, label, icon, roles, feature? }
 export const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ALL },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: [...ALL, ...AUD] },
   { to: "/directory", label: "Feature Directory", icon: Compass, roles: ALL },
   { to: "/employees", label: "Employees", icon: Users, roles: STAFF, feature: "employees" },
   { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: PAY, feature: "payroll" },
   { to: "/schedules", label: "Recurring Schedules", icon: Repeat, roles: PAY, feature: "payroll" },
   { to: "/vouchers", label: "Payroll Vouchers", icon: FileCheck2, roles: ALL, feature: "payroll_vouchers" },
   { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: PAY, feature: "simulator" },
-  { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: PAY, feature: "compliance" },
-  { to: "/leave", label: "Leave", icon: CalendarDays, roles: ALL, feature: "leave" },
-  { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: ALL, feature: "attendance" },
+  { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: [...PAY, ...AUD], feature: "compliance" },
+  { to: "/leave", label: "Leave", icon: CalendarDays, roles: [...ALL, ...AUD], feature: "leave" },
+  { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: [...ALL, ...AUD], feature: "attendance" },
   { to: "/benefits", label: "Benefits", icon: Heart, roles: ALL, feature: "benefits" },
   { to: "/talent", label: "Talent", icon: GraduationCap, roles: ALL, feature: "talent" },
   { to: "/performance", label: "Performance", icon: Sparkles, roles: ALL, feature: "talent" },
@@ -40,7 +41,8 @@ export const NAV = [
   { to: "/billing", label: "Billing", icon: CreditCard, roles: ADMIN },
   { to: "/assistant", label: "AI Assistant", icon: Sparkles, roles: ALL, feature: "ai_assistant" },
   { to: "/self-service", label: "Self Service", icon: UserCircle, roles: ALL },
-  { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ADMIN, feature: "audit_log" },
+  { to: "/audit", label: "Audit Log", icon: ScrollText, roles: [...ADMIN, ...AUD], feature: "audit_log" },
+  { to: "/scan-logs", label: "Scan Logs", icon: ScrollText, roles: AUD },
   { to: "/sms-logs", label: "SMS Audit", icon: MessageSquare, roles: PAY, feature: "bulk_sms_payslips" },
   { to: "/team", label: "My Team", icon: UserCircle, roles: ALL },
   { to: "/users", label: "Users & Access", icon: UserCog, roles: ADMIN },

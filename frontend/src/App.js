@@ -39,6 +39,7 @@ import SectorPresets from "./pages/SectorPresets";
 import Promotion from "./pages/Promotion";
 import Vouchers from "./pages/Vouchers";
 import FeatureDirectory from "./pages/FeatureDirectory";
+import ScanLogs from "./pages/ScanLogs";
 import TrainingCenterPage from "./marketing/TrainingCenterPage";
 import LandingPage from "./marketing/LandingPage";
 import PricingPage from "./marketing/PricingPage";
@@ -88,7 +89,7 @@ export default function App() {
             <Route path="/schedules" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Schedules /></ProtectedRoute>} />
             <Route path="/vouchers" element={<Vouchers />} />
             <Route path="/simulator" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Simulator /></ProtectedRoute>} />
-            <Route path="/compliance" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Compliance /></ProtectedRoute>} />
+            <Route path="/compliance" element={<ProtectedRoute roles={["admin", "superadmin", "payroll", "auditor"]}><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/benefits" element={<Benefits />} />
@@ -103,7 +104,8 @@ export default function App() {
             <Route path="/analytics" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><Analytics /></ProtectedRoute>} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />
-            <Route path="/audit" element={<ProtectedRoute adminOnly><AuditLog /></ProtectedRoute>} />
+            <Route path="/audit" element={<ProtectedRoute roles={["admin", "superadmin", "auditor"]}><AuditLog /></ProtectedRoute>} />
+            <Route path="/scan-logs" element={<ProtectedRoute roles={["admin", "superadmin", "payroll", "auditor"]}><ScanLogs /></ProtectedRoute>} />
             <Route path="/team" element={<Team />} />
             <Route path="/team/:eid" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Team /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
