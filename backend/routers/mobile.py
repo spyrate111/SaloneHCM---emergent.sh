@@ -390,12 +390,19 @@ async def _team_branches(user: dict):
     return rows or None
 
 
-async def _team_data(user: dict, day: str, employee_id: Optional[str]) -> dict:
+async def _team_data(user: dict, day: str, employee_id: Optional[str],
+                     branch_id: Optional[str] = None) -> dict:
     branches = await _team_branches(user)
     if branches is None:
         raise HTTPException(403, "Supervisors and admins only")
+    if branch_id:
+        branches = [b for b in branches if b["id"] == branch_id]
+        if not branches:
+            raise HTTPException(404, "Branch not found among your branches")
     q = {**tenant_filter(user), "date": day, "kind": {"$in": ["in", "out"]}}
-    if not can_role(user, "hr", "auditor"):
+    if branch_id:
+        q["branch_id"] = branch_id
+    elif not can_role(user, "hr", "auditor"):
         q["branch_id"] = {"$in": [b["id"] for b in branches]}
     if employee_id:
         q["employee_id"] = employee_id
@@ -442,19 +449,21 @@ async def _team_data(user: dict, day: str, employee_id: Optional[str]) -> dict:
 
 @router.get("/punch/team")
 async def team_punches(date: Optional[str] = None, employee_id: Optional[str] = None,
+                       branch_id: Optional[str] = None,
                        user: dict = Depends(get_current_user)):
     day = date or now_utc().strftime("%Y-%m-%d")
-    return await _team_data(user, day, employee_id)
+    return await _team_data(user, day, employee_id, branch_id)
 
 
 @router.get("/punch/team.csv")
 async def team_punches_csv(date: Optional[str] = None, employee_id: Optional[str] = None,
+                           branch_id: Optional[str] = None,
                            user: dict = Depends(get_current_user)):
     import csv as _csv
     import io as _io
     from fastapi.responses import StreamingResponse
     day = date or now_utc().strftime("%Y-%m-%d")
-    data = await _team_data(user, day, employee_id)
+    data = await _team_data(user, day, employee_id, branch_id)
     buf = _io.StringIO()
     w = _csv.writer(buf)
     w.writerow(["employee", "kind", "clocked_at", "branch", "lat", "lng",

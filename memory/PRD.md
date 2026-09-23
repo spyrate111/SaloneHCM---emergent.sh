@@ -696,3 +696,9 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - Nav was already role-gated from iter41/iter44 — unchanged.
 - **Tests**: tests/test_iter45_role_dashboards.py (7) — payload shapes per role, hr-has-no-money, manager/employee 403 + mobile/summary fallback, overview 403 for hr/employee/auditor. Full suite **571 passed, 7 skipped**. All 7 role dashboards verified via screenshots (test accounts).
 - NOTE: production needs REDEPLOY.
+
+## v1.45 (Sep 2026) — Punch map branch filter (iter46)
+- Backend: GET /mobile/punch/team(+.csv) accept optional `branch_id`; validated against caller's visible branches (managers → supervised only, 404 on foreign; hr/admin/superadmin/auditor → any). Response `branches` narrows to the selected branch so the map recenters; stats/CSV respect the filter.
+- Frontend (Attendance.jsx): branch dropdown (`attendance-map-branch-filter`) shown when >1 visible branch; server-side refetch on change (employee filter resets); CSV export carries branch_id. Full branch options cached from the unfiltered load.
+- Tests: tests/test_iter46_branch_filter.py (6 — manager multi-branch scoping, single-branch filter, foreign-branch 404, hr all+filter, superadmin filter, CSV). 16 passed incl. mobile regression. UI verified via screenshot (HR account, map recentered on HQ-FT).
+- NOTE: production needs REDEPLOY.

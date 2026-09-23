@@ -14,6 +14,8 @@ export default function Attendance() {
   const [team, setTeam] = useState(null); // null = no map access (employees)
   const [mapDate, setMapDate] = useState(new Date().toISOString().split("T")[0]);
   const [mapEmp, setMapEmp] = useState("");
+  const [mapBranch, setMapBranch] = useState("");
+  const [allBranches, setAllBranches] = useState([]);
 
   const load = useCallback(() => api.get("/attendance").then((r) => setList(r.data)), []);
   useEffect(() => {
@@ -22,10 +24,15 @@ export default function Attendance() {
   }, [user, load]);
 
   useEffect(() => {
-    api.get("/mobile/punch/team", { params: { date: mapDate } })
-      .then((r) => setTeam(r.data))
+    const params = { date: mapDate };
+    if (mapBranch) params.branch_id = mapBranch;
+    api.get("/mobile/punch/team", { params })
+      .then((r) => {
+        setTeam(r.data);
+        if (!mapBranch) setAllBranches(r.data.branches || []);
+      })
       .catch(() => setTeam(null));
-  }, [mapDate]);
+  }, [mapDate, mapBranch]);
 
   const mapPunches = useMemo(
     () => (team?.punches || []).filter((p) => !mapEmp || p.employee_id === mapEmp),
@@ -71,6 +78,17 @@ export default function Attendance() {
               <div className="w-40" data-testid="attendance-map-date">
                 <DatePicker value={mapDate} onChange={setMapDate} />
               </div>
+              {allBranches.length > 1 && (
+                <select value={mapBranch}
+                  onChange={(e) => { setMapBranch(e.target.value); setMapEmp(""); }}
+                  className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm max-w-[200px]"
+                  data-testid="attendance-map-branch-filter">
+                  <option value="">All branches</option>
+                  {allBranches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.code ? `${b.code} · ` : ""}{b.name}</option>
+                  ))}
+                </select>
+              )}
               <select value={mapEmp} onChange={(e) => setMapEmp(e.target.value)}
                 className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm max-w-[200px]"
                 data-testid="attendance-map-emp-filter">
@@ -78,7 +96,7 @@ export default function Attendance() {
                 {empOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
               </select>
               <button
-                onClick={() => downloadBlob(`/mobile/punch/team.csv?date=${mapDate}${mapEmp ? `&employee_id=${mapEmp}` : ""}`, `punch-map-${mapDate}.csv`)}
+                onClick={() => downloadBlob(`/mobile/punch/team.csv?date=${mapDate}${mapEmp ? `&employee_id=${mapEmp}` : ""}${mapBranch ? `&branch_id=${mapBranch}` : ""}`, `punch-map-${mapDate}.csv`)}
                 className="inline-flex items-center gap-1.5 text-sm border border-[#E2DFD6] px-3 py-2 rounded-md hover:bg-[#F7F6F2]"
                 data-testid="attendance-map-export">
                 <Download className="w-4 h-4" /> CSV
