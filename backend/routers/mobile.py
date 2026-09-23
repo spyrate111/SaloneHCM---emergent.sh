@@ -65,13 +65,6 @@ async def mobile_summary(user: dict = Depends(get_current_user)):
             "created_at", -1).to_list(10)
         # crude leave balance: annual entitlement 21d/y minus approved this year
         year = now_utc().year
-        used = sum(
-            lv.get("days", 0)
-            for lv in my_leave
-            if lv.get("status") == "approved"
-            and lv.get("leave_type") in ("annual", "sick") is False
-            and (lv.get("start_date") or "").startswith(str(year))
-        )
         approved_annual = sum(
             lv.get("days", 0)
             for lv in my_leave

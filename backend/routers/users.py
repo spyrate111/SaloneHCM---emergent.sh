@@ -226,6 +226,19 @@ async def list_roles(user: dict = Depends(require_admin)):
     return [{"role": r, "description": d} for r, d in ROLE_DESCRIPTIONS.items()]
 
 
+@router.post("/test-accounts/seed")
+async def seed_test_accounts_endpoint(user: dict = Depends(require_superadmin)):
+    """Create/refresh the 70 standard test accounts (10 per role) in THIS
+    environment's database. Superadmin only, idempotent, audited."""
+    from seed_test_accounts import seed_accounts
+    res = await seed_accounts()
+    if not res.get("ok"):
+        raise HTTPException(409, res.get("error", "Seeding failed"))
+    await audit("test_accounts_seeded", "users/test-accounts", user,
+                {"created": res["created"], "updated": res["updated"]})
+    return res
+
+
 @router.delete("/test-accounts")
 async def wipe_test_accounts(user: dict = Depends(require_superadmin)):
     """Permanently delete all seeded test accounts (flagged test_account=true

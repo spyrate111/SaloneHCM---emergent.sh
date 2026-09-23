@@ -683,3 +683,9 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - FIXED deploy blocker: /app/.gitignore had 8 malformed "-e " shell-artifact lines + duplicated credential blocks (could break deploy pipeline git ops). Rewritten clean; deployment_agent re-check = PASS.
 - No hardcoded localhost in frontend; backend localhost values are env-first fallbacks only.
 - User must REDEPLOY to ship latest commit (7a29e02) to production.
+
+## v1.43.2 (Sep 2026) — One-click test-account seeding (for production)
+- seed_test_accounts.py refactored → async `seed_accounts(company_id=None)` (defaults Demo Salone Ltd., falls back to any company; bcrypt via asyncio.to_thread). CLI still works.
+- New POST /users/test-accounts/seed (require_superadmin, audited `test_accounts_seeded`, registered before /{uid} routes). Settings "Test accounts" danger-zone card now has BOTH "Seed test accounts" (green) + "Wipe test accounts" (red) buttons.
+- Verified: curl seed as superadmin1 → {created:0, updated:70}; auditor → 403; iter44+iter41 suites 31 passed; buttons render in Settings.
+- PRODUCTION FLOW: agent cannot reach prod DB. User must REDEPLOY, log into salonehcm.com as their production superadmin (admin@salonehcm.sl + 2FA), open Settings → "Seed test accounts" → the 70 accounts get created in the PRODUCTION database.

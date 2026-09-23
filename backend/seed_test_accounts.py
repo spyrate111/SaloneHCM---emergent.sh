@@ -1,5 +1,6 @@
-"""One-off idempotent seeder: 70 test accounts (10 per role) on Demo Salone Ltd.
-Run: cd /app/backend && python seed_test_accounts.py
+"""Test-account seeding: 70 accounts (10 per role) — callable from CLI or the
+superadmin API endpoint. Idempotent; re-running resets passwords/roles.
+CLI: cd /app/backend && python seed_test_accounts.py
 """
 import asyncio
 import uuid
@@ -20,21 +21,27 @@ ROLES = [
 ]
 
 
-async def main():
-    company = await db.companies.find_one({"name": "Demo Salone Ltd."}, {"_id": 0, "id": 1})
-    assert company, "Demo Salone Ltd. tenant not found"
-    cid = company["id"]
+async def seed_accounts(company_id: str | None = None) -> dict:
+    """Create/refresh all 70 test accounts on the given tenant (defaults to
+    Demo Salone Ltd., falling back to any company)."""
+    if not company_id:
+        company = (await db.companies.find_one({"name": "Demo Salone Ltd."}, {"_id": 0, "id": 1})
+                   or await db.companies.find_one({}, {"_id": 0, "id": 1}))
+        if not company:
+            return {"ok": False, "error": "No company/tenant exists to attach accounts to"}
+        company_id = company["id"]
     created = updated = 0
     for prefix, role, pw_prefix, label in ROLES:
         for n in range(1, 11):
             email = f"{prefix}{n}@salonehcm.com"
+            pw_hash = await asyncio.to_thread(hash_password, f"{pw_prefix}{n}")
             doc = {
                 "email": email,
                 "name": f"{label} {n}",
                 "role": role,
-                "company_id": cid,
+                "company_id": company_id,
                 "employee_id": None,
-                "password_hash": hash_password(f"{pw_prefix}{n}"),
+                "password_hash": pw_hash,
                 "test_account": True,
                 "created_by": "seed_test_accounts",
             }
@@ -48,8 +55,8 @@ async def main():
                 await db.users.insert_one({"id": str(uuid.uuid4()),
                                            "created_at": iso(now_utc()), **doc})
                 created += 1
-    print(f"done — created={created} updated={updated} tenant={cid}")
+    return {"ok": True, "created": created, "updated": updated, "company_id": company_id}
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    print(asyncio.run(seed_accounts()))
