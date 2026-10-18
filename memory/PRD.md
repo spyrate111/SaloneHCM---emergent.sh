@@ -711,3 +711,8 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - **Tests**: tests/test_iter47_rbac_matrix.py — 21-test role matrix (employee own-scope incl. forced-self time entry + payslip IDOR 403; auditor 10-write denial sweep + own-account writes + read regression; manager scope + no-payroll; payroll no-HR/leave/admin; HR no payroll processing + can manage employees; admin no tenant mgmt; superadmin tenant mgmt). FULL SUITE **598 passed, 7 skipped, 0 failures**. UI verified: auditor buttons gone, employee payslip KPI shows real money.
 - Digest-prefs PUT remains admin-only by design (auditor 403 correct).
 - NOTE: production needs REDEPLOY.
+
+## v1.46.1 (Oct 2026) — Access Denied page
+- New components/AccessDenied.jsx: friendly 403 screen (shield icon, role-aware copy, "Go to my dashboard" + "Go back" buttons; testids access-denied-page/home-btn/back-btn). ProtectedRoute now renders it instead of silently redirecting on role mismatch (unauthenticated users still redirect to /login).
+- Verified: employee1 visiting /payroll sees the screen; home button returns to their role dashboard.
+- NOTE: production needs REDEPLOY.

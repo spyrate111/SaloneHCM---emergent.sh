@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import AccessDenied from "./AccessDenied";
 
 export default function ProtectedRoute({ children, adminOnly = false, superAdminOnly = false, roles = null }) {
   const { user, loading } = useAuth();
@@ -11,8 +12,8 @@ export default function ProtectedRoute({ children, adminOnly = false, superAdmin
     );
   }
   if (!user) return <Navigate to="/login" replace />;
-  if (superAdminOnly && user.role !== "superadmin") return <Navigate to="/dashboard" replace />;
-  if (adminOnly && !["admin", "superadmin"].includes(user.role)) return <Navigate to="/dashboard" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+  if (superAdminOnly && user.role !== "superadmin") return <AccessDenied />;
+  if (adminOnly && !["admin", "superadmin"].includes(user.role)) return <AccessDenied />;
+  if (roles && !roles.includes(user.role)) return <AccessDenied />;
   return children;
 }
