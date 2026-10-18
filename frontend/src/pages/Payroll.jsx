@@ -153,6 +153,7 @@ export default function Payroll() {
 
         {step === 2 && preview && (
           <div className="space-y-5">
+            <ClaimsSummaryCard />
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[
                 ["Employees", preview.totals.employee_count],
@@ -303,3 +304,27 @@ export default function Payroll() {
     </div>
   );
 }
+
+function ClaimsSummaryCard() {
+  const [sum, setSum] = useState(null);
+  useEffect(() => {
+    api.get("/expenses/pending-reimbursements").then((r) => setSum(r.data)).catch(() => {});
+  }, []);
+  if (!sum || sum.count === 0) return null;
+  return (
+    <div className="bg-[#E5EEF6] border border-[#26547C]/30 rounded-md p-4" data-testid="payroll-claims-summary">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-sm text-[#26547C]">
+          <b>{sum.count}</b> approved expense claim{sum.count === 1 ? "" : "s"} totalling{" "}
+          <b className="font-data" data-testid="payroll-claims-total">{fmtSLE(sum.total)}</b> will be
+          added as reimbursements on this run.
+        </div>
+        <div className="text-xs text-[#26547C]/80">
+          {sum.by_employee.slice(0, 3).map((b) => `${b.employee_name} (${fmtSLE(b.total)})`).join(" · ")}
+          {sum.by_employee.length > 3 ? ` +${sum.by_employee.length - 3} more` : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+

@@ -97,6 +97,7 @@ def _run_totals(slips: list) -> dict:
         "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
         "paye": round(sum(s["paye"] for s in slips), 2),
         "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
+        "reimbursements": round(sum(s.get("reimbursement", 0) for s in slips), 2),
         "net": round(sum(s["net"] for s in slips), 2),
     }
 
@@ -127,6 +128,23 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
 
     slips, applied_loan_rows = await _compute_slips(emps, user["company_id"], period)
 
+    # Approved, un-reimbursed expense claims become a reimbursement line.
+    claims = await db.expense_claims.find(
+        {"company_id": user["company_id"], "status": "approved", "payroll_run_id": None},
+        {"_id": 0, "id": 1, "employee_id": 1, "amount_sle": 1}).to_list(2000)
+    reimb_by_emp: dict = {}
+    for c in claims:
+        reimb_by_emp[c["employee_id"]] = round(
+            reimb_by_emp.get(c["employee_id"], 0) + c["amount_sle"], 2)
+    slip_eids = set()
+    for s in slips:
+        amt = reimb_by_emp.get(s["employee_id"], 0)
+        if amt:
+            s["reimbursement"] = amt
+            s["net"] = round(s["net"] + amt, 2)
+        slip_eids.add(s["employee_id"])
+    applied_claim_ids = [c["id"] for c in claims if c["employee_id"] in slip_eids]
+
     rid = str(uuid.uuid4())
     doc = {
         "id": rid,
@@ -141,6 +159,11 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         "created_at": iso(now_utc()),
     }
     await db.payroll_runs.insert_one(doc)
+    if applied_claim_ids:
+        await db.expense_claims.update_many(
+            {"id": {"$in": applied_claim_ids}},
+            {"$set": {"status": "reimbursed", "payroll_run_id": rid,
+                      "reimbursed_period": period}})
     # Persist loan deductions against each affected loan, idempotent by (loan_id, period).
     if applied_loan_rows:
         from loans_engine import apply_loan_deductions_for_run
@@ -175,8 +198,12 @@ def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd."
         ["Gross", f"{slip['gross']:,.2f}"],
         ["NASSIT (employee 5%)", f"-{slip['nassit_employee']:,.2f}"],
         ["PAYE (NRA)", f"-{slip['paye']:,.2f}"],
-        ["Net pay", f"{slip['net']:,.2f}"],
     ]
+    if slip.get("loan_deduction"):
+        rows.append(["Loan repayment", f"-{slip['loan_deduction']:,.2f}"])
+    if slip.get("reimbursement"):
+        rows.append(["Expense reimbursement", f"+{slip['reimbursement']:,.2f}"])
+    rows.append(["Net pay", f"{slip['net']:,.2f}"])
     t = Table(rows, colWidths=[300, 200])
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A4A1E")),

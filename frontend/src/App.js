@@ -40,6 +40,9 @@ import Promotion from "./pages/Promotion";
 import Vouchers from "./pages/Vouchers";
 import FeatureDirectory from "./pages/FeatureDirectory";
 import ScanLogs from "./pages/ScanLogs";
+import Expenses from "./pages/Expenses";
+import Recruitment from "./pages/Recruitment";
+import Apply from "./pages/Apply";
 import TrainingCenterPage from "./marketing/TrainingCenterPage";
 import LandingPage from "./marketing/LandingPage";
 import PricingPage from "./marketing/PricingPage";
@@ -78,6 +81,7 @@ export default function App() {
           <Route path="/transparency/:slug" element={<Transparency />} />
           <Route path="/careers/:slug" element={<PublicCareers />} />
           <Route path="/verify/:cid" element={<Verify />} />
+          <Route path="/apply/:token" element={<Apply />} />
           <Route path="/verify-payslip/:vid" element={<VerifyPayslip />} />
           <Route path="/onboard/:token" element={<Onboard />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -91,6 +95,8 @@ export default function App() {
             <Route path="/simulator" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Simulator /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute roles={["admin", "superadmin", "payroll", "auditor"]}><Compliance /></ProtectedRoute>} />
             <Route path="/leave" element={<Leave />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/recruitment" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Recruitment /></ProtectedRoute>} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/benefits" element={<Benefits />} />
             <Route path="/talent" element={<Talent />} />

@@ -3,6 +3,7 @@ import {
   Sparkles, Settings, UserCircle, ScrollText, Heart, GraduationCap,
   BarChart3, FlaskConical, FolderArchive, Building2, UserCog, MessageSquare,
   Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video, FileCheck2, Compass,
+  Receipt, Briefcase,
 } from "lucide-react";
 
 // Role groups — keep in sync with backend core.can_role / require_roles.
@@ -20,12 +21,14 @@ export const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: [...ALL, ...AUD] },
   { to: "/directory", label: "Feature Directory", icon: Compass, roles: ALL },
   { to: "/employees", label: "Employees", icon: Users, roles: STAFF, feature: "employees" },
+  { to: "/recruitment", label: "Recruitment", icon: Briefcase, roles: ["admin", "superadmin", "hr"] },
   { to: "/payroll", label: "Payroll Engine", icon: Calculator, roles: PAY, feature: "payroll" },
   { to: "/schedules", label: "Recurring Schedules", icon: Repeat, roles: PAY, feature: "payroll" },
   { to: "/vouchers", label: "Payroll Vouchers", icon: FileCheck2, roles: ALL, feature: "payroll_vouchers" },
   { to: "/simulator", label: "What-if Simulator", icon: FlaskConical, roles: PAY, feature: "simulator" },
   { to: "/compliance", label: "Compliance & Tax", icon: ShieldCheck, roles: [...PAY, ...AUD], feature: "compliance" },
   { to: "/leave", label: "Leave", icon: CalendarDays, roles: [...ALL, ...AUD], feature: "leave" },
+  { to: "/expenses", label: "Expenses", icon: Receipt, roles: [...ALL, ...AUD] },
   { to: "/attendance", label: "Time & Attendance", icon: Clock, roles: [...ALL, ...AUD], feature: "attendance" },
   { to: "/benefits", label: "Benefits", icon: Heart, roles: ALL, feature: "benefits" },
   { to: "/talent", label: "Talent", icon: GraduationCap, roles: ALL, feature: "talent" },
