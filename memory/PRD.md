@@ -702,3 +702,12 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - Frontend (Attendance.jsx): branch dropdown (`attendance-map-branch-filter`) shown when >1 visible branch; server-side refetch on change (employee filter resets); CSV export carries branch_id. Full branch options cached from the unfiltered load.
 - Tests: tests/test_iter46_branch_filter.py (6 — manager multi-branch scoping, single-branch filter, foreign-branch 404, hr all+filter, superadmin filter, CSV). 16 passed incl. mobile regression. UI verified via screenshot (HR account, map recentered on HQ-FT).
 - NOTE: production needs REDEPLOY.
+
+## v1.46 (Oct 2026) — Strict RBAC enforcement app-wide (iter47)
+- **Global auditor read-only guard** in core.get_current_user: any non-GET request by role=auditor → 403, whitelist `/auth/logout`, `/auth/2fa`, `/users/me/` (own session/security/prefs). One choke point — covers every router.
+- **Leaks closed**: GET /employees was returning ALL records (incl. salaries) to any role → now hr/payroll/admin/auditor = all; manager = self + direct reports; employee = own record only (GET /employees/{eid} same policy, 403 otherwise). /analytics/* (payroll-trend, leave-usage, top-earners, audit-activity) → require_roles("hr","payroll"). /compliance/summary (PAYE/NASSIT totals) → require_roles("payroll","auditor"). payslip_pdf IDOR was already safe (payroll or own eid).
+- **Own payslips for ALL roles**: /payroll/my-payslip(s) is own-only via user.employee_id and works for every role. seed_test_accounts now links employee1..10 + manager1..10 to real Demo employees (round-robin over active pool) → their payslips/leave/clock flows work. Auditors/admins/superadmins stay unlinked by design.
+- **Frontend**: Leave.jsx "New request" + Attendance.jsx "Log time" form hidden for auditor (list widens to full width). Compliance write buttons already hidden (v1.43).
+- **Tests**: tests/test_iter47_rbac_matrix.py — 21-test role matrix (employee own-scope incl. forced-self time entry + payslip IDOR 403; auditor 10-write denial sweep + own-account writes + read regression; manager scope + no-payroll; payroll no-HR/leave/admin; HR no payroll processing + can manage employees; admin no tenant mgmt; superadmin tenant mgmt). FULL SUITE **598 passed, 7 skipped, 0 failures**. UI verified: auditor buttons gone, employee payslip KPI shows real money.
+- Digest-prefs PUT remains admin-only by design (auditor 403 correct).
+- NOTE: production needs REDEPLOY.

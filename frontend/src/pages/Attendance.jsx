@@ -143,6 +143,7 @@ export default function Attendance() {
       {team && <OozSnoozePanel />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {user?.role !== "auditor" && (
         <form onSubmit={submit} className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4 lg:col-span-1" data-testid="attendance-form">
           <h3 className="font-heading text-lg font-semibold flex items-center gap-2"><Clock className="w-4 h-4" /> Log time</h3>
           {user?.role === "admin" && (
@@ -176,8 +177,9 @@ export default function Attendance() {
             <Plus className="w-4 h-4" /> Submit entry
           </button>
         </form>
+        )}
 
-        <div className="lg:col-span-2 bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
+        <div className={`bg-white border border-[#E2DFD6] rounded-lg overflow-hidden ${user?.role === "auditor" ? "lg:col-span-3" : "lg:col-span-2"}`}>
           <div className="px-6 py-4 border-b border-[#E2DFD6]"><h3 className="font-heading text-lg font-semibold">Recent entries</h3></div>
           <table className="w-full text-sm">
             <thead className="bg-[#F7F6F2]">

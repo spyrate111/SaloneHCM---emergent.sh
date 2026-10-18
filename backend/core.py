@@ -78,7 +78,14 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(401, "User not found")
     if not user.get("company_id"):
         raise HTTPException(401, "User has no company assigned")
+    if (user.get("role") == "auditor" and request.method not in ("GET", "HEAD", "OPTIONS")
+            and not any(s in request.url.path for s in _AUDITOR_WRITE_ALLOW)):
+        raise HTTPException(403, "Auditors have read-only access")
     return user
+
+
+# Writes auditors may still perform: their own session & account security.
+_AUDITOR_WRITE_ALLOW = ("/auth/logout", "/auth/2fa", "/users/me/")
 
 
 # ---- CSRF (double-submit cookie) ----

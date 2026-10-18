@@ -91,9 +91,11 @@ export default function Leave() {
           <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">Leave management</h1>
           <p className="text-[#525860] text-sm mt-1">Employment Act 2023 entitlements — annual, sick, maternity, paternity.</p>
         </div>
-        <button data-testid="leave-new-button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm font-medium px-4 py-2.5 rounded-md">
-          <Plus className="w-4 h-4" /> New request
-        </button>
+        {user?.role !== "auditor" && (
+          <button data-testid="leave-new-button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm font-medium px-4 py-2.5 rounded-md">
+            <Plus className="w-4 h-4" /> New request
+          </button>
+        )}
       </div>
 
       {statusFilter && (

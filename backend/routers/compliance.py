@@ -49,7 +49,7 @@ def _build_nra_csv(run: dict, employees: list, company: dict) -> bytes:
 
 
 @router.get("/summary")
-async def compliance_summary(user: dict = Depends(get_current_user)):
+async def compliance_summary(user: dict = Depends(require_roles("payroll", "auditor"))):
     tf = tenant_filter(user)
     runs = await db.payroll_runs.find(tf, {"_id": 0}).sort("created_at", -1).to_list(50)
     total_paye = sum(r["totals"]["paye"] for r in runs)

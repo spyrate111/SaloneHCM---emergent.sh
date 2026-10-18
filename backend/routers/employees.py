@@ -1,7 +1,7 @@
 """Employee CRUD endpoints."""
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
-from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant
+from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
 from models import EmployeeIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
@@ -12,7 +12,19 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 
 @router.get("")
 async def list_employees(user: dict = Depends(get_current_user)):
-    return await db.employees.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(2000)
+    """HR/payroll/admin/auditor: full register. Manager: self + direct reports.
+    Employee: own record only."""
+    tf = tenant_filter(user)
+    if can_role(user, "hr", "payroll", "auditor"):
+        return await db.employees.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    my_eid = user.get("employee_id")
+    if not my_eid:
+        return []
+    if user.get("role") == "manager":
+        return await db.employees.find(
+            {**tf, "$or": [{"id": my_eid}, {"manager_id": my_eid}]},
+            {"_id": 0}).sort("created_at", -1).to_list(2000)
+    return await db.employees.find({**tf, "id": my_eid}, {"_id": 0}).to_list(1)
 
 
 @router.post("")
@@ -31,6 +43,12 @@ async def get_employee(eid: str, user: dict = Depends(get_current_user)):
     e = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
     if not e:
         raise HTTPException(404, "Not found")
+    if not can_role(user, "hr", "payroll", "auditor"):
+        my_eid = user.get("employee_id")
+        is_own = eid == my_eid
+        is_report = user.get("role") == "manager" and e.get("manager_id") == my_eid
+        if not (is_own or is_report):
+            raise HTTPException(403, "You may only view your own record")
     return e
 
 

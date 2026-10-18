@@ -23,24 +23,31 @@ ROLES = [
 
 async def seed_accounts(company_id: str | None = None) -> dict:
     """Create/refresh all 70 test accounts on the given tenant (defaults to
-    Demo Salone Ltd., falling back to any company)."""
+    Demo Salone Ltd., falling back to any company). employee1..10 and
+    manager1..10 get linked to real employee records so own-payslip and
+    self-service flows work."""
     if not company_id:
         company = (await db.companies.find_one({"name": "Demo Salone Ltd."}, {"_id": 0, "id": 1})
                    or await db.companies.find_one({}, {"_id": 0, "id": 1}))
         if not company:
             return {"ok": False, "error": "No company/tenant exists to attach accounts to"}
         company_id = company["id"]
+    emp_pool = [e["id"] for e in await db.employees.find(
+        {"company_id": company_id, "status": "active"}, {"_id": 0, "id": 1}).to_list(50)]
     created = updated = 0
     for prefix, role, pw_prefix, label in ROLES:
         for n in range(1, 11):
             email = f"{prefix}{n}@salonehcm.com"
             pw_hash = await asyncio.to_thread(hash_password, f"{pw_prefix}{n}")
+            employee_id = None
+            if prefix in ("employee", "manager") and emp_pool:
+                employee_id = emp_pool[(n - 1) % len(emp_pool)]
             doc = {
                 "email": email,
                 "name": f"{label} {n}",
                 "role": role,
                 "company_id": company_id,
-                "employee_id": None,
+                "employee_id": employee_id,
                 "password_hash": pw_hash,
                 "test_account": True,
                 "created_by": "seed_test_accounts",
