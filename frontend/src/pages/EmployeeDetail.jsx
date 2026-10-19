@@ -4,6 +4,7 @@ import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
 import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
+import OffboardingPanel from "../components/OffboardingPanel";
 
 export default function EmployeeDetail() {
   const { id } = useParams();
@@ -223,6 +224,8 @@ export default function EmployeeDetail() {
           )}
         </div>
       </div>
+
+      <OffboardingPanel employee={e} onChanged={load} />
     </div>
   );
 }

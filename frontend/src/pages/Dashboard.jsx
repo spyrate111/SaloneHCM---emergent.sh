@@ -5,6 +5,7 @@ import RoleTour from "../components/RoleTourCard";
 import { useFeatures } from "../lib/features";
 import ComplianceScoreWidget from "../components/ComplianceScoreWidget";
 import DigestPreviewCard from "../components/DigestPreviewCard";
+import AnnouncementsCard from "../components/AnnouncementsCard";
 import {
   Kpi, HrDashboard, PayrollDashboard, ManagerDashboard,
   EmployeeDashboard, AuditorDashboard, TenantOpsCard,
@@ -22,12 +23,19 @@ const BAR_RADIUS = [0, 4, 4, 0];
 export default function Dashboard() {
   const { user } = useAuth();
   const role = user?.role;
-  if (role === "hr") return <HrDashboard user={user} />;
-  if (role === "payroll") return <PayrollDashboard user={user} />;
-  if (role === "manager") return <ManagerDashboard user={user} />;
-  if (role === "employee") return <EmployeeDashboard user={user} />;
-  if (role === "auditor") return <AuditorDashboard user={user} />;
-  return <AdminDashboard user={user} superadmin={role === "superadmin"} />;
+  let inner;
+  if (role === "hr") inner = <HrDashboard user={user} />;
+  else if (role === "payroll") inner = <PayrollDashboard user={user} />;
+  else if (role === "manager") inner = <ManagerDashboard user={user} />;
+  else if (role === "employee") inner = <EmployeeDashboard user={user} />;
+  else if (role === "auditor") inner = <AuditorDashboard user={user} />;
+  else inner = <AdminDashboard user={user} superadmin={role === "superadmin"} />;
+  return (
+    <div className="space-y-6">
+      <AnnouncementsCard />
+      {inner}
+    </div>
+  );
 }
 
 function AdminDashboard({ user, superadmin }) {

@@ -76,6 +76,8 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(401, "User not found")
+    if user.get("disabled"):
+        raise HTTPException(401, "Account deactivated")
     if not user.get("company_id"):
         raise HTTPException(401, "User has no company assigned")
     if (user.get("role") == "auditor" and request.method not in ("GET", "HEAD", "OPTIONS")
@@ -118,6 +120,8 @@ async def csrf_protect(request: Request) -> None:
     if request.method in _SAFE_METHODS:
         return
     if request.url.path.endswith(_CSRF_EXEMPT_SUFFIXES):
+        return
+    if "/api/careers/" in request.url.path:  # public, unauthenticated apply flow
         return
     if request.headers.get("Authorization", "").startswith("Bearer "):
         return

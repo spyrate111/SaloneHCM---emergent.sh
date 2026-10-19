@@ -20,7 +20,7 @@ from routers import (
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
-    expenses, recruitment,
+    expenses, recruitment, announcements, offboarding,
     vouchers, training, mobile, webauthn, onboarding, training_progress,
 )
 
@@ -88,6 +88,8 @@ api.include_router(payroll_variance.router)
 api.include_router(expenses.router)
 api.include_router(recruitment.router)
 api.include_router(recruitment.public_router)
+api.include_router(announcements.router)
+api.include_router(offboarding.router)
 api.include_router(payroll_rails.retro_router, prefix="/civil-service")
 api.include_router(payroll_rails.signatures_router, prefix="/civil-service")
 api.include_router(payroll_rails.cutoff_router, prefix="/payroll")

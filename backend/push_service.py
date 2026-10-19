@@ -83,6 +83,29 @@ async def fanout_to_user(user_id: str, payload: dict) -> dict:
     return {"sent": sent, "failed": failed}
 
 
+async def fanout_to_company(company_id: str, payload: dict) -> dict:
+    """Dispatch a push to every subscription in a company (e.g. announcements)."""
+    if not is_configured():
+        return {"sent": 0, "failed": 0, "skipped": "vapid_not_configured"}
+    subs = await db.push_subscriptions.find({"company_id": company_id}, {"_id": 0}).to_list(2000)
+    if not subs:
+        return {"sent": 0, "failed": 0, "skipped": "no_subscriptions"}
+    results = await asyncio.gather(*[_send_one(s, payload) for s in subs])
+    sent = sum(1 for r in results if r.get("ok"))
+    failed = len(results) - sent
+    try:
+        await db.push_logs.insert_one({
+            "company_id": company_id,
+            "payload": payload,
+            "sent": sent,
+            "failed": failed,
+            "ts": iso(now_utc()),
+        })
+    except Exception:
+        pass
+    return {"sent": sent, "failed": failed}
+
+
 async def fanout_to_employee(employee_id: str, payload: dict) -> dict:
     """Translate employee_id → user_id then fanout."""
     user = await db.users.find_one({"employee_id": employee_id}, {"_id": 0, "id": 1})

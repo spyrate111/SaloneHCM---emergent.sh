@@ -48,6 +48,8 @@ async def login(request: Request, body: LoginIn, response: Response):
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password")
+    if user.get("disabled"):
+        raise HTTPException(401, "Account deactivated")
     if not user.get("company_id"):
         raise HTTPException(401, "User has no company assigned — contact your admin")
 

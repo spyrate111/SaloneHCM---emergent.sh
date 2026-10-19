@@ -6,6 +6,7 @@ import { filterNavForUser } from "../lib/nav";
 import AppSidebar from "./AppSidebar";
 import AppHeader from "./AppHeader";
 import CutoffBanner from "./CutoffBanner";
+import UrgentAnnouncementBanner from "./UrgentAnnouncementBanner";
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -45,6 +46,7 @@ export default function Layout() {
           isSuperAdmin={isSuperAdmin}
           onOpenSidebar={() => setMobileOpen(true)}
         />
+        <UrgentAnnouncementBanner />
         <CutoffBanner />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto animate-fade-up">
           <Outlet />

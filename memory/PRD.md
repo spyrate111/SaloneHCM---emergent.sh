@@ -716,3 +716,17 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - New components/AccessDenied.jsx: friendly 403 screen (shield icon, role-aware copy, "Go to my dashboard" + "Go back" buttons; testids access-denied-page/home-btn/back-btn). ProtectedRoute now renders it instead of silently redirecting on role mismatch (unauthenticated users still redirect to /login).
 - Verified: employee1 visiting /payroll sees the screen; home button returns to their role dashboard.
 - NOTE: production needs REDEPLOY.
+
+## v1.47 (Oct 2026) — Expense Claims + Recruitment/ATS (iter48)
+### Expense Claims (routers/expenses.py, collection expense_claims)
+- POST /expenses (multipart: description, amount_sle, category∈transport/meals/accommodation/supplies/other, optional receipt JPG/PNG/PDF ≤5MB → object storage). Requires linked employee record.
+- GET /expenses scoped (hr/admin/auditor all · manager own+reports · employee own); GET /{cid}/receipt same scope (+payroll); PUT /{cid}/decision (manager-of/hr/admin, no self-approval, pending-only, audited); GET /pending-reimbursements (payroll) → {total,count,by_employee}.
+- Payroll integration (payroll_engine.run_payroll): approved unreimbursed claims → slip["reimbursement"] (+net), totals["reimbursements"]; claims marked status=reimbursed + payroll_run_id post-insert; payslip PDF adds "Expense reimbursement" (+ loan repayment) rows.
+- Frontend Expenses.jsx (/expenses, nav ALL+auditor): claim form, My claims, Team claims w/ approve/reject (hidden for auditor), receipt view. Payroll.jsx step-2 ClaimsSummaryCard (payroll-claims-summary) from /expenses/pending-reimbursements.
+### Recruitment/ATS (routers/recruitment.py, collections job_vacancies, job_applications)
+- HR-only: POST/GET/PUT vacancies (public_token, open/closed), GET /vacancies/{vid}/applications, PATCH /applications/{aid}/stage (applied/shortlisted/interview/offer/hired/rejected → prompt_create_employee on hired), POST /applications/{aid}/create-employee (name split, 409 if repeated, cutoff-lock respected), GET CV download.
+- PUBLIC (no auth): GET /api/careers/{token}; POST /api/careers/{token}/apply (CV PDF/DOC/DOCX ≤5MB, dup-email 409, closed/past-closing 410). CSRF middleware exempts /api/careers/* (fix after testing agent found cookie-bearing browsers got 403).
+- Frontend: Recruitment.jsx (/recruitment, hr/admin nav+route), copy public link, stage dropdowns, HireModal (pre-filled); Apply.jsx public route /apply/:token (bare axios).
+### Testing
+- tests/test_iter48_expenses_recruitment.py (8 pytest, incl. full payroll reimbursement run on period 2030-12 w/ cleanup). FULL SUITE **606 passed, 7 skipped**. Testing agent iteration_38.json: all 8 frontend flows PASS (employee submit, HR approve, auditor read-only, payroll summary card, vacancy post, public apply logged-out, hire→employee, employee access-denied). CSRF issue fixed + verified.
+- NOTE: production needs REDEPLOY.

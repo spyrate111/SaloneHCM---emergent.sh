@@ -42,6 +42,7 @@ import FeatureDirectory from "./pages/FeatureDirectory";
 import ScanLogs from "./pages/ScanLogs";
 import Expenses from "./pages/Expenses";
 import Recruitment from "./pages/Recruitment";
+import Announcements from "./pages/Announcements";
 import Apply from "./pages/Apply";
 import TrainingCenterPage from "./marketing/TrainingCenterPage";
 import LandingPage from "./marketing/LandingPage";
@@ -97,6 +98,7 @@ export default function App() {
             <Route path="/leave" element={<Leave />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/recruitment" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Recruitment /></ProtectedRoute>} />
+            <Route path="/announcements" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Announcements /></ProtectedRoute>} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/benefits" element={<Benefits />} />
             <Route path="/talent" element={<Talent />} />
