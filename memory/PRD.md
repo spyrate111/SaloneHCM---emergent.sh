@@ -730,3 +730,20 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 ### Testing
 - tests/test_iter48_expenses_recruitment.py (8 pytest, incl. full payroll reimbursement run on period 2030-12 w/ cleanup). FULL SUITE **606 passed, 7 skipped**. Testing agent iteration_38.json: all 8 frontend flows PASS (employee submit, HR approve, auditor read-only, payroll summary card, vacancy post, public apply logged-out, hire→employee, employee access-denied). CSRF issue fixed + verified.
 - NOTE: production needs REDEPLOY.
+
+## v1.48 (Oct 2026) — Announcements/Notice Board + Offboarding (iter49)
+### Announcements (routers/announcements.py, collection announcements)
+- POST /announcements (hr/admin/superadmin): title, body, priority∈normal/urgent, optional expires_at YYYY-MM-DD (422 if past). Audited. Push fanout to ALL company staff via new push_service.fanout_to_company (BackgroundTasks; skips if VAPID unconfigured).
+- GET /announcements (any logged-in role): active only (expired = expires_at < today). ?include_expired=true honored only for hr/admin/auditor → archive w/ expired flag. DELETE /{aid} hr/admin, audited.
+- Frontend: pages/Announcements.jsx (/announcements, nav+route hr/admin/superadmin — create form, Active list, Archive section, delete w/ confirm); components/AnnouncementsCard.jsx (dashboard notice card for ALL roles — wrapped around role-dashboard switch in Dashboard.jsx); components/UrgentAnnouncementBanner.jsx (red top banner in Layout.jsx for urgent, dismiss persisted in sessionStorage shcm_dismissed_announcements).
+### Offboarding (routers/offboarding.py, collection offboardings)
+- POST /offboarding/{eid}/start (hr/admin): 4-item checklist — final_settlement(payroll), document_handover(hr), equipment_return(hr), access_revocation(admin-only). Employee status→exiting. 409 on duplicate.
+- PUT /{oid}/items/{key}/complete: role-gated (_may_complete; admins override), 409 double-complete. When all 4 done → employee status=exited, users.disabled=true (+deactivated_at), audited (offboarding_started/item_completed/completed w/ account_deactivated).
+- Account deactivation ENFORCED: login (auth.py) + core.get_current_user both 401 "Account deactivated" when users.disabled.
+- GET /offboarding + /employee/{eid} (hr/payroll/auditor/admin). DELETE /{oid} cancel (hr/admin, in-progress only → employee restored to active, audited).
+- Frontend: components/OffboardingPanel.jsx at bottom of EmployeeDetail.jsx — start button (confirm), checklist w/ role-gated "Mark complete" buttons, status badge, completed note, cancel. testids: offboarding-panel/start-btn/item-{key}/complete-{key}/status-badge/cancel-btn/completed-note.
+### Misc
+- Employees.jsx Add-employee modal: 422 pydantic list details now rendered via sonner toast (was silent alert fallback) — pre-existing gap flagged by testing agent.
+### Testing
+- tests/test_iter49_announcements_offboarding.py (6 pytest: role gates, validation, expired archive scoping, full workflow w/ real login-deactivation proof, cancel). Testing agent iteration_39.json: **8/8 frontend flows PASS** (post urgent, employee banner+card+dismiss, employee access-denied on /announcements, delete, offboarding role-gated completion across HR/Payroll/Admin, auto-deactivate, cancel). Full suite regression run post-change.
+- NOTE: production needs REDEPLOY.

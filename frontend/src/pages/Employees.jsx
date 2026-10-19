@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { Plus, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { DatePicker } from "../components/ui/date-picker";
 
 const empty = {
@@ -34,7 +35,11 @@ export default function Employees() {
       await api.post("/employees", { ...form, basic_salary_sle: Number(form.basic_salary_sle), allowances_sle: Number(form.allowances_sle) });
       setOpen(false); setForm(empty); load();
     } catch (e) {
-      alert(typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Failed to create employee");
+      const d = e?.response?.data?.detail;
+      const msg = typeof d === "string" ? d
+        : Array.isArray(d) ? d.map((x) => `${(x.loc || []).slice(1).join(".")}: ${x.msg}`).join(" · ")
+        : "Failed to create employee";
+      toast.error(msg);
     } finally { setBusy(false); }
   };
 

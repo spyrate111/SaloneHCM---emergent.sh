@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend end-to-end testing of iter49 Announcements/Notice Board and Offboarding workflows on preview. All 8 user-story test cases pass. Announcements CRUD + urgent banner + dashboard notice card + dismiss + role gating + 403 restriction all functional. Offboarding start/role-gated completion (HR→Payroll→Admin)/auto-deactivation and HR cancel flow all functional. Backend push notifications may be skipped (VAPID) — not treated as failure per spec.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Employees → Add employee (pre-existing, outside iter49 scope)", "issue": "Form silently swallows backend 422 validation errors — no toast or inline message when email domain is rejected (e.g. '.test' TLD reserved by pydantic email validator) or employment_type is wrong case. Modal stays open with form data intact and user has no feedback. Not blocking iter49 but worth flagging.", "affected_selectors": ["button:has-text('Save employee')", "data-testid=emp-email"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_39.json"],
+  "action_items": [
+    "(Optional, pre-existing) Surface 422 errors from POST /api/employees in the Add employee modal via toast/inline messages so users know why save failed."
+  ],
+  "critical_code_review_comments": [
+    "AnnouncementsCard, UrgentAnnouncementBanner, Announcements page and OffboardingPanel are all clean, small, well-structured components with correct data-testid coverage.",
+    "OffboardingPanel.mayComplete correctly enforces role gating: role===item.responsible_role, with admin override; the UI matches the backend role check (verified HR, Payroll, Admin each only see their respective Mark complete buttons).",
+    "Urgent banner dismiss persists via sessionStorage key shcm_dismissed_announcements as spec'd."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (8/8 user stories)"},
+  "test_credentials": "hradmin1@salonehcm.com/Test@HRAdmin1, payroll1@salonehcm.com/Test@Payroll1, admin1@salonehcm.com/Test@Admin1, employee1@salonehcm.com/Test@Employee1 — all valid on preview.",
+  "seed_data_creation": "Created 2 throwaway employees via POST /api/employees (QATestA/B Throw1792432373 @salonehcm.sl). Both DELETED after test (200 OK). Created 1 TEST urgent announcement, deleted after verification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter49 feature set (announcements + offboarding) is production-ready. Note: creating an employee without an associated user login means the 'login returns 401 Account deactivated' can't be directly verified from the UI alone; backend test_iter49_announcements_offboarding.py covers that path. To create throwaway employees via API, use employment_type='Full-time' (exact case) and a non-reserved email TLD (.sl, .com — not .test).",
+  "rca of the issue": "n/a — no bugs in iter49 scope. The only observed issue (silent 422 on employee create modal) is a pre-existing UX gap not introduced by this iteration."
+}
