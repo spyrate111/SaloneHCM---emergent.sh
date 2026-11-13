@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
 from payroll_engine import PAYE_BANDS, NASSIT_EMPLOYEE, NASSIT_EMPLOYER
@@ -55,8 +55,8 @@ async def compliance_summary(user: dict = Depends(require_roles("payroll", "audi
     total_paye = sum(r["totals"]["paye"] for r in runs)
     total_nassit = sum(r["totals"]["nassit_employee"] + r["totals"]["nassit_employer"] for r in runs)
     # NRA / NASSIT filing status — by period
-    filings = await db.nra_filings.find(tf, {"_id": 0}).sort("filed_at", -1).to_list(50)
-    filed_periods = {f["period"]: f for f in filings}
+    filings = await db.nra_filings.find(tf, {"_id": 0}).sort("filed_at", -1).to_list(100)
+    filed_runs = {f.get("run_id"): f for f in filings if f.get("run_id")}
     history = [
         {
             "run_id": r["id"],
@@ -64,9 +64,23 @@ async def compliance_summary(user: dict = Depends(require_roles("payroll", "audi
             "paye": r["totals"]["paye"],
             "nassit_total": r["totals"]["nassit_employee"] + r["totals"]["nassit_employer"],
             "employees": r["totals"]["employee_count"],
-            "nra_filed": r["period"] in filed_periods,
-            "nra_filed_at": filed_periods.get(r["period"], {}).get("filed_at"),
-            "nra_reference": filed_periods.get(r["period"], {}).get("nra_reference"),
+            "nra_filed": bool(
+                filed_runs.get(r["id"])
+                and filed_runs[r["id"]].get("reference_source") == "external"
+                and filed_runs[r["id"]].get("nra_reference")
+            ),
+            "nra_legacy_recorded": bool(
+                filed_runs.get(r["id"])
+                and filed_runs[r["id"]].get("reference_source") != "external"
+            ),
+            "nra_filed_at": (
+                filed_runs[r["id"]].get("filed_at")
+                if filed_runs.get(r["id"], {}).get("reference_source") == "external" else None
+            ),
+            "nra_reference": (
+                filed_runs[r["id"]].get("nra_reference")
+                if filed_runs.get(r["id"], {}).get("reference_source") == "external" else None
+            ),
         }
         for r in runs
     ]
@@ -74,8 +88,9 @@ async def compliance_summary(user: dict = Depends(require_roles("payroll", "audi
         "runs_count": len(runs),
         "ytd_paye_sle": round(total_paye, 2),
         "ytd_nassit_sle": round(total_nassit, 2),
-        "filed_count": len(filings),
-        "outstanding": [h for h in history if not h["nra_filed"]],
+        "filed_count": sum(1 for h in history if h["nra_filed"]),
+        "outstanding": [h for h in history if not h["nra_filed"] and not h["nra_legacy_recorded"]],
+        "unverified": [h for h in history if h["nra_legacy_recorded"]],
         "history": history,
         "next_filing": "NRA PAYE — 15th of next month",
         "regs": {
@@ -108,8 +123,7 @@ async def nra_export(rid: str, user: dict = Depends(require_roles("payroll", "au
 
 @router.get("/nra-paye-return.csv/{rid}")
 async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nra_export"))):
-    """NRA PAYE Return CSV — the layout the Sierra Leone NRA accepts at their portal.
-    Each row = one employee; final row is the period total per NRA convention."""
+    """Structured payroll workpaper for NRA PAYE preparation; it does not submit the return."""
     if not can_role(user, "payroll", "auditor"):
         raise HTTPException(403, "Payroll, auditor or admin only")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
@@ -167,7 +181,7 @@ async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nr
 
 @router.get("/nassit-schedule.csv/{rid}")
 async def nassit_schedule_csv(rid: str, user: dict = Depends(require_feature("nra_export"))):
-    """NASSIT contribution schedule CSV — per-employee employee + employer NASSIT for the period."""
+    """Per-employee NASSIT contribution workpaper to accompany the payment advice form."""
     if not can_role(user, "payroll", "auditor"):
         raise HTTPException(403, "Payroll, auditor or admin only")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
@@ -212,35 +226,52 @@ async def nassit_schedule_csv(rid: str, user: dict = Depends(require_feature("nr
     )
 
 
+class FilingReferenceIn(BaseModel):
+    nra_reference: str = Field(..., min_length=1, max_length=120)
+
+
 @router.post("/file-nra/{rid}")
-async def mark_nra_filed(rid: str, user: dict = Depends(require_feature("nra_export"))):
-    """Record that the NRA return has been filed for this run."""
+async def mark_nra_filed(rid: str, body: FilingReferenceIn, user: dict = Depends(require_feature("nra_export"))):
+    """Record the reference returned after an employer submits through NRA ITAS."""
     if user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(403, "Admin only")
+    nra_ref = body.nra_reference.strip()
+    if not nra_ref:
+        raise HTTPException(422, "Enter the reference returned by NRA ITAS")
     tf = tenant_filter(user)
     r = await db.payroll_runs.find_one({"id": rid, **tf}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
-    existing = await db.nra_filings.find_one({"run_id": rid, **tf})
-    if existing:
-        raise HTTPException(409, "Already filed")
-    # Auto-generate a deterministic NRA reference (in production this would come from NRA portal).
-    nra_ref = f"NRA-{r['period']}-{r['id'][:8].upper()}"
-    doc = {
-        **tf,
-        "id": rid,  # piggyback on run id for uniqueness within tenant
-        "run_id": rid,
+
+    filing = {
         "period": r["period"],
         "nra_reference": nra_ref,
+        "reference_source": "external",
         "filed_at": datetime.now(timezone.utc).isoformat(),
         "filed_by": user["email"],
         "paye_total": r["totals"]["paye"],
         "nassit_total": r["totals"]["nassit_employee"] + r["totals"]["nassit_employer"],
     }
-    await db.nra_filings.insert_one(doc)
-    await audit("nra_filed", f"payroll_runs/{rid}", user,
+    existing = await db.nra_filings.find_one({"run_id": rid, **tf}, {"_id": 0})
+    if existing and existing.get("reference_source") == "external":
+        raise HTTPException(409, "An NRA submission reference is already recorded for this run")
+    if existing:
+        await db.nra_filings.update_one({"run_id": rid, **tf}, {"$set": filing})
+        doc = await db.nra_filings.find_one({"run_id": rid, **tf}, {"_id": 0})
+        action = "nra_filing_reference_verified"
+    else:
+        doc = {
+            **tf,
+            "id": rid,
+            "run_id": rid,
+            **filing,
+        }
+        await db.nra_filings.insert_one(doc)
+        doc.pop("_id", None)
+        action = "nra_filed"
+
+    await audit(action, f"payroll_runs/{rid}", user,
                 {"period": r["period"], "nra_reference": nra_ref})
-    doc.pop("_id", None)
     return doc
 
 
