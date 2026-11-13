@@ -760,3 +760,20 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 ### Testing
 - tests/test_iter50_careers_claim_notifications.py (2: unauth listing filters open/closed/past + field whitelist; claim submit+reject-with-note regression). iter48 suite re-run: 10/10 passed. Visual: /careers card renders + click-through to apply form + login link verified via screenshots. Push delivery itself depends on browser subscriptions (VAPID configured in backend/.env).
 - NOTE: production needs REDEPLOY.
+
+## v1.50 (Nov 2026) — Application emails + read receipts + exit interview notes (iter51)
+### Application emails (email_service.py + routers/recruitment.py)
+- send_application_confirmation (receipt + "response within 10 working days of closing date") fired as BackgroundTask on public apply; send_application_stage_update with STAGE_EMAIL_COPY for shortlisted/interview/offer/rejected on PATCH stage (no email for applied/hired). Uses existing Resend provider; all sends logged to email_logs with REAL subject + job_title/stage meta. applicant_name/job_title/company HTML-escaped (untrusted public input).
+- Resend sandbox note: fabricated domains log status=failed ("Invalid to field") — dispatch pipeline itself verified.
+### Announcement read receipts (routers/announcements.py, collection announcement_reads)
+- POST /announcements/mark-seen {ids} (any role, idempotent upsert, tenant-validated, 100-id cap) — fired by AnnouncementsCard when the dashboard notice card renders.
+- GET /announcements adds read_count + total_staff (non-disabled company users) for hr/admin/auditor only. GET /{aid}/unread (hr/admin/auditor) → staff who haven't seen it. DELETE cascades announcement_reads.
+- Announcements.jsx: "X/Y read" badge (announcement-readcount-{id}); urgent rows get "Who hasn't read this?" toggle (unread-btn/-list testids), list refetched on every open.
+### Exit interview notes (routers/offboarding.py)
+- PUT /offboarding/{oid}/exit-interview (hr/admin): leaving_reason ∈ resignation/retirement/redundancy/contract_end/dismissal/other + free-text notes (5000 cap); 422 bad reason, 403 non-HR, 409 cancelled. Stored as exit_interview{reason,notes,recorded_by,recorded_at}; audited exit_interview_recorded.
+- OffboardingPanel.jsx ExitInterviewSection: record/edit form (reason dropdown + notes) for HR/admin; read-only display (reason badge + notes + recorded-by) for other panel viewers; visible after completion on the employee profile.
+### Misc
+- DELETE /employees/{eid} now cascades offboardings (orphan flagged by testing agent).
+### Testing
+- tests/test_iter51_emails_receipts_exitnotes.py (3) + testing-agent tests/test_iter52_receipts_exit_emails_api.py (2). Testing agent iteration_40.json: **7/7 frontend flows PASS** (read badge increments after employee dashboard view, urgent unread list shrinks, employee 403/no-counts, exit interview record/edit/role-gates/audit, application confirmation + stage emails logged, hired sends none, dashboard smoke). All 4 flagged minor items fixed (real subject in email_logs, HTML escaping, unread refetch, offboarding cascade). Combined iter48–52 suites: 21/21 passed.
+- NOTE: production needs REDEPLOY.

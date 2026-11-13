@@ -249,16 +249,21 @@ async def send_application_confirmation(
     company_id: Optional[str] = None,
 ) -> dict:
     """Confirm receipt of a public job application."""
+    import html as _html
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
     html = _wrap_html(
         title="Application received",
         body_html=f"""
-          <p>Hi {applicant_name or 'there'},</p>
-          <p>Thank you for applying for <strong>{job_title}</strong> at <strong>{company_name}</strong>. Your application has been received and is now with the HR team.</p>
+          <p>Hi {name or 'there'},</p>
+          <p>Thank you for applying for <strong>{job}</strong> at <strong>{comp}</strong>. Your application has been received and is now with the HR team.</p>
           <p>You can expect a response within <strong>10 working days</strong> of the vacancy's closing date. We'll email you as soon as your application moves to the next stage.</p>
         """,
     )
-    res = await _send(to, f"[{company_name}] Application received — {job_title}", html)
-    await _log("application_confirmation", to, job_title, res, {"company_id": company_id})
+    subject = f"[{company_name}] Application received — {job_title}"
+    res = await _send(to, subject, html)
+    await _log("application_confirmation", to, subject, res, {"company_id": company_id, "job_title": job_title})
     return res
 
 
@@ -283,15 +288,21 @@ async def send_application_stage_update(
     company_id: Optional[str] = None,
 ) -> dict:
     """Notify an applicant their application moved stage (shortlisted/interview/offer/rejected)."""
+    import html as _html
     title, body_tpl = STAGE_EMAIL_COPY[stage]
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
     html = _wrap_html(
         title=title,
         body_html=f"""
-          <p>Hi {applicant_name or 'there'},</p>
-          <p>{body_tpl.format(job=job_title)}</p>
-          <p style="color:#525860;font-size:12px;">This update concerns your application at {company_name}.</p>
+          <p>Hi {name or 'there'},</p>
+          <p>{body_tpl.format(job=job)}</p>
+          <p style="color:#525860;font-size:12px;">This update concerns your application at {comp}.</p>
         """,
     )
-    res = await _send(to, f"[{company_name}] {title} — {job_title}", html)
-    await _log("application_stage", to, job_title, res, {"stage": stage, "company_id": company_id})
+    subject = f"[{company_name}] {title} — {job_title}"
+    res = await _send(to, subject, html)
+    await _log("application_stage", to, subject, res,
+               {"stage": stage, "company_id": company_id, "job_title": job_title})
     return res

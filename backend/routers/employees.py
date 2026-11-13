@@ -80,5 +80,6 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
 async def delete_employee(eid: str, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "terminating/deleting an employee")
     await db.employees.delete_one({"id": eid, **tenant_filter(user)})
+    await db.offboardings.delete_many({"employee_id": eid, **tenant_filter(user)})
     await audit("delete", f"employees/{eid}", user)
     return {"ok": True}

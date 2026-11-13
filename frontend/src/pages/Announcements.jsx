@@ -102,7 +102,7 @@ function UnreadList({ announcement }) {
   const [list, setList] = useState(null);
 
   const toggle = () => {
-    if (!open && list === null) {
+    if (!open) {
       api.get(`/announcements/${announcement.id}/unread`)
         .then((r) => setList(r.data)).catch(() => setList([]));
     }
