@@ -29,6 +29,10 @@ class MobileMoneyBatchIn(BaseModel):
     payment_date: date
 
 
+class RetryMobileMoneyBatchIn(BaseModel):
+    payment_date: date
+
+
 class RecipientReconciliationIn(BaseModel):
     status: Literal["paid", "failed"]
     provider_reference: Optional[str] = Field(default="", max_length=120)
@@ -54,7 +58,7 @@ def _batch_summary(batch: dict) -> dict:
     return {
         key: batch.get(key)
         for key in (
-            "id", "run_id", "period", "provider", "provider_name", "currency",
+            "id", "run_id", "period", "provider", "provider_name", "currency", "retry_of", "attempt_number",
             "payment_date", "status", "total_amount_sle", "recipient_count",
             "paid_count", "failed_count", "pending_count", "created_by",
             "created_at", "approved_by", "approved_at", "exported_at",
@@ -203,7 +207,7 @@ async def create_run_mobile_money_batch(
         raise HTTPException(412, "MoF approval is required before preparing this government payroll batch.")
 
     existing = await db.mobile_money_batches.find_one(
-        {"run_id": rid, "provider": body.provider, **scope}, {"_id": 0},
+        {"run_id": rid, "provider": body.provider, "retry_of": {"$exists": False}, **scope}, {"_id": 0},
     )
     if existing:
         return {**existing, "already_exists": True}
@@ -257,6 +261,7 @@ async def create_run_mobile_money_batch(
         "provider": body.provider,
         "provider_name": PROVIDERS[body.provider],
         "currency": "SLE",
+        "attempt_number": 1,
         "payment_date": body.payment_date.isoformat(),
         "status": "pending_approval",
         "total_amount_sle": total_amount,
@@ -286,6 +291,90 @@ async def create_run_mobile_money_batch(
         },
     )
     return batch
+
+
+@router.post("/mobile-money/batches/{bid}/retry-failed")
+async def retry_failed_mobile_money_payments(
+    bid: str,
+    body: RetryMobileMoneyBatchIn,
+    user: dict = Depends(require_roles("payroll")),
+):
+    scope = tenant_filter(user)
+    parent = await db.mobile_money_batches.find_one(
+        {"id": bid, **scope}, {"_id": 0},
+    )
+    if not parent:
+        raise HTTPException(404, "Mobile-money batch not found")
+    failed = [row for row in parent.get("recipients", []) if row.get("status") == "failed"]
+    if not failed:
+        raise HTTPException(409, "This batch has no failed payments to retry.")
+
+    existing = await db.mobile_money_batches.find_one(
+        {"retry_of": bid, **scope}, {"_id": 0},
+    )
+    if existing:
+        return {**existing, "already_exists": True}
+
+    recipients = []
+    for payment in failed:
+        recipients.append({
+            "id": str(uuid.uuid4()),
+            "employee_id": payment["employee_id"],
+            "employee_name": payment["employee_name"],
+            "mobile_number": payment["mobile_number"],
+            "amount_sle": payment["amount_sle"],
+            "payment_reference": (
+                f"SHCM-{parent['period'].replace('-', '')}-"
+                f"{uuid.uuid4().hex[:8].upper()}"
+            ),
+            "status": "pending",
+            "provider_reference": "",
+            "failure_reason": "",
+            "reconciliation_history": [],
+            "retry_of_recipient_id": payment["id"],
+        })
+    now = iso(now_utc())
+    total_amount = round(sum(row["amount_sle"] for row in recipients), 2)
+    retry = {
+        "id": str(uuid.uuid4()),
+        "company_id": user["company_id"],
+        "run_id": parent["run_id"],
+        "period": parent["period"],
+        "provider": parent["provider"],
+        "provider_name": parent["provider_name"],
+        "currency": "SLE",
+        "payment_date": body.payment_date.isoformat(),
+        "status": "pending_approval",
+        "attempt_number": int(parent.get("attempt_number", 1)) + 1,
+        "retry_of": bid,
+        "total_amount_sle": total_amount,
+        "recipient_count": len(recipients),
+        "paid_count": 0,
+        "failed_count": 0,
+        "pending_count": len(recipients),
+        "created_by": user["email"],
+        "created_at": now,
+        "approved_by": None,
+        "approved_at": None,
+        "exported_at": None,
+        "reconciled_at": None,
+        "recipients": recipients,
+    }
+    await db.mobile_money_batches.insert_one(dict(retry))
+    await audit(
+        "mobile_money_failed_payments_retry_created",
+        f"payroll_runs/{parent['run_id']}",
+        user,
+        {
+            "batch_id": retry["id"],
+            "retry_of": bid,
+            "provider": retry["provider"],
+            "period": retry["period"],
+            "recipient_count": len(recipients),
+            "total_sle": total_amount,
+        },
+    )
+    return retry
 
 
 @router.get("/mobile-money/pending-approvals")
@@ -358,7 +447,21 @@ async def export_mobile_money_workbook(
         raise HTTPException(404, "Mobile-money batch not found")
     if batch.get("status") not in ("approved", "exported", "partially_reconciled", "reconciled"):
         raise HTTPException(409, "A manager must approve this batch before export.")
-    payload = _build_mobile_money_xlsx(batch)
+    pending_recipients = [
+        recipient for recipient in batch.get("recipients", [])
+        if recipient.get("status") == "pending"
+    ]
+    if not pending_recipients:
+        raise HTTPException(409, "There are no pending payments left to export. Create a retry batch for failed payments.")
+    export_batch = {
+        **batch,
+        "recipients": pending_recipients,
+        "recipient_count": len(pending_recipients),
+        "total_amount_sle": round(
+            sum(float(recipient["amount_sle"]) for recipient in pending_recipients), 2,
+        ),
+    }
+    payload = _build_mobile_money_xlsx(export_batch)
     exported_at = batch.get("exported_at") or iso(now_utc())
     next_status = "exported" if batch.get("status") == "approved" else batch["status"]
     await db.mobile_money_batches.update_one(
