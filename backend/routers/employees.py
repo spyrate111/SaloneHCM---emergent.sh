@@ -65,9 +65,13 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             await assert_not_cutoff_locked(
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
+    updates = body.model_dump()
+    # Older clients omit this new optional field; preserve an existing middle name.
+    if "middle_name" not in body.model_fields_set:
+        updates.pop("middle_name", None)
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
-        {"$set": body.model_dump()},
+        {"$set": updates},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
