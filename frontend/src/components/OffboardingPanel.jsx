@@ -2,9 +2,18 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { LogOut, CheckCircle2, Circle } from "lucide-react";
+import { LogOut, CheckCircle2, Circle, FileText } from "lucide-react";
 
 const ROLE_LABEL = { payroll: "Payroll Officer", hr: "HR Admin", admin: "Admin" };
+const LEAVING_REASONS = [
+  ["resignation", "Resignation"],
+  ["retirement", "Retirement"],
+  ["redundancy", "Redundancy"],
+  ["contract_end", "Contract End"],
+  ["dismissal", "Dismissal"],
+  ["other", "Other"],
+];
+const REASON_LABEL = Object.fromEntries(LEAVING_REASONS);
 const STATUS_CLS = {
   in_progress: "bg-[#F6EDD8] text-[#8B6A14]",
   completed: "bg-[#E4F7E7] text-[#0A4A1E]",
@@ -141,11 +150,96 @@ export default function OffboardingPanel({ employee, onChanged }) {
           All checklist items signed off on {(ob.completed_at || "").slice(0, 10)} — the employee&rsquo;s account has been deactivated.
         </div>
       )}
+
+      <ExitInterviewSection ob={ob} canEdit={isHr} onSaved={load} />
+
       {ob.status === "in_progress" && isHr && (
         <button onClick={cancel} disabled={busy} data-testid="offboarding-cancel-btn"
           className="text-xs border border-[#E2DFD6] text-[#525860] hover:bg-[#F7F6F2] px-3 py-1.5 rounded-md disabled:opacity-50">
           Cancel offboarding
         </button>
+      )}
+    </div>
+  );
+}
+
+function ExitInterviewSection({ ob, canEdit, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState({
+    leaving_reason: ob.exit_interview?.leaving_reason || "resignation",
+    notes: ob.exit_interview?.notes || "",
+  });
+  const [busy, setBusy] = useState(false);
+  const rec = ob.exit_interview;
+
+  const save = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.put(`/offboarding/${ob.id}/exit-interview`, f);
+      toast.success("Exit interview recorded");
+      setEditing(false);
+      onSaved?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not save exit interview");
+    } finally { setBusy(false); }
+  };
+
+  if (!rec && !canEdit) return null;
+  return (
+    <div className="border-t border-[#F0EEE8] pt-4" data-testid="exit-interview-section">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] inline-flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5" /> Exit interview
+        </div>
+        {canEdit && !editing && (
+          <button onClick={() => setEditing(true)} data-testid="exit-interview-edit-btn"
+            className="text-xs text-[#26547C] hover:underline">
+            {rec ? "Edit" : "Record exit interview"}
+          </button>
+        )}
+      </div>
+
+      {!editing && rec && (
+        <div className="mt-2" data-testid="exit-interview-display">
+          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#F1EEE6] text-[#525860]"
+            data-testid="exit-interview-reason-badge">
+            {REASON_LABEL[rec.leaving_reason] || rec.leaving_reason}
+          </span>
+          {rec.notes && <p className="text-sm text-[#525860] mt-2 whitespace-pre-wrap">{rec.notes}</p>}
+          <div className="text-[11px] text-[#8A8F96] mt-1.5">
+            Recorded by {rec.recorded_by} · {(rec.recorded_at || "").slice(0, 10)}
+          </div>
+        </div>
+      )}
+      {!editing && !rec && (
+        <p className="text-xs text-[#686D76] mt-2">No exit interview recorded yet.</p>
+      )}
+
+      {editing && (
+        <form onSubmit={save} className="mt-3 space-y-3">
+          <label className="block text-xs text-[#525860]">Leaving reason
+            <select value={f.leaving_reason} onChange={(e) => setF({ ...f, leaving_reason: e.target.value })}
+              className="mt-1 w-full sm:w-64 border border-[#E2DFD6] rounded-md px-3 py-2 text-sm bg-white"
+              data-testid="exit-interview-reason-select">
+              {LEAVING_REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </label>
+          <label className="block text-xs text-[#525860]">Interview notes
+            <textarea rows={4} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })}
+              placeholder="Key points from the exit interview…"
+              className="mt-1 w-full border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
+              data-testid="exit-interview-notes-input" />
+          </label>
+          <div className="flex gap-2">
+            <button disabled={busy} data-testid="exit-interview-save-btn"
+              className="bg-[#0A4A1E] text-white text-xs px-4 py-2 rounded-md disabled:opacity-50">
+              {busy ? "Saving…" : "Save exit interview"}
+            </button>
+            <button type="button" onClick={() => setEditing(false)}
+              className="border border-[#E2DFD6] text-xs px-4 py-2 rounded-md">Cancel</button>
+          </div>
+        </form>
       )}
     </div>
   );

@@ -239,3 +239,59 @@ async def send_csv_attachment(
         "company_id": company_id,
     })
     return res
+
+
+async def send_application_confirmation(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Confirm receipt of a public job application."""
+    html = _wrap_html(
+        title="Application received",
+        body_html=f"""
+          <p>Hi {applicant_name or 'there'},</p>
+          <p>Thank you for applying for <strong>{job_title}</strong> at <strong>{company_name}</strong>. Your application has been received and is now with the HR team.</p>
+          <p>You can expect a response within <strong>10 working days</strong> of the vacancy's closing date. We'll email you as soon as your application moves to the next stage.</p>
+        """,
+    )
+    res = await _send(to, f"[{company_name}] Application received — {job_title}", html)
+    await _log("application_confirmation", to, job_title, res, {"company_id": company_id})
+    return res
+
+
+STAGE_EMAIL_COPY = {
+    "shortlisted": ("You've been shortlisted",
+                    "Good news — your application for <strong>{job}</strong> has been shortlisted. The HR team will be in touch shortly with details of the next step."),
+    "interview": ("Interview invitation",
+                  "You've been invited to the interview stage for <strong>{job}</strong>. HR will contact you soon to arrange a date and time."),
+    "offer": ("We'd like to make you an offer",
+              "Congratulations — following your interview for <strong>{job}</strong>, we would like to make you an offer. HR will contact you with the full details."),
+    "rejected": ("Application update",
+                 "Thank you for your interest in <strong>{job}</strong>. After careful consideration, we will not be progressing your application on this occasion. We encourage you to apply for future openings."),
+}
+
+
+async def send_application_stage_update(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    stage: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Notify an applicant their application moved stage (shortlisted/interview/offer/rejected)."""
+    title, body_tpl = STAGE_EMAIL_COPY[stage]
+    html = _wrap_html(
+        title=title,
+        body_html=f"""
+          <p>Hi {applicant_name or 'there'},</p>
+          <p>{body_tpl.format(job=job_title)}</p>
+          <p style="color:#525860;font-size:12px;">This update concerns your application at {company_name}.</p>
+        """,
+    )
+    res = await _send(to, f"[{company_name}] {title} — {job_title}", html)
+    await _log("application_stage", to, job_title, res, {"stage": stage, "company_id": company_id})
+    return res

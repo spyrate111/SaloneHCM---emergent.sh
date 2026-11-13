@@ -4,7 +4,6 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-
 from core import (db, get_current_user, require_roles, can_role, audit,
                   tenant_filter, with_tenant, now_utc, iso)
 import push_service
@@ -74,9 +73,59 @@ async def list_announcements(include_expired: bool = False,
         tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
     for r in rows:
         r["expired"] = _is_expired(r, today)
-    if include_expired and can_role(user, "hr", "auditor"):
-        return rows
+    if can_role(user, "hr", "auditor"):
+        total_staff = await db.users.count_documents(
+            {**tenant_filter(user), "disabled": {"$ne": True}})
+        counts = {}
+        async for g in db.announcement_reads.aggregate([
+                {"$match": tenant_filter(user)},
+                {"$group": {"_id": "$announcement_id", "n": {"$sum": 1}}}]):
+            counts[g["_id"]] = g["n"]
+        for r in rows:
+            r["read_count"] = counts.get(r["id"], 0)
+            r["total_staff"] = total_staff
+        if include_expired:
+            return rows
     return [r for r in rows if not r["expired"]]
+
+
+class SeenIn(BaseModel):
+    ids: list[str]
+
+
+@router.post("/mark-seen")
+async def mark_seen(body: SeenIn, user: dict = Depends(get_current_user)):
+    """Called when a user's dashboard renders announcements — records read receipts."""
+    valid = await db.announcements.find(
+        {"id": {"$in": body.ids[:100]}, **tenant_filter(user)}, {"_id": 0, "id": 1}).to_list(100)
+    now = iso(now_utc())
+    for v in valid:
+        await db.announcement_reads.update_one(
+            {"announcement_id": v["id"], "user_id": user["id"]},
+            {"$setOnInsert": {
+                "announcement_id": v["id"],
+                "user_id": user["id"],
+                "user_name": user.get("name") or user["email"],
+                "role": user.get("role"),
+                "company_id": user["company_id"],
+                "seen_at": now,
+            }},
+            upsert=True)
+    return {"ok": True, "marked": len(valid)}
+
+
+@router.get("/{aid}/unread")
+async def unread_staff(aid: str, user: dict = Depends(require_roles("hr", "auditor"))):
+    """Staff who have NOT yet seen an announcement — follow-up list for urgent notices."""
+    ann = await db.announcements.find_one({"id": aid, **tenant_filter(user)}, {"_id": 0, "id": 1})
+    if not ann:
+        raise HTTPException(404, "Announcement not found")
+    seen = {r["user_id"] async for r in db.announcement_reads.find(
+        {"announcement_id": aid, **tenant_filter(user)}, {"_id": 0, "user_id": 1})}
+    users = await db.users.find(
+        {**tenant_filter(user), "disabled": {"$ne": True}},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1}).to_list(2000)
+    return [u for u in users if u["id"] not in seen]
 
 
 @router.delete("/{aid}")
@@ -85,5 +134,6 @@ async def delete_announcement(aid: str, user: dict = Depends(require_roles("hr")
     if not row:
         raise HTTPException(404, "Announcement not found")
     await db.announcements.delete_one({"id": aid, **tenant_filter(user)})
+    await db.announcement_reads.delete_many({"announcement_id": aid})
     await audit("announcement_deleted", f"announcements/{aid}", user, {"title": row["title"]})
     return {"ok": True}

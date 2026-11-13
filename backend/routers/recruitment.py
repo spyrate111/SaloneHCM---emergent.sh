@@ -1,7 +1,7 @@
 """Recruitment / ATS: vacancies, public applications, stage pipeline, hire-to-employee."""
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr
 
@@ -9,6 +9,7 @@ from core import (db, require_roles, audit, tenant_filter, with_tenant,
                   now_utc, iso)
 from storage import put_object, get_object, APP_NAME
 from routers.payroll_rails import assert_not_cutoff_locked
+import email_service
 
 router = APIRouter(prefix="/recruitment", tags=["recruitment"])
 public_router = APIRouter(prefix="/careers", tags=["careers-public"])
@@ -84,7 +85,7 @@ async def list_applications(vid: str, user: dict = Depends(_HR)):
 
 
 @router.patch("/applications/{aid}/stage")
-async def set_stage(aid: str, body: dict, user: dict = Depends(_HR)):
+async def set_stage(aid: str, body: dict, bg: BackgroundTasks, user: dict = Depends(_HR)):
     stage = (body or {}).get("stage")
     if stage not in STAGES:
         raise HTTPException(422, f"stage must be one of: {', '.join(STAGES)}")
@@ -95,6 +96,12 @@ async def set_stage(aid: str, body: dict, user: dict = Depends(_HR)):
         {"id": aid}, {"$set": {"stage": stage, "stage_updated_at": iso(now_utc())}})
     await audit("application_stage", f"job_applications/{aid}", user,
                 {"name": app_doc["name"], "stage": stage})
+    if stage in email_service.STAGE_EMAIL_COPY:
+        company = await db.companies.find_one(
+            {"id": user["company_id"]}, {"_id": 0, "name": 1}) or {}
+        bg.add_task(email_service.send_application_stage_update,
+                    app_doc["email"], app_doc["name"], app_doc["vacancy_title"],
+                    stage, company.get("name", "SaloneHCM"), user["company_id"])
     return {"ok": True, "stage": stage,
             "prompt_create_employee": stage == "hired" and not app_doc.get("hired_employee_id")}
 
@@ -200,6 +207,7 @@ async def public_vacancy(token: str):
 @public_router.post("/{token}/apply")
 async def public_apply(
     token: str,
+    bg: BackgroundTasks,
     name: str = Form(...),
     email: EmailStr = Form(...),
     phone: str = Form(""),
@@ -244,4 +252,9 @@ async def public_apply(
         "created_at": iso(now_utc()),
     }
     await db.job_applications.insert_one(doc)
+    company = await db.companies.find_one(
+        {"id": v["company_id"]}, {"_id": 0, "name": 1}) or {}
+    bg.add_task(email_service.send_application_confirmation,
+                doc["email"], doc["name"], v["title"],
+                company.get("name", "SaloneHCM"), v["company_id"])
     return {"ok": True, "message": "Application received — HR will be in touch."}

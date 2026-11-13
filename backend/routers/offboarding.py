@@ -2,6 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from core import (db, get_current_user, require_roles, can_role, is_admin, audit,
                   tenant_filter, with_tenant, now_utc, iso)
@@ -110,6 +111,36 @@ async def complete_item(oid: str, key: str, user: dict = Depends(get_current_use
 
     await db.offboardings.update_one({"id": oid}, {"$set": update})
     return {"ok": True, "all_complete": all_done, "account_deactivated": deactivated}
+
+
+LEAVING_REASONS = {"resignation", "retirement", "redundancy", "contract_end", "dismissal", "other"}
+
+
+class ExitInterviewIn(BaseModel):
+    leaving_reason: str
+    notes: str = ""
+
+
+@router.put("/{oid}/exit-interview")
+async def record_exit_interview(oid: str, body: ExitInterviewIn,
+                                user: dict = Depends(require_roles("hr"))):
+    if body.leaving_reason not in LEAVING_REASONS:
+        raise HTTPException(422, f"leaving_reason must be one of: {', '.join(sorted(LEAVING_REASONS))}")
+    ob = await db.offboardings.find_one({"id": oid, **tenant_filter(user)}, {"_id": 0})
+    if not ob:
+        raise HTTPException(404, "Offboarding not found")
+    if ob["status"] == "cancelled":
+        raise HTTPException(409, "Cannot record an exit interview on a cancelled offboarding")
+    record = {
+        "leaving_reason": body.leaving_reason,
+        "notes": body.notes.strip()[:5000],
+        "recorded_by": user.get("name") or user["email"],
+        "recorded_at": iso(now_utc()),
+    }
+    await db.offboardings.update_one({"id": oid}, {"$set": {"exit_interview": record}})
+    await audit("exit_interview_recorded", f"offboardings/{oid}", user,
+                {"employee": ob["employee_name"], "leaving_reason": body.leaving_reason})
+    return {"ok": True, "exit_interview": record}
 
 
 @router.delete("/{oid}")

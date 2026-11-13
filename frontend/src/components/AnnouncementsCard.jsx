@@ -7,7 +7,12 @@ export default function AnnouncementsCard() {
   const [rows, setRows] = useState([]);
 
   useEffect(() => {
-    api.get("/announcements").then((r) => setRows(r.data)).catch(() => {});
+    api.get("/announcements").then((r) => {
+      setRows(r.data);
+      if (r.data.length > 0) {
+        api.post("/announcements/mark-seen", { ids: r.data.map((a) => a.id) }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   if (rows.length === 0) return null;
