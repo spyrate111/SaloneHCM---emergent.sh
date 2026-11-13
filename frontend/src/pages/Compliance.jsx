@@ -107,14 +107,14 @@ export default function Compliance() {
         <div className="px-6 py-4 border-b border-[#E2DFD6]">
           <h3 className="font-heading text-lg font-semibold">Payroll filing workpapers</h3>
           <p className="text-xs text-[#686D76] mt-0.5 max-w-4xl">
-            These CSVs support filing preparation; they do not submit returns. NRA ITAS requires the current PAYE workbook to be downloaded and uploaded. The NASSIT employee schedule accompanies its payment advice form.
+            The NRA export is a preparation workpaper; download the current PAYE workbook for ITAS. The NASSIT Excel schedule follows the fields in its Companion Guide and should accompany the SS4A payment advice form.
           </p>
           <div className="flex flex-wrap gap-4 mt-2 text-xs">
             <a href="https://mail.nra.gov.sl/document/paye-return-form" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
               Official NRA PAYE workbook
             </a>
-            <a href="https://www.nassit.org.sl/our-services/contributions/" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
-              NASSIT contribution instructions
+            <a href="https://www.nassit.org.sl/images/NASSIT_Reports/My_NASSIT_Companion.pdf" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
+              NASSIT contribution schedule guide
             </a>
           </div>
         </div>
@@ -172,11 +172,11 @@ export default function Compliance() {
                         </button>
                         <button
                           data-testid={`export-nassit-${r.run_id}`}
-                          disabled={busy === `NASSIT-Schedule-${r.period}.csv`}
-                          onClick={() => downloadBlob(`/compliance/nassit-schedule.csv/${r.run_id}`, `NASSIT-Schedule-${r.period}.csv`)}
+                          disabled={busy === `NASSIT-Contribution-Schedule-${r.period}.xlsx`}
+                          onClick={() => downloadBlob(`/compliance/nassit-schedule.xlsx/${r.run_id}`, `NASSIT-Contribution-Schedule-${r.period}.xlsx`)}
                           className="inline-flex items-center gap-1 text-xs bg-[#17A035] hover:bg-[#148231] text-white px-2.5 py-1.5 rounded"
                         >
-                          <Download className="w-3.5 h-3.5" /> NASSIT
+                          <Download className="w-3.5 h-3.5" /> NASSIT Excel
                         </button>
                         {!r.nra_filed && canManageFilings && (
                           <button
