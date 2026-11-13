@@ -36,8 +36,11 @@ def _build_nra_csv(run: dict, employees: list, company: dict) -> bytes:
         emp = emp_map.get(s["employee_id"], {})
         taxable = round(s["gross"] - s["nassit_employee"], 2)
         w.writerow([
-            emp.get("tin", ""), s["employee_name"], emp.get("nassit_no", ""),
-            emp.get("department", ""), f'{s["gross"]:.2f}', f'{taxable:.2f}',
+            _payroll_identity_value(s, "employee_tin", emp, "tin"),
+            s["employee_name"],
+            _payroll_identity_value(s, "employee_nassit_no", emp, "nassit_no"),
+            _payroll_identity_value(s, "employee_department", emp, "department"),
+            f'{s["gross"]:.2f}', f'{taxable:.2f}',
             f'{s["paye"]:.2f}', f'{s["nassit_employee"]:.2f}',
             f'{s["nassit_employer"]:.2f}', f'{s["net"]:.2f}',
         ])
@@ -64,6 +67,19 @@ def _payroll_identity_value(slip: dict, snapshot_key: str, employee: dict, curre
     if snapshot_key in slip:
         return slip.get(snapshot_key) or ""
     return employee.get(current_key, "")
+
+
+async def _employees_for_payroll_run(run: dict, user: dict) -> list:
+    """Load only employees in this payroll run without truncating large establishments."""
+    employee_ids = list({
+        slip.get("employee_id") for slip in run.get("slips", [])
+        if slip.get("employee_id")
+    })
+    if not employee_ids:
+        return []
+    return await db.employees.find(
+        {"id": {"$in": employee_ids}, **tenant_filter(user)}, {"_id": 0},
+    ).to_list(len(employee_ids))
 
 
 def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
@@ -288,7 +304,7 @@ async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nr
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
-    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    employees = await _employees_for_payroll_run(r, user)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     emp_map = {e["id"]: e for e in employees}
     period = r["period"]
@@ -311,10 +327,10 @@ async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nr
         # Taxable = gross less NASSIT employee (Sierra Leone convention)
         taxable = round(s["gross"] - s["nassit_employee"], 2)
         w.writerow([
-            emp.get("tin", ""),
+            _payroll_identity_value(s, "employee_tin", emp, "tin"),
             s["employee_name"],
-            emp.get("nassit_no", ""),
-            emp.get("department", ""),
+            _payroll_identity_value(s, "employee_nassit_no", emp, "nassit_no"),
+            _payroll_identity_value(s, "employee_department", emp, "department"),
             f'{s["gross"]:.2f}',
             f'{taxable:.2f}',
             f'{s["paye"]:.2f}',
@@ -348,7 +364,7 @@ async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("n
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Run not found")
-    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    employees = await _employees_for_payroll_run(run, user)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
     if not company.get("name") or not company.get("nassit_employer"):
         raise HTTPException(
@@ -397,7 +413,7 @@ async def nassit_schedule_csv(rid: str, user: dict = Depends(require_feature("nr
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
-    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    employees = await _employees_for_payroll_run(r, user)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     emp_map = {e["id"]: e for e in employees}
 
@@ -418,7 +434,7 @@ async def nassit_schedule_csv(rid: str, user: dict = Depends(require_feature("nr
         total_emp += emp_share
         total_er += er_share
         w.writerow([
-            emp.get("nassit_no", ""),
+            _payroll_identity_value(s, "employee_nassit_no", emp, "nassit_no"),
             s["employee_name"],
             f'{s.get("basic", 0):.2f}',
             f'{emp_share:.2f}',
@@ -506,7 +522,7 @@ async def email_nra_paye_csv(rid: str, body: EmailFilingIn, user: dict = Depends
     r = await db.payroll_runs.find_one({"id": rid, **tf}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
-    employees = await db.employees.find(tf, {"_id": 0}).to_list(2000)
+    employees = await _employees_for_payroll_run(r, user)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     csv_bytes = _build_nra_csv(r, employees, company or {})
     to = (body.to or user["email"]).strip().lower()
