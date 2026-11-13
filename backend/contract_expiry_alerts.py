@@ -44,7 +44,6 @@ async def _stage_due_alerts(today) -> None:
             await db.contract_expiry_alerts.insert_one({
                 **key,
                 "id": str(uuid.uuid4()),
-                "employee_name": f'{employee.get("first_name", "")} {employee.get("last_name", "")}'.strip(),
                 "status": "pending",
                 "attempts": 0,
                 "created_at": iso(now_utc()),
@@ -68,7 +67,7 @@ async def _deliver_pending_alerts() -> dict:
         employee = await db.employees.find_one(
             {"id": alert["employee_id"], **tf, "status": "active",
              "contract_end_date": alert["contract_end_date"]},
-            {"_id": 0, "id": 1},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1},
         )
         user = await db.users.find_one(
             {"id": alert["user_id"], **tf, "role": {"$in": list(HR_ROLES)},
@@ -83,7 +82,7 @@ async def _deliver_pending_alerts() -> dict:
             cancelled += 1
             continue
 
-        name = alert["employee_name"] or "An employee"
+        name = f'{employee.get("first_name", "")} {employee.get("last_name", "")}'.strip() or "An employee"
         days = alert["days_before"]
         title = f"Contract expiry reminder ({days}-day)"
         body = f"{name}'s contract ends on {alert['contract_end_date']}."
