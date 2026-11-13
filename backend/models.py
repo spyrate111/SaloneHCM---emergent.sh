@@ -35,6 +35,8 @@ class EmployeeIn(BaseModel):
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
     bank_account: Optional[str] = ""
+    orange_money_number: Optional[str] = ""
+    afrimoney_number: Optional[str] = ""
     hire_date: str
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
@@ -64,6 +66,11 @@ class TimeEntryIn(BaseModel):
 
 
 # ---------- Payroll ----------
+class EmployeeMobileMoneyDetailsIn(BaseModel):
+    orange_money_number: Optional[str] = Field(default="", max_length=32)
+    afrimoney_number: Optional[str] = Field(default="", max_length=32)
+
+
 class PayrollRunIn(BaseModel):
     period_month: int = Field(..., ge=1, le=12)
     period_year: int = Field(..., ge=2020, le=2100)
