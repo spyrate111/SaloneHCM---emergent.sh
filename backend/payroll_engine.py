@@ -57,6 +57,13 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
     return {
         "employee_id": emp["id"],
         "employee_name": f'{emp["first_name"]} {emp["last_name"]}',
+        # Snapshot statutory identity so later profile edits do not rewrite old schedules.
+        "employee_first_name": emp.get("first_name", ""),
+        "employee_last_name": emp.get("last_name", ""),
+        "employee_middle_name": emp.get("middle_name", ""),
+        "employee_nassit_no": emp.get("nassit_no", ""),
+        "employee_tin": emp.get("tin", ""),
+        "employee_department": emp.get("department", ""),
         "basic": basic,
         "allowances": allow_total,
         "allowance_breakdown": breakdown,

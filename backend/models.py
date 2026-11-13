@@ -23,6 +23,7 @@ class TotpDisableIn(BaseModel):
 class EmployeeIn(BaseModel):
     first_name: str
     last_name: str
+    middle_name: Optional[str] = ""
     email: EmailStr
     phone: Optional[str] = ""
     job_title: str
