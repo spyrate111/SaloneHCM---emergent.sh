@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
 import OffboardingPanel from "../components/OffboardingPanel";
@@ -9,6 +10,7 @@ import OffboardingPanel from "../components/OffboardingPanel";
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { has } = useFeatures();
+  const { user } = useAuth();
   const [e, setE] = useState(null);
   const [slip, setSlip] = useState(null);
   // Civil-service refs
@@ -18,6 +20,8 @@ export default function EmployeeDetail() {
   const [savingCs, setSavingCs] = useState(false);
   const [qr, setQr] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
+  const [wallets, setWallets] = useState({ orange_money_number: "", afrimoney_number: "" });
+  const [savingWallets, setSavingWallets] = useState(false);
 
   const issueQr = async () => {
     setQrBusy(true);
@@ -33,6 +37,10 @@ export default function EmployeeDetail() {
 
   const load = useCallback(() => api.get(`/employees/${id}`).then((r) => {
     setE(r.data);
+    setWallets({
+      orange_money_number: r.data.orange_money_number || "",
+      afrimoney_number: r.data.afrimoney_number || "",
+    });
     setCs({
       grade_code: r.data.grade_code || "",
       step_number: r.data.step_number || "",
@@ -81,6 +89,19 @@ export default function EmployeeDetail() {
       toast.error(err?.response?.data?.detail || "Save failed");
     } finally {
       setSavingCs(false);
+    }
+  };
+
+  const saveWallets = async () => {
+    setSavingWallets(true);
+    try {
+      await api.patch("/employees/" + id + "/mobile-money-details", wallets);
+      toast.success("Mobile money payment details saved");
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not save payment details");
+    } finally {
+      setSavingWallets(false);
     }
   };
 
@@ -139,6 +160,43 @@ export default function EmployeeDetail() {
               </div>
             ))}
           </div>
+
+          {["hr", "admin", "superadmin"].includes(user?.role) && (
+            <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="mobile-money-profile-editor">
+              <div>
+                <h3 className="font-heading text-lg font-semibold">Mobile money payment details</h3>
+                <p className="text-xs text-[#686D76] mt-1">Enter the wallet number for each provider. These numbers are used only to prepare SLE payroll batches.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  ["orange_money_number", "Orange Money wallet number"],
+                  ["afrimoney_number", "Afrimoney wallet number"],
+                ].map(([key, label]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">{label}</label>
+                    <input
+                      data-testid={key}
+                      type="tel"
+                      value={wallets[key]}
+                      onChange={(event) => setWallets({ ...wallets, [key]: event.target.value })}
+                      className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
+                      placeholder="+232 ..."
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  data-testid="save-mobile-money-details"
+                  onClick={saveWallets}
+                  disabled={savingWallets}
+                  className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs px-3 py-2 rounded-md disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" /> {savingWallets ? "Saving…" : "Save payment details"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {has("civil_service") && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="cs-profile-editor">
