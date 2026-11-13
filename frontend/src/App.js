@@ -43,6 +43,7 @@ import ScanLogs from "./pages/ScanLogs";
 import Expenses from "./pages/Expenses";
 import Recruitment from "./pages/Recruitment";
 import Announcements from "./pages/Announcements";
+import Careers from "./pages/Careers";
 import Apply from "./pages/Apply";
 import TrainingCenterPage from "./marketing/TrainingCenterPage";
 import LandingPage from "./marketing/LandingPage";
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/training" element={<TrainingCenterPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/transparency/:slug" element={<Transparency />} />
+          <Route path="/careers" element={<Careers />} />
           <Route path="/careers/:slug" element={<PublicCareers />} />
           <Route path="/verify/:cid" element={<Verify />} />
           <Route path="/apply/:token" element={<Apply />} />

@@ -328,6 +328,13 @@ export default function Login() {
             <div className="font-data">Admin · admin@salonehcm.sl · Admin@2026</div>
             <div className="font-data text-[#686D76]">Employee · aminata.kamara@salonehcm.sl · Employee@2026</div>
           </div>
+
+          <div className="mt-4 text-center">
+            <a href="/careers" data-testid="login-careers-link"
+              className="text-sm text-[#0A4A1E] font-medium hover:underline">
+              We&rsquo;re hiring — view open positions →
+            </a>
+          </div>
         </div>
       </div>
     </div>

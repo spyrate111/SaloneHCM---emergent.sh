@@ -2,12 +2,13 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from core import (db, get_current_user, require_roles, can_role, audit,
                   tenant_filter, with_tenant, now_utc, iso)
 from storage import put_object, get_object, APP_NAME
+import push_service
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 
@@ -33,6 +34,7 @@ async def _visible_filter(user: dict) -> dict:
 
 @router.post("")
 async def submit_claim(
+    bg: BackgroundTasks,
     description: str = Form(...),
     amount_sle: float = Form(...),
     category: str = Form(...),
@@ -86,6 +88,13 @@ async def submit_claim(
     doc.pop("_id", None)
     await audit("expense_claim_submitted", f"expense_claims/{cid}", user,
                 {"amount_sle": doc["amount_sle"], "category": category})
+    if emp.get("manager_id"):
+        bg.add_task(push_service.fanout_to_employee, emp["manager_id"], {
+            "title": "New expense claim",
+            "body": f'{doc["employee_name"]} — SLE {doc["amount_sle"]:,.2f} ({category})',
+            "url": f"/expenses?claim={cid}",
+            "kind": "expense_claim",
+        })
     if doc.get("receipt"):
         doc["receipt"] = {"filename": doc["receipt"]["filename"]}
     return doc
@@ -121,7 +130,8 @@ async def pending_reimbursements(user: dict = Depends(require_roles("payroll")))
 
 
 @router.put("/{cid}/decision")
-async def decide_claim(cid: str, body: dict, user: dict = Depends(get_current_user)):
+async def decide_claim(cid: str, body: dict, bg: BackgroundTasks,
+                       user: dict = Depends(get_current_user)):
     status = (body or {}).get("status")
     if status not in ("approved", "rejected"):
         raise HTTPException(422, "status must be 'approved' or 'rejected'")
@@ -139,14 +149,24 @@ async def decide_claim(cid: str, body: dict, user: dict = Depends(get_current_us
                   and emp.get("manager_id") == user.get("employee_id"))
         if not is_mgr:
             raise HTTPException(403, "Only the employee's manager, HR or an admin may decide")
+    note = ((body or {}).get("note") or "").strip()[:300]
     await db.expense_claims.update_one({"id": cid}, {"$set": {
         "status": status,
         "decided_by": user.get("name") or user["email"],
         "decided_at": iso(now_utc()),
-        "decision_note": ((body or {}).get("note") or "").strip()[:300],
+        "decision_note": note,
     }})
     await audit(f"expense_claim_{status}", f"expense_claims/{cid}", user,
                 {"employee": claim["employee_name"], "amount_sle": claim["amount_sle"]})
+    body_txt = f'Your {claim["category"]} claim of SLE {claim["amount_sle"]:,.2f} was {status}'
+    if status == "rejected" and note:
+        body_txt += f" — {note}"
+    bg.add_task(push_service.fanout_to_employee, claim["employee_id"], {
+        "title": f"Expense claim {status}",
+        "body": body_txt,
+        "url": f"/expenses?claim={cid}",
+        "kind": "expense_claim",
+    })
     return {"ok": True, "status": status}
 
 

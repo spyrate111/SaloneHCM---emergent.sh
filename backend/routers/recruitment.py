@@ -1,13 +1,12 @@
 """Recruitment / ATS: vacancies, public applications, stage pipeline, hire-to-employee."""
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr
 
 from core import (db, require_roles, audit, tenant_filter, with_tenant,
-                  now_utc, iso, get_current_user, can_role)
+                  now_utc, iso)
 from storage import put_object, get_object, APP_NAME
 from routers.payroll_rails import assert_not_cutoff_locked
 
@@ -158,6 +157,22 @@ async def download_cv(aid: str, user: dict = Depends(_HR)):
 
 
 # ---------------- public (no auth) ----------------
+
+@public_router.get("")
+async def public_open_vacancies():
+    """All open, still-accepting vacancies across companies — powers /careers."""
+    today = now_utc().strftime("%Y-%m-%d")
+    rows = await db.job_vacancies.find(
+        {"status": "open", "closing_date": {"$gte": today}},
+        {"_id": 0, "title": 1, "department": 1, "grade_level": 1,
+         "closing_date": 1, "public_token": 1, "company_id": 1,
+         "created_at": 1}).sort("closing_date", 1).to_list(500)
+    cids = list({r["company_id"] for r in rows})
+    names = {c["id"]: c.get("name", "") async for c in db.companies.find(
+        {"id": {"$in": cids}}, {"_id": 0, "id": 1, "name": 1})}
+    for r in rows:
+        r["company_name"] = names.get(r.pop("company_id"), "")
+    return rows
 
 def _public_vacancy(v: dict) -> dict:
     return {k: v.get(k) for k in ("title", "department", "grade_level",

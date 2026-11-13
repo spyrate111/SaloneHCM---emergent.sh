@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
@@ -19,11 +20,19 @@ export default function Expenses() {
   const canDecide = ["manager", "hr", "admin", "superadmin"].includes(role);
   const [rows, setRows] = useState([]);
   const [open, setOpen] = useState(false);
+  const [params] = useSearchParams();
+  const focusId = params.get("claim");
 
   const load = useCallback(() => {
     api.get("/expenses").then((r) => setRows(r.data)).catch(() => {});
   }, []);
   useEffect(load, [load]);
+
+  useEffect(() => {
+    if (!focusId || rows.length === 0) return;
+    const el = document.querySelector(`[data-testid="expense-row-${focusId}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [rows, focusId]);
 
   const decide = async (cid, status) => {
     try {
@@ -43,7 +52,8 @@ export default function Expenses() {
   };
 
   const Row = ({ r, actions }) => (
-    <div className="flex items-center justify-between gap-3 border-b border-[#F0EEE8] py-3 flex-wrap" data-testid={`expense-row-${r.id}`}>
+    <div className={`flex items-center justify-between gap-3 border-b border-[#F0EEE8] py-3 flex-wrap ${r.id === focusId ? "bg-[#E9F2FB] ring-1 ring-[#26547C] rounded-md px-3 -mx-3" : ""}`}
+      data-testid={`expense-row-${r.id}`}>
       <div className="min-w-0">
         <div className="text-sm font-medium text-[#1A1C1E]">
           {r.employee_name} · <span className="capitalize text-[#525860]">{r.category}</span>

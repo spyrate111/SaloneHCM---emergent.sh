@@ -745,5 +745,18 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 ### Misc
 - Employees.jsx Add-employee modal: 422 pydantic list details now rendered via sonner toast (was silent alert fallback) — pre-existing gap flagged by testing agent.
 ### Testing
-- tests/test_iter49_announcements_offboarding.py (6 pytest: role gates, validation, expired archive scoping, full workflow w/ real login-deactivation proof, cancel). Testing agent iteration_39.json: **8/8 frontend flows PASS** (post urgent, employee banner+card+dismiss, employee access-denied on /announcements, delete, offboarding role-gated completion across HR/Payroll/Admin, auto-deactivate, cancel). Full suite regression run post-change.
+- tests/test_iter49_announcements_offboarding.py (6 pytest: role gates, validation, expired archive scoping, full workflow w/ real login-deactivation proof, cancel). Testing agent iteration_39.json: **8/8 frontend flows PASS**. Full suite 612 passed, 7 skipped.
+- NOTE: production needs REDEPLOY.
+
+## v1.49 (Nov 2026) — Claim notifications + public /careers listing (iter50)
+### Claim push notifications (routers/expenses.py)
+- Submit: BackgroundTasks push to the employee's direct manager via push_service.fanout_to_employee(emp.manager_id) — "New expense claim: {name} — SLE {amount} ({category})", deep link /expenses?claim={cid}. Skipped silently if no manager_id or manager has no push subscription.
+- Decision: push to claimant — "Expense claim approved/rejected", body includes amount+category and rejection note when present; same deep link.
+- Expenses.jsx deep link: ?claim={id} scrolls to and highlights (blue ring) the matching row.
+### Public careers listing (/careers)
+- New GET /api/careers (NO auth, safe-method so CSRF-exempt): all open vacancies with closing_date >= today across companies — returns title, department, grade_level, closing_date, company_name, public_token only (no internal ids). Closed/past-closing excluded.
+- New pages/Careers.jsx at route /careers (public, before pre-existing /careers/:slug PublicCareers for the legacy job_postings module). Cards link to /apply/{public_token}. testids: careers-page/vacancy-{token}/empty/login-link.
+- Login.jsx: "We're hiring — view open positions →" link (login-careers-link) under demo accounts box.
+### Testing
+- tests/test_iter50_careers_claim_notifications.py (2: unauth listing filters open/closed/past + field whitelist; claim submit+reject-with-note regression). iter48 suite re-run: 10/10 passed. Visual: /careers card renders + click-through to apply form + login link verified via screenshots. Push delivery itself depends on browser subscriptions (VAPID configured in backend/.env).
 - NOTE: production needs REDEPLOY.
