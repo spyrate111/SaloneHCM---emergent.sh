@@ -308,6 +308,10 @@ async def cost_tracking(period: str, user: dict = Depends(require_roles("hr"))):
                 "budget_codes": set(), "shared_budget_codes": set(),
                 "missing_allocation_codes": set(),
             })
+            org["budget_codes"].add(code)
+            if code:
+                code_orgs[code].add(org_key)
+                by_code[code]["organization_units"].add(org_key)
             actual_by_org[org_key]["gross"] += gross
             actual_by_org[org_key]["headcount"] += 1
 
