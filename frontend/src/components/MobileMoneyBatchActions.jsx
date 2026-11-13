@@ -71,6 +71,26 @@ export default function MobileMoneyBatchActions({ run }) {
     }
   };
 
+  const retryFailed = async () => {
+    if (!batch) return;
+    setBusy("retry");
+    try {
+      const { data } = await api.post(
+        "/payroll/mobile-money/batches/" + batch.id + "/retry-failed",
+        { payment_date: paymentDate },
+      );
+      setBatches((current) => [data, ...current.filter((item) => item.id !== data.id)]);
+      setSelectedBatchId(data.id);
+      toast.success(data.already_exists
+        ? "A retry batch already exists for these failed payments"
+        : "Failed payments copied to a new approval batch");
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not prepare failed-payment retry");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const approveBatch = async () => {
     if (!batch) return;
     setBusy("approve");
@@ -253,7 +273,17 @@ export default function MobileMoneyBatchActions({ run }) {
                     {batch.status === "pending_approval" && canApprove && batch.created_by === user?.email && (
                       <span className="text-xs text-[#8B6A14]">You cannot approve a batch you created.</span>
                     )}
-                    {batch.status !== "pending_approval" && (
+                    {batch.failed_count > 0 && (
+                      <button
+                        data-testid={"mobile-money-retry-" + batch.id}
+                        onClick={retryFailed}
+                        disabled={busy !== ""}
+                        className="inline-flex items-center gap-1.5 border border-[#B84F2F] text-[#B84F2F] hover:bg-[#FBE9DF] px-3 py-2 rounded-md text-xs disabled:opacity-50"
+                      >
+                        {busy === "retry" ? "Preparing retry…" : "Prepare failed-payment retry"}
+                      </button>
+                    )}
+                    {batch.status !== "pending_approval" && batch.pending_count > 0 && (
                       <button
                         data-testid={"mobile-money-export-" + batch.id}
                         onClick={exportBatch}
