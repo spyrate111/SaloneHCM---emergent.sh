@@ -2,7 +2,7 @@
  * Mobile profile — push notifications toggle, biometric (WebAuthn) enrolment,
  * device list, app version. Uses existing /api/push and /api/auth/webauthn.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import api, { fmtSLE } from "../../lib/api";
 import { Bell, BellOff, Fingerprint, Smartphone, Trash2, Info, LogOut, FileText, CloudDownload, CheckCircle2, FolderDown } from "lucide-react";
@@ -10,8 +10,26 @@ import { useAuth } from "../../context/AuthContext";
 
 const REGISTRATION_KEY = "salonehcm_push_endpoint";
 const PACK_CACHE = "salonehcm-payslip-pack";
-const PACK_META_KEY = "salonehcm_m_pack_meta";
-const packKey = (row) => `/offline-payslips/${row.run_id}.pdf`;
+const PACK_META_PREFIX = "salonehcm_m_pack_meta";
+const packMetaKey = (accountId) => accountId ? `${PACK_META_PREFIX}:${accountId}` : null;
+const packKey = (accountId, row) => `/offline-payslips/${encodeURIComponent(accountId)}/${row.run_id}.pdf`;
+
+function readPackMeta(accountId) {
+  const key = packMetaKey(accountId);
+  if (!key) return [];
+  try {
+    const rows = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePackMeta(accountId, rows) {
+  const key = packMetaKey(accountId);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(rows)); } catch { /* quota */ }
+}
 
 function urlBase64ToUint8Array(base64) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -38,30 +56,50 @@ export default function MobileProfile() {
   const [pushBusy, setPushBusy] = useState(false);
   const [creds, setCreds] = useState([]);
   const [bioBusy, setBioBusy] = useState(false);
-  const [slips, setSlips] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(PACK_META_KEY) || "[]"); } catch { return []; }
-  });
+  const accountId = user?.id || null;
+  const [slips, setSlips] = useState(() => readPackMeta(accountId));
   const [savedIds, setSavedIds] = useState({});
   const [savingId, setSavingId] = useState(null);
+  const activeUserId = useRef(accountId);
 
-  const checkSaved = async (rows) => {
-    if (!("caches" in window)) return;
+  useLayoutEffect(() => {
+    if (activeUserId.current === accountId) return;
+    activeUserId.current = accountId;
+    setSlips(readPackMeta(accountId));
+    setSavedIds({});
+    setSavingId(null);
+  }, [accountId]);
+
+  const checkSaved = async (rows, forAccountId) => {
+    if (!forAccountId || !("caches" in window)) return;
     const c = await caches.open(PACK_CACHE);
     const map = {};
-    for (const row of rows) map[row.run_id] = !!(await c.match(packKey(row)));
-    setSavedIds(map);
+    for (const row of rows) map[row.run_id] = !!(await c.match(packKey(forAccountId, row)));
+    if (activeUserId.current === forAccountId) setSavedIds(map);
   };
 
   useEffect(() => {
+    const requestAccountId = accountId;
+    if (!requestAccountId) {
+      setSlips([]);
+      setSavedIds({});
+      return;
+    }
+    const cachedRows = readPackMeta(requestAccountId);
     api.get("/payroll/my-payslips").then((r) => {
+      if (activeUserId.current !== requestAccountId) return;
       const last3 = (r.data || []).slice(0, 3);
       setSlips(last3);
-      try { localStorage.setItem(PACK_META_KEY, JSON.stringify(last3)); } catch { /* quota */ }
-      checkSaved(last3);
-    }).catch(() => checkSaved(slips)); // offline — check cache against cached meta
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      writePackMeta(requestAccountId, last3);
+      checkSaved(last3, requestAccountId);
+    }).catch(() => {
+      if (activeUserId.current === requestAccountId) checkSaved(cachedRows, requestAccountId);
+    });
+  }, [accountId]);
 
   const savePdf = async (row) => {
+    const requestAccountId = accountId;
+    if (!requestAccountId) return;
     setSavingId(row.run_id);
     try {
       const res = await api.get(
@@ -69,13 +107,15 @@ export default function MobileProfile() {
         { responseType: "blob" },
       );
       const c = await caches.open(PACK_CACHE);
-      await c.put(packKey(row), new Response(res.data, { headers: { "Content-Type": "application/pdf" } }));
-      setSavedIds((s) => ({ ...s, [row.run_id]: true }));
-      toast.success(`${row.period} payslip saved for offline`);
+      await c.put(packKey(requestAccountId, row), new Response(res.data, { headers: { "Content-Type": "application/pdf" } }));
+      if (activeUserId.current === requestAccountId) {
+        setSavedIds((s) => ({ ...s, [row.run_id]: true }));
+        toast.success(`${row.period} payslip saved for offline`);
+      }
     } catch {
-      toast.error("Could not save — check your connection");
+      if (activeUserId.current === requestAccountId) toast.error("Could not save — check your connection");
     } finally {
-      setSavingId(null);
+      if (activeUserId.current === requestAccountId) setSavingId(null);
     }
   };
 
@@ -86,8 +126,9 @@ export default function MobileProfile() {
   };
 
   const openSaved = async (row) => {
+    if (!accountId) return;
     const c = await caches.open(PACK_CACHE);
-    const hit = await c.match(packKey(row));
+    const hit = await c.match(packKey(accountId, row));
     if (!hit) { toast.error("Not saved offline yet"); return; }
     const blob = await hit.blob();
     const url = URL.createObjectURL(blob);
