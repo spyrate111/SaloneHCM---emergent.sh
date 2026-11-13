@@ -13,7 +13,16 @@ const ME_CACHE_KEY = "salonehcm_m_me";
 const OUTBOX_PREFIX = "salonehcm_m_leave_outbox";
 
 function readCachedMe() {
-  try { return JSON.parse(localStorage.getItem(ME_CACHE_KEY) || "null"); } catch { return null; }
+  try {
+    const cached = JSON.parse(localStorage.getItem(ME_CACHE_KEY) || "null");
+    return cached && typeof cached === "object" ? {
+      employee_id: cached.employee_id,
+      first_name: cached.first_name,
+      last_name: cached.last_name,
+    } : null;
+  } catch {
+    return null;
+  }
 }
 
 function outboxKey(employeeId) {
@@ -22,7 +31,12 @@ function outboxKey(employeeId) {
 
 function readOutbox(employeeId) {
   if (!employeeId) return [];
-  try { return JSON.parse(localStorage.getItem(outboxKey(employeeId)) || "[]"); } catch { return []; }
+  try {
+    const items = JSON.parse(localStorage.getItem(outboxKey(employeeId)) || "[]");
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
 }
 
 function writeOutbox(employeeId, items) {
@@ -66,7 +80,12 @@ export default function MobileLeave() {
     }).catch(() => { /* keep cache */ });
     api.get("/auth/me").then((r) => {
       setMe(r.data);
-      try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(r.data)); } catch { /* noop */ }
+      const offlineIdentity = {
+        employee_id: r.data?.employee_id,
+        first_name: r.data?.first_name,
+        last_name: r.data?.last_name,
+      };
+      try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(offlineIdentity)); } catch { /* noop */ }
       setQueued(readOutbox(r.data?.employee_id));
     }).catch(() => {});
   };
