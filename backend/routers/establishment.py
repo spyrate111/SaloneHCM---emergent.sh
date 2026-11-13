@@ -216,6 +216,192 @@ async def overruns(user: dict = Depends(require_roles("hr"))):
     return [p for p in positions if p["overrun_count"] > 0]
 
 
+@router.get("/costs")
+async def cost_tracking(period: str, user: dict = Depends(require_roles("hr"))):
+    """Compare approved posts and IFMIS allocations with the latest completed payroll."""
+    if (len(period) != 7 or period[4] != "-" or not period[:4].isdigit()
+            or not period[5:].isdigit() or not 1 <= int(period[5:]) <= 12):
+        raise HTTPException(422, "period must be YYYY-MM")
+
+    tf = tenant_filter(user)
+    company_id = user["company_id"]
+    positions = await db.establishment_positions.find(
+        tf,
+        {"_id": 0, "id": 1, "ministry": 1, "directorate": 1,
+         "approved_count": 1, "budget_code": 1},
+    ).to_list(5000)
+    filled_by_position = await _filled_counts(company_id)
+
+    def _code(value):
+        return str(value).strip().upper() if value is not None and str(value).strip() else None
+
+    def _org_key(ministry, directorate):
+        return (str(ministry or "").strip().casefold(),
+                str(directorate or "").strip().casefold())
+
+    orgs = {}
+    code_orgs = defaultdict(set)
+    by_code = defaultdict(lambda: {
+        "approved_headcount": 0, "filled_headcount": 0,
+        "position_count": 0, "organization_units": set(),
+    })
+
+    for pos in positions:
+        ministry = str(pos.get("ministry") or "Unassigned ministry").strip()
+        directorate = str(pos.get("directorate") or "Unassigned directorate").strip()
+        org_key = _org_key(ministry, directorate)
+        org = orgs.setdefault(org_key, {
+            "ministry": ministry, "directorate": directorate,
+            "approved_headcount": 0, "filled_headcount": 0,
+            "payroll_headcount": 0, "actual_gross_sle": 0.0,
+            "budget_codes": set(), "shared_budget_codes": set(),
+            "missing_allocation_codes": set(),
+        })
+        approved = int(pos.get("approved_count") or 0)
+        filled = int(filled_by_position.get(pos.get("id"), 0))
+        org["approved_headcount"] += approved
+        org["filled_headcount"] += filled
+
+        code = _code(pos.get("budget_code"))
+        row = by_code[code]
+        row["approved_headcount"] += approved
+        row["filled_headcount"] += filled
+        row["position_count"] += 1
+        row["organization_units"].add(org_key)
+        org["budget_codes"].add(code)
+        if code:
+            code_orgs[code].add(org_key)
+
+    # Use the newest saved balance per code if old duplicate rows exist.
+    balance_rows = await db.budget_balances.find(
+        {**tf, "period": period},
+        {"_id": 0, "budget_code": 1, "allocated_sle": 1, "updated_at": 1},
+    ).sort("updated_at", -1).to_list(2000)
+    allocations = {}
+    for balance in balance_rows:
+        code = _code(balance.get("budget_code"))
+        if code and code not in allocations:
+            allocations[code] = round(float(balance.get("allocated_sle") or 0), 2)
+
+    latest_runs = await db.payroll_runs.find(
+        {**tf, "period": period, "status": "completed"},
+        {"_id": 0, "id": 1, "created_at": 1, "slips": 1},
+    ).sort("created_at", -1).limit(1).to_list(1)
+    latest_run = latest_runs[0] if latest_runs else None
+    actual_by_code = defaultdict(lambda: {"gross": 0.0, "headcount": 0})
+    actual_by_org = defaultdict(lambda: {"gross": 0.0, "headcount": 0})
+
+    if latest_run:
+        for slip in latest_run.get("slips", []):
+            gross = round(float(slip.get("gross") or 0), 2)
+            code = _code(slip.get("budget_code"))
+            actual_by_code[code]["gross"] += gross
+            actual_by_code[code]["headcount"] += 1
+
+            ministry = str(slip.get("mda_ministry") or "Unassigned ministry").strip()
+            directorate = str(slip.get("department") or "Unspecified directorate").strip()
+            org_key = _org_key(ministry, directorate)
+            org = orgs.setdefault(org_key, {
+                "ministry": ministry, "directorate": directorate,
+                "approved_headcount": 0, "filled_headcount": 0,
+                "payroll_headcount": 0, "actual_gross_sle": 0.0,
+                "budget_codes": set(), "shared_budget_codes": set(),
+                "missing_allocation_codes": set(),
+            })
+            actual_by_org[org_key]["gross"] += gross
+            actual_by_org[org_key]["headcount"] += 1
+
+    for code, org_keys in code_orgs.items():
+        for org_key in org_keys:
+            org = orgs[org_key]
+            if code not in allocations:
+                org["missing_allocation_codes"].add(code)
+            elif len(org_keys) > 1:
+                org["shared_budget_codes"].add(code)
+            else:
+                org.setdefault("allocated_sle", 0.0)
+                org["allocated_sle"] += allocations[code]
+
+    for org_key, org in orgs.items():
+        org.update(actual_by_org.get(org_key, {"gross": 0.0, "headcount": 0}))
+        org["actual_gross_sle"] = round(org["gross"], 2) if latest_run else None
+        org["payroll_headcount"] = org["headcount"] if latest_run else None
+        org.pop("gross", None)
+        org.pop("headcount", None)
+        if None in org["budget_codes"]:
+            org["missing_allocation_codes"].add("No budget code")
+        org["allocation_complete"] = bool(org["budget_codes"]) and not (
+            org["shared_budget_codes"] or org["missing_allocation_codes"]
+        )
+        org["allocated_sle"] = round(org.get("allocated_sle", 0.0), 2)
+        org["variance_sle"] = (
+            round(org["actual_gross_sle"] - org["allocated_sle"], 2)
+            if latest_run and org["allocation_complete"] else None
+        )
+        org["shared_budget_codes"] = sorted(org["shared_budget_codes"])
+        org["missing_allocation_codes"] = sorted(org["missing_allocation_codes"])
+        org["budget_codes"] = sorted(code for code in org["budget_codes"] if code)
+
+    all_codes = set(by_code) | set(allocations) | set(actual_by_code)
+    code_rows = []
+    for code in all_codes:
+        planned = by_code.get(code, {
+            "approved_headcount": 0, "filled_headcount": 0,
+            "position_count": 0, "organization_units": set(),
+        })
+        actual = actual_by_code.get(code, {"gross": 0.0, "headcount": 0})
+        allocation = allocations.get(code)
+        actual_gross = round(actual["gross"], 2) if latest_run else None
+        code_rows.append({
+            "budget_code": code,
+            "approved_headcount": planned["approved_headcount"],
+            "filled_headcount": planned["filled_headcount"],
+            "position_count": planned["position_count"],
+            "payroll_headcount": actual["headcount"] if latest_run else None,
+            "actual_gross_sle": actual_gross,
+            "allocated_sle": allocation,
+            "utilization_pct": (
+                round(actual_gross / allocation * 100, 1)
+                if actual_gross is not None and allocation else None
+            ),
+            "variance_sle": (
+                round(actual_gross - allocation, 2)
+                if actual_gross is not None and allocation is not None else None
+            ),
+            "shared_across_org_units": len(code_orgs.get(code, set())) > 1,
+            "organization_units": [
+                {"ministry": orgs[key]["ministry"], "directorate": orgs[key]["directorate"]}
+                for key in sorted(planned["organization_units"])
+            ],
+        })
+
+    code_rows.sort(key=lambda row: (row["budget_code"] is None, row["budget_code"] or ""))
+    org_rows = [
+        {key: value for key, value in org.items()
+         if key not in ("budget_codes",)}
+        for org in orgs.values()
+    ]
+    org_rows.sort(key=lambda row: (row["ministry"].casefold(), row["directorate"].casefold()))
+
+    total_actual = round(sum(row["gross"] for row in actual_by_code.values()), 2) if latest_run else None
+    return {
+        "period": period,
+        "currency": "SLE",
+        "payroll_run_id": latest_run.get("id") if latest_run else None,
+        "payroll_run_created_at": latest_run.get("created_at") if latest_run else None,
+        "actuals_available": latest_run is not None,
+        "totals": {
+            "approved_headcount": sum(int(pos.get("approved_count") or 0) for pos in positions),
+            "filled_headcount": sum(int(filled_by_position.get(pos.get("id"), 0)) for pos in positions),
+            "payroll_headcount": sum(row["headcount"] for row in actual_by_code.values()) if latest_run else None,
+            "actual_gross_sle": total_actual,
+            "allocated_sle": round(sum(allocations.values()), 2),
+        },
+        "by_org_unit": org_rows,
+        "by_budget_code": code_rows,
+    }
+
+
 # ---------- Assignment ----------
 
 @router.post("/positions/{pid}/assign")
