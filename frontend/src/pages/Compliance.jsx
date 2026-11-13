@@ -78,8 +78,8 @@ export default function Compliance() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <KPI dark icon={ShieldCheck} label="YTD PAYE remitted" value={fmtSLE(summary.ytd_paye_sle)} />
-        <KPI icon={Receipt} label="YTD NASSIT" value={fmtSLE(summary.ytd_nassit_sle)} sub="Employee + Employer" />
+        <KPI dark icon={ShieldCheck} label={`YTD PAYE assessed (${summary.report_year})`} value={fmtSLE(summary.ytd_paye_sle)} />
+        <KPI icon={Receipt} label={`YTD NASSIT assessed (${summary.report_year})`} value={fmtSLE(summary.ytd_nassit_sle)} sub="Employee + Employer" />
         <KPI icon={FileCheck} label="Returns filed" value={summary.filed_count || 0} sub={`of ${summary.runs_count} runs`} color="text-[#17A035]" />
         <KPI icon={AlertCircle} label="Outstanding" value={(summary.outstanding || []).length} color={summary.outstanding?.length ? "text-[#B84F2F]" : "text-[#525860]"} sub={summary.next_filing} />
       </div>
