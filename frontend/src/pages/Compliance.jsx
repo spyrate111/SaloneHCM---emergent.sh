@@ -9,6 +9,7 @@ export default function Compliance() {
   const { has } = useFeatures();
   const { user } = useAuth();
   const readOnly = user?.role === "auditor";
+  const canManageFilings = user?.role === "admin" || user?.role === "superadmin";
   const hasNraExport = has("nra_export");
   const [summary, setSummary] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -41,13 +42,18 @@ export default function Compliance() {
   };
 
   const markFiled = async (rid) => {
-    if (!window.confirm("Mark this run as filed at NRA? This will record an audit-trail entry.")) return;
+    const nraReference = window.prompt(
+      "After submitting this return through NRA ITAS, enter the reference issued by NRA:",
+    );
+    if (!nraReference?.trim()) return;
     try {
-      const { data } = await api.post(`/compliance/file-nra/${rid}`);
-      toast.success(`Filed — NRA reference ${data.nra_reference}`);
+      const { data } = await api.post("/compliance/file-nra/" + rid, {
+        nra_reference: nraReference.trim(),
+      });
+      toast.success("NRA reference " + data.nra_reference + " recorded");
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Mark filed failed");
+      toast.error(e?.response?.data?.detail || "Could not record NRA filing");
     }
   };
 
@@ -69,7 +75,7 @@ export default function Compliance() {
       <div>
         <div className="text-[11px] uppercase tracking-[0.18em] text-[#525860]">Compliance & Tax</div>
         <h1 className="font-heading text-3xl sm:text-4xl font-bold mt-1">NRA & NASSIT</h1>
-        <p className="text-[#525860] text-sm mt-1 max-w-2xl">Sierra Leone PAYE bands and social security contributions, ready for filing.</p>
+        <p className="text-[#525860] text-sm mt-1 max-w-2xl">Prepare payroll workpapers for Sierra Leone PAYE and NASSIT reporting. Submit returns through the authorities&rsquo; current filing process.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -100,13 +106,24 @@ export default function Compliance() {
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-[#E2DFD6]">
-          <h3 className="font-heading text-lg font-semibold">Filing-ready exports</h3>
-          <p className="text-xs text-[#686D76] mt-0.5">
-            {hasNraExport
-              ? "Download the NRA PAYE Return + NASSIT contribution schedule per period — formats the NRA & NASSIT portals accept directly."
-              : "Download per-period CSV for NRA submission."}
+          <h3 className="font-heading text-lg font-semibold">Payroll filing workpapers</h3>
+          <p className="text-xs text-[#686D76] mt-0.5 max-w-4xl">
+            These CSVs support filing preparation; they do not submit returns. NRA ITAS requires the current PAYE workbook to be downloaded and uploaded. The NASSIT employee schedule accompanies its payment advice form.
           </p>
+          <div className="flex flex-wrap gap-4 mt-2 text-xs">
+            <a href="https://mail.nra.gov.sl/document/paye-return-form" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
+              Official NRA PAYE workbook
+            </a>
+            <a href="https://www.nassit.org.sl/our-services/contributions/" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
+              NASSIT contribution instructions
+            </a>
+          </div>
         </div>
+        {summary.unverified?.length > 0 && (
+          <div className="mx-6 mt-4 rounded-md border border-[#EAD9AE] bg-[#FBF1DE] px-3 py-2 text-xs text-[#8B6A14]" role="status">
+            Some older filing markers were saved without an NRA portal reference. Verify those submissions and record the reference before treating them as filed.
+          </div>
+        )}
         <table className="w-full text-sm">
           <thead className="bg-[#F7F6F2]">
             <tr>{["Period", "Employees", "PAYE", "NASSIT", "Status", ""].map((h) => (
@@ -122,12 +139,16 @@ export default function Compliance() {
                 <td className="py-3 px-4 font-data">{fmtSLE(r.nassit_total)}</td>
                 <td className="py-3 px-4">
                   {r.nra_filed
-                    ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]" title={`Filed ${new Date(r.nra_filed_at).toLocaleDateString()} · ${r.nra_reference}`}>
+                    ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]" title={"NRA reference " + r.nra_reference + " recorded " + new Date(r.nra_filed_at).toLocaleDateString()}>
                         <FileCheck className="w-3 h-3" /> Filed
                       </span>
-                    : <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF1DE] text-[#8B6A14]">
-                        <AlertCircle className="w-3 h-3" /> Outstanding
-                      </span>}
+                    : r.nra_legacy_recorded
+                      ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF1DE] text-[#8B6A14]" title="A previous marker has no NRA portal reference. Verify the submission.">
+                          <AlertCircle className="w-3 h-3" /> Verify reference
+                        </span>
+                      : <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF1DE] text-[#8B6A14]">
+                          <AlertCircle className="w-3 h-3" /> Outstanding
+                        </span>}
                 </td>
                 <td className="py-3 px-4 text-right">
                   <div className="inline-flex gap-1.5 flex-wrap justify-end">
@@ -146,7 +167,7 @@ export default function Compliance() {
                           onClick={() => emailNra(r.run_id, r.period)}
                           className="inline-flex items-center gap-1 text-xs bg-white border border-[#26547C] text-[#26547C] hover:bg-[#E5EEF6] px-2.5 py-1.5 rounded"
                           title="Email this NRA PAYE Return CSV to your inbox"
-                          style={readOnly ? { display: "none" } : undefined}
+                          style={!canManageFilings ? { display: "none" } : undefined}
                         >
                           <Mail className="w-3.5 h-3.5" /> Email me
                         </button>
@@ -158,13 +179,13 @@ export default function Compliance() {
                         >
                           <Download className="w-3.5 h-3.5" /> NASSIT
                         </button>
-                        {!r.nra_filed && !readOnly && (
+                        {!r.nra_filed && canManageFilings && (
                           <button
                             data-testid={`mark-filed-${r.run_id}`}
                             onClick={() => markFiled(r.run_id)}
                             className="inline-flex items-center gap-1 text-xs bg-white border border-[#17A035] text-[#17A035] hover:bg-[#E4F7E7] px-2.5 py-1.5 rounded"
                           >
-                            <FileCheck className="w-3.5 h-3.5" /> Mark filed
+                            <FileCheck className="w-3.5 h-3.5" /> Record ITAS reference
                           </button>
                         )}
                       </>
