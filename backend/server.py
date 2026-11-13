@@ -10,7 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from core import client, limiter, csrf_protect
+from core import client, db, limiter, csrf_protect
 from seeders import seed
 from storage import init_storage
 import scheduler as payroll_scheduler
@@ -31,6 +31,15 @@ logger = logging.getLogger("salonehcm")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await seed()
+    await db.mobile_money_batches.create_index(
+        [("company_id", 1), ("run_id", 1), ("provider", 1)],
+        unique=True,
+        partialFilterExpression={"retry_of": {"$exists": False}},
+        name="unique_initial_mobile_money_batch",
+    )
+    await db.mobile_money_batches.create_index(
+        "retry_of", unique=True, sparse=True, name="unique_mobile_money_retry",
+    )
     try:
         init_storage()
     except Exception as e:
