@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn
+from models import ContractEndDateIn, EmployeeIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
@@ -38,6 +38,34 @@ async def create_employee(body: EmployeeIn, user: dict = Depends(require_roles("
     return doc
 
 
+@router.patch("/{eid}/contract")
+async def update_contract_end_date(
+    eid: str, body: ContractEndDateIn, user: dict = Depends(require_roles("hr")),
+):
+    emp = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
+    if not emp:
+        raise HTTPException(404, "Not found")
+    if body.contract_end_date and emp.get("hire_date") and body.contract_end_date < emp["hire_date"]:
+        raise HTTPException(422, "Contract end date cannot be before the hire date")
+
+    old_date = emp.get("contract_end_date")
+    new_date = body.contract_end_date
+    await db.employees.update_one(
+        {"id": eid, **tenant_filter(user)},
+        {"$set": {"contract_end_date": new_date, "updated_at": iso(now_utc())}},
+    )
+    if old_date != new_date:
+        await db.contract_expiry_alerts.update_many(
+            {"company_id": user["company_id"], "employee_id": eid, "status": "pending"},
+            {"$set": {"status": "cancelled", "cancelled_at": iso(now_utc())}},
+        )
+    await audit(
+        "contract_end_date_updated", f"employees/{eid}", user,
+        {"previous_end_date": old_date, "contract_end_date": new_date},
+    )
+    return await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
+
+
 @router.get("/{eid}")
 async def get_employee(eid: str, user: dict = Depends(get_current_user)):
     e = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
@@ -65,9 +93,14 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             await assert_not_cutoff_locked(
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
+    update_doc = body.model_dump()
+    # Older clients send the original employee payload without this new optional
+    # field, so a normal profile edit must not erase a saved contract end date.
+    if body.contract_end_date is None and existing and existing.get("contract_end_date"):
+        update_doc["contract_end_date"] = existing["contract_end_date"]
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
-        {"$set": body.model_dump()},
+        {"$set": update_doc},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")

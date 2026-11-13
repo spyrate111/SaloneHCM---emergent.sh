@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { DatePicker } from "../components/ui/date-picker";
@@ -8,7 +8,7 @@ import { DatePicker } from "../components/ui/date-picker";
 const empty = {
   first_name: "", last_name: "", email: "", phone: "",
   job_title: "", department: "", location: "Freetown",
-  employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
+  employment_type: "Full-time", contract_end_date: "", basic_salary_sle: 0, allowances_sle: 0,
   nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
   hire_date: "2025-01-01", status: "active",
 };
@@ -27,6 +27,16 @@ export default function Employees() {
     const s = `${e.first_name} ${e.last_name} ${e.email} ${e.department} ${e.job_title}`.toLowerCase();
     return s.includes(q.toLowerCase());
   });
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const dateKeyToUtc = (value) => Date.parse(`${value}T00:00:00Z`);
+  const expiringContracts = list
+    .filter((e) => e.status === "active" && e.contract_end_date)
+    .map((employee) => ({
+      ...employee,
+      daysRemaining: Math.round((dateKeyToUtc(employee.contract_end_date) - dateKeyToUtc(todayKey)) / 86400000),
+    }))
+    .filter((e) => Number.isFinite(e.daysRemaining) && e.daysRemaining >= -30 && e.daysRemaining <= 90)
+    .sort((a, b) => a.daysRemaining - b.daysRemaining);
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -59,6 +69,37 @@ export default function Employees() {
           <Plus className="w-4 h-4" strokeWidth={1.5} /> Add employee
         </button>
       </div>
+
+      {expiringContracts.length > 0 && (
+        <section className="bg-[#FBF1DE] border border-[#E8D3A6] rounded-lg p-4" data-testid="contract-expiry-alerts">
+          <div className="flex items-start gap-3">
+            <CalendarClock className="w-5 h-5 text-[#8B6A14] shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h2 className="font-semibold text-sm text-[#674B0D]">
+                {expiringContracts.length} contract{expiringContracts.length === 1 ? "" : "s"} expiring soon
+              </h2>
+              <p className="text-xs text-[#725511] mt-1">HR reminders are scheduled 90, 60, and 30 days before expiry.</p>
+              <ul className="mt-3 space-y-2">
+                {expiringContracts.map((employee) => (
+                  <li key={employee.id} className="flex items-center justify-between gap-3 text-sm">
+                    <Link to={`/employees/${employee.id}`} className="font-medium text-[#26547C] hover:underline">
+                      {employee.first_name} {employee.last_name}
+                    </Link>
+                    <span className="text-xs text-[#725511] text-right">
+                      {employee.daysRemaining < 0
+                        ? `Expired ${Math.abs(employee.daysRemaining)} day(s) ago`
+                        : employee.daysRemaining === 0
+                          ? "Expires today"
+                          : `Expires in ${employee.daysRemaining} day(s)`}
+                      {" · "}{employee.contract_end_date}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
         <div className="p-4 border-b border-[#E2DFD6] flex items-center gap-3">
@@ -134,6 +175,7 @@ export default function Employees() {
                 ["job_title", "Job title", "text"],
                 ["department", "Department", "text"],
                 ["location", "Location", "text"],
+                ["contract_end_date", "Contract end date (optional)", "date"],
                 ["nassit_no", "NASSIT No.", "text"],
                 ["tin", "TIN", "text"],
                 ["bank_name", "Bank name", "text"],
