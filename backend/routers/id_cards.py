@@ -45,7 +45,7 @@ def _normalized_photo(data: bytes) -> bytes:
         return output.getvalue()
     except HTTPException:
         raise
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    except Exception as exc:
         raise HTTPException(422, "Could not read this photo") from exc
 
 
@@ -71,7 +71,7 @@ def _render_card(employee: dict, company_name: str, photo: bytes) -> bytes:
 
     pdf.setFillColor(colors.white)
     pdf.setFont("Helvetica-Bold", 8)
-    pdf.drawString(6 * mm, height - 7.2 * mm, _fit_text(company_name, "Helvetica-Bold", 8, 54 * mm))
+    pdf.drawString(6 * mm, height - 7.2 * mm, _fit_text(company_name, "Helvetica-Bold", 8, 40 * mm))
     pdf.setFont("Helvetica", 6)
     pdf.drawRightString(width - 6 * mm, height - 7.2 * mm, "STAFF IDENTIFICATION")
 
