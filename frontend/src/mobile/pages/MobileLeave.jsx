@@ -2,19 +2,43 @@
  * Mobile leave — mine + reports queue (if I'm a manager). Employees can
  * submit a new request via a bottom-sheet modal.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { toast } from "sonner";
 import api from "../../lib/api";
 import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, AlertTriangle, X } from "lucide-react";
 import { ymNow, shiftMonth, daysInMonth, firstDow, monthLabel, buildDayMap, todayKey } from "../../lib/leaveCal";
 
-const CACHE_KEY = "salonehcm_m_leave";
-const ME_CACHE_KEY = "salonehcm_m_me";
+const CACHE_PREFIX = "salonehcm_m_leave";
+const ME_CACHE_PREFIX = "salonehcm_m_me";
 const OUTBOX_PREFIX = "salonehcm_m_leave_outbox";
 
-function readCachedMe() {
+function accountCacheKey(prefix, accountId) {
+  return accountId ? prefix + ":" + accountId : null;
+}
+
+function readCachedRows(accountId) {
+  const key = accountCacheKey(CACHE_PREFIX, accountId);
+  if (!key) return [];
   try {
-    const cached = JSON.parse(localStorage.getItem(ME_CACHE_KEY) || "null");
+    const cached = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(cached) ? cached : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedRows(accountId, rows) {
+  const key = accountCacheKey(CACHE_PREFIX, accountId);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(rows)); } catch { /* noop */ }
+}
+
+function readCachedMe(accountId) {
+  const key = accountCacheKey(ME_CACHE_PREFIX, accountId);
+  if (!key) return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || "null");
     return cached && typeof cached === "object" ? {
       employee_id: cached.employee_id,
       first_name: cached.first_name,
@@ -64,32 +88,57 @@ const STATUS_STYLE = {
 };
 
 export default function MobileLeave() {
-  const [rows, setRows] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "[]"); } catch { return []; }
-  });
+  const { user: authUser } = useAuth();
+  const authUserId = authUser?.id || null;
+  const [rows, setRows] = useState(() => readCachedRows(authUserId));
   const [showForm, setShowForm] = useState(false);
-  const [me, setMe] = useState(readCachedMe);
-  const [queued, setQueued] = useState(() => readOutbox(readCachedMe()?.employee_id));
+  const [me, setMe] = useState(() => readCachedMe(authUserId) || (
+    authUser?.employee_id ? {
+      employee_id: authUser.employee_id,
+      first_name: authUser.first_name,
+      last_name: authUser.last_name,
+    } : null
+  ));
+  const [queued, setQueued] = useState(() => readOutbox(authUser?.employee_id));
   const syncInFlight = useRef(false);
+  const activeUserId = useRef(authUserId);
 
-  const refresh = () => {
+  useLayoutEffect(() => {
+    if (activeUserId.current === authUserId) return;
+    activeUserId.current = authUserId;
+    setRows(readCachedRows(authUserId));
+    setMe(readCachedMe(authUserId) || (authUser?.employee_id ? {
+      employee_id: authUser.employee_id,
+      first_name: authUser.first_name,
+      last_name: authUser.last_name,
+    } : null));
+    setQueued(readOutbox(authUser?.employee_id));
+  }, [authUserId, authUser?.employee_id, authUser?.first_name, authUser?.last_name]);
+
+  const refresh = useCallback(() => {
+    const requestUserId = authUserId;
     api.get("/leave").then((r) => {
-      const data = r.data || [];
+      if (requestUserId !== activeUserId.current) return;
+      const data = Array.isArray(r.data) ? r.data : [];
       setRows(data);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch { /* noop */ }
+      writeCachedRows(requestUserId, data);
     }).catch(() => { /* keep cache */ });
     api.get("/auth/me").then((r) => {
+      if (requestUserId !== activeUserId.current) return;
       setMe(r.data);
       const offlineIdentity = {
         employee_id: r.data?.employee_id,
         first_name: r.data?.first_name,
         last_name: r.data?.last_name,
       };
-      try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(offlineIdentity)); } catch { /* noop */ }
-      setQueued(readOutbox(r.data?.employee_id));
+      const key = accountCacheKey(ME_CACHE_PREFIX, requestUserId);
+      if (key) {
+        try { localStorage.setItem(key, JSON.stringify(offlineIdentity)); } catch { /* noop */ }
+      }
+      setQueued(readOutbox(r.data?.employee_id || authUser?.employee_id));
     }).catch(() => {});
-  };
-  useEffect(refresh, []);
+  }, [authUserId, authUser?.employee_id]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
     const employeeId = me?.employee_id;
@@ -116,7 +165,7 @@ export default function MobileLeave() {
             setQueued(items);
             setRows((current) => {
               const next = [response.data, ...current.filter((row) => row.client_request_id !== item.client_request_id)];
-              try { localStorage.setItem(CACHE_KEY, JSON.stringify(next)); } catch { /* noop */ }
+              writeCachedRows(authUserId, next);
               return next;
             });
           } catch (e) {
