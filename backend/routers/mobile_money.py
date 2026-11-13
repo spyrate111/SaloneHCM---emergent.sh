@@ -14,6 +14,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from core import audit, db, iso, now_utc, require_roles, tenant_filter
 
@@ -277,7 +278,16 @@ async def create_run_mobile_money_batch(
         "reconciled_at": None,
         "recipients": recipients,
     }
-    await db.mobile_money_batches.insert_one(dict(batch))
+    try:
+        await db.mobile_money_batches.insert_one(dict(batch))
+    except DuplicateKeyError:
+        existing = await db.mobile_money_batches.find_one(
+            {"run_id": rid, "provider": body.provider, "retry_of": {"$exists": False}, **scope},
+            {"_id": 0},
+        )
+        if existing:
+            return {**existing, "already_exists": True}
+        raise
     await audit(
         "mobile_money_batch_created",
         f"payroll_runs/{rid}",
@@ -360,7 +370,15 @@ async def retry_failed_mobile_money_payments(
         "reconciled_at": None,
         "recipients": recipients,
     }
-    await db.mobile_money_batches.insert_one(dict(retry))
+    try:
+        await db.mobile_money_batches.insert_one(dict(retry))
+    except DuplicateKeyError:
+        existing = await db.mobile_money_batches.find_one(
+            {"retry_of": bid, **scope}, {"_id": 0},
+        )
+        if existing:
+            return {**existing, "already_exists": True}
+        raise
     await audit(
         "mobile_money_failed_payments_retry_created",
         f"payroll_runs/{parent['run_id']}",
