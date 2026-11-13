@@ -10,7 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from core import client, limiter, csrf_protect
+from core import client, db, limiter, csrf_protect
 from seeders import seed
 from storage import init_storage
 import scheduler as payroll_scheduler
@@ -30,6 +30,15 @@ logger = logging.getLogger("salonehcm")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    try:
+        await db.leave_requests.create_index(
+            [("company_id", 1), ("employee_id", 1), ("client_request_id", 1)],
+            unique=True,
+            partialFilterExpression={"client_request_id": {"$type": "string"}},
+            name="leave_client_request_unique",
+        )
+    except Exception as e:
+        logger.warning("Leave request idempotency index unavailable: %s", e)
     await seed()
     try:
         init_storage()
