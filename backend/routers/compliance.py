@@ -59,6 +59,13 @@ def _xml_safe_text(value) -> str:
     return xml_escape(text)
 
 
+def _payroll_identity_value(slip: dict, snapshot_key: str, employee: dict, current_key: str):
+    """Use run-time identity when present; only older runs fall back to current profiles."""
+    if snapshot_key in slip:
+        return slip.get(snapshot_key) or ""
+    return employee.get(current_key, "")
+
+
 def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
     """Build a one-sheet Excel contribution schedule using NASSIT's published fields."""
     emp_map = {e["id"]: e for e in employees}
@@ -86,10 +93,10 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
         totals["total"] += total_share
         rows.append([
             index,
-            slip.get("employee_last_name") or employee.get("last_name", ""),
-            slip.get("employee_first_name") or employee.get("first_name", ""),
-            slip.get("employee_middle_name") or employee.get("middle_name", ""),
-            slip.get("employee_nassit_no") or employee.get("nassit_no", ""),
+            _payroll_identity_value(slip, "employee_last_name", employee, "last_name"),
+            _payroll_identity_value(slip, "employee_first_name", employee, "first_name"),
+            _payroll_identity_value(slip, "employee_middle_name", employee, "middle_name"),
+            _payroll_identity_value(slip, "employee_nassit_no", employee, "nassit_no"),
             basic,
             employer_share,
             employee_share,
@@ -353,14 +360,16 @@ async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("n
         slip.get("employee_name", "Employee")
         for slip in run["slips"]
         if not (
-            slip.get("employee_nassit_no")
-            or emp_map.get(slip["employee_id"], {}).get("nassit_no")
+            _payroll_identity_value(
+                slip, "employee_nassit_no",
+                emp_map.get(slip["employee_id"], {}), "nassit_no",
+            )
         )
     ]
     if missing_ids:
         raise HTTPException(
             422,
-            f"Add NASSIT numbers to {len(missing_ids)} employee profile(s) before exporting.",
+            f"NASSIT numbers are missing for {len(missing_ids)} employee(s). Complete their profiles and rerun payroll before exporting.",
         )
 
     payload = _build_nassit_xlsx(run, employees, company)
