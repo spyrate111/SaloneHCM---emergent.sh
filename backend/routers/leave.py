@@ -1,6 +1,7 @@
 """Leave endpoints."""
 import uuid
 from datetime import datetime
+from pymongo.errors import DuplicateKeyError
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from core import db, get_current_user, audit, now_utc, iso, tenant_filter, with_tenant, is_admin
@@ -394,6 +395,32 @@ async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
     emp = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
     if not emp:
         raise HTTPException(404, "Employee not found in your organization")
+
+    client_request_id = (body.client_request_id or "").strip()
+
+    async def _existing_request():
+        if not client_request_id:
+            return None
+        existing = await db.leave_requests.find_one(
+            {**tenant_filter(user), "employee_id": eid, "client_request_id": client_request_id},
+            {"_id": 0},
+        )
+        if not existing:
+            return None
+        same_request = (
+            existing.get("leave_type") == body.leave_type
+            and existing.get("start_date") == body.start_date
+            and existing.get("end_date") == body.end_date
+            and (existing.get("reason") or "") == (body.reason or "")
+        )
+        if not same_request:
+            raise HTTPException(409, "This offline request ID was already used for different leave details")
+        return existing
+
+    existing = await _existing_request()
+    if existing:
+        return existing
+
     days = (datetime.fromisoformat(body.end_date) - datetime.fromisoformat(body.start_date)).days + 1
     doc = with_tenant({
         "id": str(uuid.uuid4()),
@@ -407,7 +434,15 @@ async def create_leave(body: LeaveIn, user: dict = Depends(get_current_user)):
         "status": "pending",
         "created_at": iso(now_utc()),
     }, user)
-    await db.leave_requests.insert_one(doc)
+    if client_request_id:
+        doc["client_request_id"] = client_request_id
+    try:
+        await db.leave_requests.insert_one(doc)
+    except DuplicateKeyError:
+        existing = await _existing_request()
+        if existing:
+            return existing
+        raise HTTPException(409, "This offline request ID has already been used")
     doc.pop("_id", None)
     return doc
 
