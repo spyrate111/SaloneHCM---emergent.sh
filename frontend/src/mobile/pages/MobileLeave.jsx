@@ -100,7 +100,7 @@ export default function MobileLeave() {
     } : null
   ));
   const [queued, setQueued] = useState(() => readOutbox(authUser?.employee_id));
-  const syncInFlight = useRef(false);
+  const syncInFlight = useRef(new Set());
   const activeUserId = useRef(authUserId);
 
   useLayoutEffect(() => {
@@ -145,8 +145,8 @@ export default function MobileLeave() {
     if (!employeeId) return undefined;
 
     const sync = async () => {
-      if (!navigator.onLine || syncInFlight.current) return;
-      syncInFlight.current = true;
+      if (!navigator.onLine || syncInFlight.current.has(authUserId)) return;
+      syncInFlight.current.add(authUserId);
       let items = readOutbox(employeeId);
       try {
         for (const item of items) {
@@ -160,6 +160,7 @@ export default function MobileLeave() {
               reason: item.reason,
               client_request_id: item.client_request_id,
             });
+            if (activeUserId.current !== authUserId) return;
             items = items.filter((queuedItem) => queuedItem.client_request_id !== item.client_request_id);
             writeOutbox(employeeId, items);
             setQueued(items);
@@ -169,6 +170,7 @@ export default function MobileLeave() {
               return next;
             });
           } catch (e) {
+            if (activeUserId.current !== authUserId) return;
             const status = e?.response?.status;
             if (status >= 400 && status < 500 && status !== 429) {
               const detail = e?.response?.data?.detail;
@@ -185,14 +187,17 @@ export default function MobileLeave() {
           }
         }
       } finally {
-        syncInFlight.current = false;
+        syncInFlight.current.delete(authUserId);
+        if (activeUserId.current !== authUserId && navigator.onLine) {
+          window.dispatchEvent(new Event("online"));
+        }
       }
     };
 
     void sync();
     window.addEventListener("online", sync);
     return () => window.removeEventListener("online", sync);
-  }, [me?.employee_id]);
+  }, [me?.employee_id, authUserId]);
 
   const removeQueued = (clientRequestId) => {
     const employeeId = me?.employee_id;
