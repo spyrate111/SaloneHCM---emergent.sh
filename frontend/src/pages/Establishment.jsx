@@ -164,6 +164,7 @@ function CostTracking({ period, onPeriodChange, report, loading }) {
               ? "Actuals use the most recent completed payroll run for " + report.period + "."
               : "No completed payroll run exists for " + report.period + "; actual payroll values are shown as —."}
             {" "}Amounts are in SLE. Directorate allocations are marked incomplete when a budget code is shared or missing.
+            Older payroll runs without a department snapshot appear under Unspecified directorate.
           </p>
 
           <div>
