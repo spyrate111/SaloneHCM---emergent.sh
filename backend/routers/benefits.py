@@ -49,7 +49,7 @@ async def delete_plan(pid: str, user: dict = Depends(require_admin)):
 @router.get("/enrollments")
 async def list_enrollments(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
+    q = {**tf} if user["role"] in ("admin", "superadmin") else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.benefit_enrollments.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
     plans = {p["id"]: p for p in await db.benefit_plans.find(tf, {"_id": 0}).to_list(200)}
     employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
@@ -65,7 +65,7 @@ async def list_enrollments(user: dict = Depends(get_current_user)):
 
 @router.post("/enrollments")
 async def enroll(body: EnrollmentIn, user: dict = Depends(get_current_user)):
-    eid = body.employee_id if user["role"] == "admin" else user.get("employee_id")
+    eid = body.employee_id if user["role"] in ("admin", "superadmin") else user.get("employee_id")
     if not eid:
         raise HTTPException(400, "employee_id required")
     tf = tenant_filter(user)

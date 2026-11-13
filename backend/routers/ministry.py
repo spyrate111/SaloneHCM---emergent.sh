@@ -1,13 +1,13 @@
 """Ministry-level rollups — Gov-tier dashboard that aggregates by department (= ministry)."""
 from collections import defaultdict
 from fastapi import APIRouter, Depends
-from core import db, require_feature, tenant_filter
+from core import db, require_admin, require_feature, tenant_filter
 from payroll_engine import calc_payslip
 
 router = APIRouter(
     prefix="/ministry",
     tags=["ministry"],
-    dependencies=[Depends(require_feature("ministry_reports"))],
+    dependencies=[Depends(require_feature("ministry_reports")), Depends(require_admin)],
 )
 
 

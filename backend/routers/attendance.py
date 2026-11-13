@@ -10,7 +10,7 @@ router = APIRouter(prefix="/attendance", tags=["attendance"])
 @router.get("")
 async def list_attendance(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    if user["role"] == "admin":
+    if user["role"] in ("admin", "superadmin"):
         return await db.attendance.find(tf, {"_id": 0}).sort("date", -1).to_list(1000)
     return await db.attendance.find(
         {"employee_id": user.get("employee_id"), **tf},
@@ -20,7 +20,7 @@ async def list_attendance(user: dict = Depends(get_current_user)):
 
 @router.post("")
 async def add_attendance(body: TimeEntryIn, user: dict = Depends(get_current_user)):
-    eid = body.employee_id if user["role"] == "admin" else user.get("employee_id")
+    eid = body.employee_id if user["role"] in ("admin", "superadmin") else user.get("employee_id")
     if not eid:
         raise HTTPException(400, "employee_id required")
     # Validate employee belongs to user's company

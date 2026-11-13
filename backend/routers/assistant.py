@@ -65,7 +65,7 @@ def _extract_plan(text: str):
 
 async def _build_system_message(user: dict, include_context: bool, action_mode: bool) -> str:
     sys_msg = SYSTEM_BASE
-    if include_context and user.get("role") == "admin":
+    if include_context and user.get("role") in ("admin", "superadmin"):
         ctx = await _ai_context.build(user)
         sys_msg += (
             "\n\n--- BEGIN LIVE COMPANY DATA ---\n"
@@ -74,7 +74,7 @@ async def _build_system_message(user: dict, include_context: bool, action_mode: 
             "When the admin asks about anomalies, top performers, leave usage, or payroll trends, "
             "ground your answer in the data above."
         )
-    if action_mode and user.get("role") == "admin":
+    if action_mode and user.get("role") in ("admin", "superadmin"):
         sys_msg += ACTION_MODE_PROMPT
     return sys_msg
 
@@ -128,14 +128,14 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
         "ts": iso(now_utc()),
     })
 
-    plan = _extract_plan(reply) if body.action_mode and user.get("role") == "admin" else None
+    plan = _extract_plan(reply) if body.action_mode and user.get("role") in ("admin", "superadmin") else None
     return {"session_id": sid, "reply": reply, "plan": plan}
 
 
 @router.get("/history/{sid}")
 async def assistant_history(sid: str, user: dict = Depends(get_current_user)):
     return await db.assistant_messages.find(
-        {"session_id": sid, **tenant_filter(user)},
+        {"session_id": sid, "user_id": user["id"], **tenant_filter(user)},
         {"_id": 0},
     ).sort("ts", 1).to_list(200)
 

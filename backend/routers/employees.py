@@ -8,7 +8,7 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 
 
 @router.get("")
-async def list_employees(user: dict = Depends(get_current_user)):
+async def list_employees(user: dict = Depends(require_admin)):
     return await db.employees.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(2000)
 
 
@@ -23,7 +23,7 @@ async def create_employee(body: EmployeeIn, user: dict = Depends(require_admin))
 
 
 @router.get("/{eid}")
-async def get_employee(eid: str, user: dict = Depends(get_current_user)):
+async def get_employee(eid: str, user: dict = Depends(require_admin)):
     e = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
     if not e:
         raise HTTPException(404, "Not found")

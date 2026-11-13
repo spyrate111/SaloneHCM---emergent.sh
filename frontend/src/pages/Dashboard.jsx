@@ -45,21 +45,23 @@ export default function Dashboard() {
           Good day, {user?.name?.split(" ")[0] || "there"}.
         </h1>
         <p className="text-[#525860] mt-2 text-sm max-w-2xl">
-          Here's what's happening across your organization today — payroll, headcount, compliance, and pending approvals.
+          {isAdmin
+            ? "Here's what's happening across your organization today — payroll, headcount, compliance, and pending approvals."
+            : "Track organization headcount and pending leave requests for you and your direct reports."}
         </p>
       </div>
 
       {isAdmin && <ComplianceScoreWidget />}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isAdmin ? "lg:grid-cols-4" : "lg:grid-cols-2"} gap-5`}>
         <KPI label="Headcount" value={fmtNum(data.headcount)} sub={`${data.total_employees} total records`} icon={Users} accent="bg-[#133326]" />
-        <KPI label="Monthly Payroll" value={fmtSLE(data.monthly_payroll_sle)} sub="Gross run estimate" icon={Wallet} accent="bg-[#26547C]" />
-        <KPI label="Pending Leaves" value={fmtNum(data.pending_leaves)} sub="Awaiting your approval" icon={CalendarClock} accent="bg-[#D1603D]" />
-        <KPI label="Last Run Net" value={fmtSLE(data.last_run?.totals?.net || 0)} sub={data.last_run?.period || "No runs yet"} icon={Receipt} accent="bg-[#2D7A5D]" />
+        {isAdmin && <KPI label="Monthly Payroll" value={fmtSLE(data.monthly_payroll_sle)} sub="Gross run estimate" icon={Wallet} accent="bg-[#26547C]" />}
+        <KPI label="Pending Leaves" value={fmtNum(data.pending_leaves)} sub={isAdmin ? "Awaiting approval" : "Your team’s pending requests"} icon={CalendarClock} accent="bg-[#D1603D]" />
+        {isAdmin && <KPI label="Last Run Net" value={fmtSLE(data.last_run?.totals?.net || 0)} sub={data.last_run?.period || "No runs yet"} icon={Receipt} accent="bg-[#2D7A5D]" />}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
+      <div className={`grid grid-cols-1 ${isAdmin ? "lg:grid-cols-3" : "lg:grid-cols-1"} gap-5`}>
+        {isAdmin && <div className="lg:col-span-2 bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="flex items-center justify-between mb-5">
             <div>
               <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Payroll trend</div>
@@ -87,7 +89,7 @@ export default function Dashboard() {
               <div className="h-full grid place-items-center text-sm text-[#686D76]">Run your first payroll to see trends.</div>
             )}
           </ChartShell>
-        </div>
+        </div>}
 
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860] mb-1">Headcount by department</div>
@@ -106,7 +108,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className={`grid grid-cols-1 ${isAdmin ? "lg:grid-cols-3" : "lg:grid-cols-1"} gap-5`}>
+        {isAdmin && <>
         <a href="/payroll" className="group bg-[#133326] text-white rounded-lg p-6 hover:bg-[#0F281E] transition" data-testid="quick-payroll">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/60">Quick action</div>
           <div className="font-heading text-xl font-semibold mt-2">Run this month's payroll</div>
@@ -123,6 +126,7 @@ export default function Dashboard() {
             View reports <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </a>
+        </>}
         <a href="/assistant" className="group bg-[#D1603D] text-white rounded-lg p-6 hover:bg-[#B84F2F] transition" data-testid="quick-assistant">
           <div className="text-[10px] uppercase tracking-[0.18em] text-white/70">AI</div>
           <div className="font-heading text-xl font-semibold mt-2">Ask the SaloneHCM Assistant</div>

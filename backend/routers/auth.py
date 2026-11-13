@@ -80,7 +80,7 @@ class _AcceptInviteIn(BaseModel):
 @router.get("/invite/{token}")
 async def lookup_invite(token: str):
     """Frontend hits this with the token from the magic-link to render the accept form."""
-    invite = await db.user_invites.find_one({"token": token, "consumed_at": None}, {"_id": 0})
+    invite = await db.user_invites.find_one({"token": token, "consumed_at": None, "superseded_at": None}, {"_id": 0})
     if not invite:
         raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
     # Expiry check
@@ -99,20 +99,31 @@ async def lookup_invite(token: str):
 @router.post("/accept-invite")
 @limiter.limit("10/minute")
 async def accept_invite(request: Request, body: _AcceptInviteIn, response: Response):
-    invite = await db.user_invites.find_one({"token": body.token, "consumed_at": None})
+    invite = await db.user_invites.find_one({"token": body.token, "consumed_at": None, "superseded_at": None})
     if not invite:
         raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
     if invite.get("expires_at") and invite["expires_at"] < iso(now_utc()):
         raise HTTPException(410, detail={"code": "invite_expired", "message": "Invitation has expired"})
 
-    # Idempotent: if a user already exists for this email, update password; else create.
-    existing = await db.users.find_one({"email": invite["email"]})
-    if existing:
-        await db.users.update_one({"id": existing["id"]}, {"$set": {"password_hash": hash_password(body.password)}})
-        user_id = existing["id"]
-    else:
-        import uuid as _uuid
-        user_id = str(_uuid.uuid4())
+    # An invitation may only create a new account. Never let an old link reset
+    # the password of an account that was created after the invitation was sent.
+    if await db.users.find_one({"email": invite["email"]}):
+        raise HTTPException(409, detail={
+            "code": "account_exists",
+            "message": "An account with this email already exists. Contact your administrator.",
+        })
+
+    import uuid as _uuid
+    user_id = str(_uuid.uuid4())
+    consumed_at = iso(now_utc())
+    claim = await db.user_invites.update_one(
+        {"token": body.token, "consumed_at": None, "superseded_at": None},
+        {"$set": {"consumed_at": consumed_at, "consumed_by_user_id": user_id}},
+    )
+    if not claim.matched_count:
+        raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
+
+    try:
         await db.users.insert_one({
             "id": user_id,
             "email": invite["email"],
@@ -125,11 +136,12 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
             "created_by": invite.get("invited_by"),
             "accepted_invite": invite["token"],
         })
-
-    await db.user_invites.update_one(
-        {"token": body.token},
-        {"$set": {"consumed_at": iso(now_utc()), "consumed_by_user_id": user_id}},
-    )
+    except Exception:
+        await db.user_invites.update_one(
+            {"token": body.token, "consumed_by_user_id": user_id, "consumed_at": consumed_at},
+            {"$set": {"consumed_at": None}, "$unset": {"consumed_by_user_id": ""}},
+        )
+        raise
 
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})

@@ -74,18 +74,17 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     emps = await db.employees.find(
         {"status": "active", "company_id": user["company_id"]},
         {"_id": 0},
-    ).to_list(2000)
+    ).to_list(None)
     period = f"{year}-{month:02d}"
 
-    # Pull allowance breakdown per employee using the civil-service module
-    try:
-        from routers.civil_service import get_active_allowance_amounts
-        slips = []
-        for e in emps:
-            breakdown = await get_active_allowance_amounts(e, user["company_id"], period)
-            slips.append(calc_payslip(e, allowance_breakdown=breakdown))
-    except Exception:
-        slips = [calc_payslip(e) for e in emps]
+    # Pull allowance breakdown per employee using the civil-service module.
+    # Fail the run if allowance calculation fails; silently omitting allowances
+    # would create an inaccurate payroll run.
+    from routers.civil_service import get_active_allowance_amounts
+    slips = []
+    for e in emps:
+        breakdown = await get_active_allowance_amounts(e, user["company_id"], period)
+        slips.append(calc_payslip(e, allowance_breakdown=breakdown))
 
     rid = str(uuid.uuid4())
     doc = {
