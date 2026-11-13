@@ -8,7 +8,6 @@ import { Download, ShieldCheck, FileCheck, Receipt, AlertCircle, Mail } from "lu
 export default function Compliance() {
   const { has } = useFeatures();
   const { user } = useAuth();
-  const readOnly = user?.role === "auditor";
   const canManageFilings = user?.role === "admin" || user?.role === "superadmin";
   const hasNraExport = has("nra_export");
   const [summary, setSummary] = useState(null);
