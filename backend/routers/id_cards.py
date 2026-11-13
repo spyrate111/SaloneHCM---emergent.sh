@@ -2,12 +2,11 @@
 import io
 import os
 import uuid
-from urllib.parse import quote
 
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
@@ -37,8 +36,13 @@ def _normalized_photo(data: bytes) -> bytes:
             raise HTTPException(413, "Photo dimensions are too large")
         probe.verify()
 
-        image = Image.open(io.BytesIO(data))
-        image = ImageOps.exif_transpose(image).convert("RGB")
+        image = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
+        if image.mode in {"RGBA", "LA"} or "transparency" in image.info:
+            rgba = image.convert("RGBA")
+            image = Image.new("RGB", rgba.size, "white")
+            image.paste(rgba, mask=rgba.getchannel("A"))
+        else:
+            image = image.convert("RGB")
         image.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
         output = io.BytesIO()
         image.save(output, format="JPEG", quality=88, optimize=True)
@@ -53,7 +57,7 @@ def _fit_text(value: str, font: str, size: float, max_width: float) -> str:
     text = str(value or "").strip()
     if pdfmetrics.stringWidth(text, font, size) <= max_width:
         return text
-    suffix = "…"
+    suffix = "..."
     while text and pdfmetrics.stringWidth(text + suffix, font, size) > max_width:
         text = text[:-1]
     return (text + suffix) if text else suffix
@@ -214,7 +218,7 @@ async def download_id_card(eid: str, user: dict = Depends(require_roles("hr"))):
         raise HTTPException(502, "Photo storage is unavailable") from exc
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "name": 1}) or {}
     pdf_bytes = _render_card(employee, company.get("name") or "SaloneHCM", photo_bytes)
-    filename = f"staff-id-{quote(str(employee.get('last_name') or 'employee'))}.pdf"
+    filename = f"staff-id-{str(eid).replace('-', '')[:8].upper()}.pdf"
     await audit("employee_id_card_downloaded", f"employees/{eid}/id-card", user,
                 {"employee_id": eid})
     return StreamingResponse(
