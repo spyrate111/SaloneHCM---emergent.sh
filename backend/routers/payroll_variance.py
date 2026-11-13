@@ -197,7 +197,7 @@ def _duplicate_identifier_anomalies(cur_slips: list[dict], emp_index: dict) -> l
         grouped = defaultdict(list)
         for eid in slip_by_id:
             raw = (emp_index.get(eid) or {}).get(field)
-            normalized = re.sub(r"[\\s-]+", "", str(raw or "")).upper()
+            normalized = re.sub(r"[\s-]+", "", str(raw or "")).upper()
             if normalized:
                 grouped[normalized].append(eid)
 
