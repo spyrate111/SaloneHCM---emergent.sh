@@ -51,12 +51,33 @@ def _build_nra_csv(run: dict, employees: list, company: dict) -> bytes:
 @router.get("/summary")
 async def compliance_summary(user: dict = Depends(require_roles("payroll", "auditor"))):
     tf = tenant_filter(user)
-    runs = await db.payroll_runs.find(tf, {"_id": 0}).sort("created_at", -1).to_list(50)
-    total_paye = sum(r["totals"]["paye"] for r in runs)
-    total_nassit = sum(r["totals"]["nassit_employee"] + r["totals"]["nassit_employer"] for r in runs)
-    # NRA / NASSIT filing status — by period
-    filings = await db.nra_filings.find(tf, {"_id": 0}).sort("filed_at", -1).to_list(100)
-    filed_runs = {f.get("run_id"): f for f in filings if f.get("run_id")}
+    all_runs = await db.payroll_runs.find(tf, {"_id": 0}).sort("created_at", -1).to_list(500)
+    # A rerun replaces the earlier run for the same pay period in reporting.
+    latest_by_period = {}
+    for run in all_runs:
+        if run.get("status") == "completed" and run.get("period"):
+            latest_by_period.setdefault(run["period"], run)
+    latest_runs = list(latest_by_period.values())[:50]
+
+    reporting_year = datetime.now(timezone.utc).year
+    year_runs = [
+        run for period, run in latest_by_period.items()
+        if period.startswith(f"{reporting_year}-")
+    ]
+    total_paye = sum(float(r.get("totals", {}).get("paye", 0)) for r in year_runs)
+    total_nassit = sum(
+        float(r.get("totals", {}).get("nassit_employee", 0))
+        + float(r.get("totals", {}).get("nassit_employer", 0))
+        for r in year_runs
+    )
+
+    # NRA filing status is tied to the current payroll run for each period.
+    filings = await db.nra_filings.find(tf, {"_id": 0}).sort("filed_at", -1).to_list(500)
+    filed_runs = {}
+    for filing in filings:
+        run_id = filing.get("run_id")
+        if run_id and run_id not in filed_runs:
+            filed_runs[run_id] = filing
     history = [
         {
             "run_id": r["id"],
@@ -82,17 +103,18 @@ async def compliance_summary(user: dict = Depends(require_roles("payroll", "audi
                 if filed_runs.get(r["id"], {}).get("reference_source") == "external" else None
             ),
         }
-        for r in runs
+        for r in latest_runs
     ]
     return {
-        "runs_count": len(runs),
+        "runs_count": len(latest_runs),
+        "report_year": reporting_year,
         "ytd_paye_sle": round(total_paye, 2),
         "ytd_nassit_sle": round(total_nassit, 2),
         "filed_count": sum(1 for h in history if h["nra_filed"]),
         "outstanding": [h for h in history if not h["nra_filed"] and not h["nra_legacy_recorded"]],
         "unverified": [h for h in history if h["nra_legacy_recorded"]],
         "history": history,
-        "next_filing": "NRA PAYE — 15th of next month",
+        "next_filing": "NRA PAYE due by the 15th of the following month",
         "regs": {
             "paye_bands": PAYE_BANDS[:-1],
             "nassit_employee": NASSIT_EMPLOYEE,
