@@ -23,7 +23,7 @@ async def preview_payroll(user: dict = Depends(require_admin)):
     emps = await db.employees.find(
         {"status": "active", **tenant_filter(user)},
         {"_id": 0},
-    ).to_list(2000)
+    ).to_list(None)
     slips = [calc_payslip(e) for e in emps]
     totals = {
         "employee_count": len(slips),
