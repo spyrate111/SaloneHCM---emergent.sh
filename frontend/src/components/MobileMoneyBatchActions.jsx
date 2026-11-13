@@ -112,6 +112,8 @@ export default function MobileMoneyBatchActions({ run }) {
       const filename = "SaloneHCM-Mobile-Money-Workpaper-" + batch.provider + "-" + batch.period + ".xlsx";
       await downloadBlob("/payroll/mobile-money/batches/" + batch.id + "/workbook", filename);
       await loadBatches();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not download mobile money workpaper");
     } finally {
       setBusy("");
     }
@@ -269,9 +271,6 @@ export default function MobileMoneyBatchActions({ run }) {
                     )}
                     {batch.status === "pending_approval" && batch.created_by === user?.email && (
                       <span className="text-xs text-[#8B6A14]">Awaiting approval from another manager.</span>
-                    )}
-                    {batch.status === "pending_approval" && canApprove && batch.created_by === user?.email && (
-                      <span className="text-xs text-[#8B6A14]">You cannot approve a batch you created.</span>
                     )}
                     {batch.failed_count > 0 && (
                       <button
