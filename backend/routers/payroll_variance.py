@@ -35,6 +35,8 @@ GROSS_PCT = 10.0
 MINISTRY_PCT = 15.0
 RAISE_PCT = 10.0
 NEW_STARTER_STALE_DAYS = 30
+LOAN_DEDUCTION_MIN_CHANGE_SLE = 100.0
+LOAN_DEDUCTION_CHANGE_PCT = 25.0
 
 
 def _prev_period(period: str) -> Optional[str]:
@@ -227,6 +229,49 @@ def _duplicate_identifier_anomalies(cur_slips: list[dict], emp_index: dict) -> l
     return out
 
 
+def _loan_deduction_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
+    """Flag new, stopped, or sharply changed loan deductions before approval."""
+    out = []
+    for eid, cur in cur_by_id.items():
+        prev = prev_by_id.get(eid)
+        if not prev:
+            continue
+        before = _round(prev.get("loan_deduction", 0))
+        after = _round(cur.get("loan_deduction", 0))
+        if before == after:
+            continue
+
+        delta = _round(after - before)
+        delta_pct = _pct(after, before)
+        if before == 0 and after > 0:
+            kind = "new_loan_deduction"
+            severity = "warn"
+            message = "A loan deduction has appeared this period. Verify an approved repayment schedule."
+        elif before > 0 and after == 0:
+            kind = "stopped_loan_deduction"
+            severity = "warn"
+            message = "A loan deduction stopped this period. Confirm the loan was paid off or the deduction was paused."
+        elif abs(delta) >= LOAN_DEDUCTION_MIN_CHANGE_SLE and abs(delta_pct or 0) >= LOAN_DEDUCTION_CHANGE_PCT:
+            kind = "loan_deduction_change"
+            severity = "high" if delta > 0 and delta_pct >= 50 else "warn"
+            message = f"Loan deduction changed by {abs(delta_pct)}%. Verify the approved repayment schedule."
+        else:
+            continue
+
+        out.append({
+            "severity": severity,
+            "kind": kind,
+            "subject": cur.get("employee_name") or eid,
+            "employee_id": eid,
+            "before": before,
+            "after": after,
+            "delta": delta,
+            "delta_pct": delta_pct,
+            "message": message,
+        })
+    return out
+
+
 def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict]:
     """Return a list of {severity, kind, subject, before, after, delta, delta_pct, message}."""
     prev_by_id = {s["employee_id"]: s for s in prev_slips}
@@ -236,6 +281,7 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
         + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
         + _terminated_paid_anomalies(cur_by_id, emp_index)
         + _duplicate_identifier_anomalies(cur_slips, emp_index)
+        + _loan_deduction_anomalies(cur_by_id, prev_by_id)
     )
 
 
