@@ -70,6 +70,7 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
         "step_number": emp.get("step_number"),
         "budget_code": emp.get("budget_code"),
         "mda_ministry": emp.get("mda_ministry"),
+        "department": emp.get("department"),
     }
 
 
