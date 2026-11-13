@@ -2,16 +2,43 @@
  * Mobile leave — mine + reports queue (if I'm a manager). Employees can
  * submit a new request via a bottom-sheet modal.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import api from "../../lib/api";
 import { CalendarDays, Plus, CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, AlertTriangle, X } from "lucide-react";
 import { ymNow, shiftMonth, daysInMonth, firstDow, monthLabel, buildDayMap, todayKey } from "../../lib/leaveCal";
 
 const CACHE_KEY = "salonehcm_m_leave";
+const ME_CACHE_KEY = "salonehcm_m_me";
+const OUTBOX_PREFIX = "salonehcm_m_leave_outbox";
+
+function readCachedMe() {
+  try { return JSON.parse(localStorage.getItem(ME_CACHE_KEY) || "null"); } catch { return null; }
+}
+
+function outboxKey(employeeId) {
+  return OUTBOX_PREFIX + ":" + employeeId;
+}
+
+function readOutbox(employeeId) {
+  if (!employeeId) return [];
+  try { return JSON.parse(localStorage.getItem(outboxKey(employeeId)) || "[]"); } catch { return []; }
+}
+
+function writeOutbox(employeeId, items) {
+  if (!employeeId) return;
+  try { localStorage.setItem(outboxKey(employeeId), JSON.stringify(items)); } catch { /* noop */ }
+}
+
+function makeClientRequestId() {
+  return globalThis.crypto?.randomUUID?.()
+    || "offline-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+}
 
 const STATUS_STYLE = {
   pending:  { cls: "bg-[#F6EDD8] text-[#8B6A14]", icon: Clock },
+  queued_offline: { cls: "bg-[#F6EDD8] text-[#8B6A14]", icon: Clock },
+  needs_attention: { cls: "bg-[#FBE9E9] text-[#B03A2E]", icon: AlertTriangle },
   approved: { cls: "bg-[#E4F7E7] text-[#0A4A1E]", icon: CheckCircle2 },
   rejected: { cls: "bg-[#FBE9E9] text-[#B03A2E]", icon: XCircle },
   withdrawn: { cls: "bg-[#EFEEE9] text-[#686D76]", icon: XCircle },
@@ -22,7 +49,9 @@ export default function MobileLeave() {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "[]"); } catch { return []; }
   });
   const [showForm, setShowForm] = useState(false);
-  const [me, setMe] = useState(null);
+  const [me, setMe] = useState(readCachedMe);
+  const [queued, setQueued] = useState(() => readOutbox(readCachedMe()?.employee_id));
+  const syncInFlight = useRef(false);
 
   const refresh = () => {
     api.get("/leave").then((r) => {
@@ -30,11 +59,92 @@ export default function MobileLeave() {
       setRows(data);
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch { /* noop */ }
     }).catch(() => { /* keep cache */ });
-    api.get("/auth/me").then((r) => setMe(r.data)).catch(() => {});
+    api.get("/auth/me").then((r) => {
+      setMe(r.data);
+      try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(r.data)); } catch { /* noop */ }
+      setQueued(readOutbox(r.data?.employee_id));
+    }).catch(() => {});
   };
   useEffect(refresh, []);
 
-  const mine = rows.filter((r) => r.employee_id === me?.employee_id);
+  useEffect(() => {
+    const employeeId = me?.employee_id;
+    if (!employeeId) return undefined;
+
+    const sync = async () => {
+      if (!navigator.onLine || syncInFlight.current) return;
+      syncInFlight.current = true;
+      let items = readOutbox(employeeId);
+      try {
+        for (const item of items) {
+          if (item.sync_error) continue;
+          try {
+            const response = await api.post("/leave", {
+              employee_id: employeeId,
+              leave_type: item.leave_type,
+              start_date: item.start_date,
+              end_date: item.end_date,
+              reason: item.reason,
+              client_request_id: item.client_request_id,
+            });
+            items = items.filter((queuedItem) => queuedItem.client_request_id !== item.client_request_id);
+            writeOutbox(employeeId, items);
+            setQueued(items);
+            setRows((current) => {
+              const next = [response.data, ...current.filter((row) => row.client_request_id !== item.client_request_id)];
+              try { localStorage.setItem(CACHE_KEY, JSON.stringify(next)); } catch { /* noop */ }
+              return next;
+            });
+          } catch (e) {
+            const status = e?.response?.status;
+            if (status >= 400 && status < 500 && status !== 429) {
+              const detail = e?.response?.data?.detail;
+              const message = typeof detail === "string" ? detail : "The request was rejected. Remove it and submit again.";
+              items = items.map((queuedItem) => queuedItem.client_request_id === item.client_request_id
+                ? { ...queuedItem, status: "needs_attention", sync_error: message }
+                : queuedItem);
+              writeOutbox(employeeId, items);
+              setQueued(items);
+              toast.error("An offline leave request needs your attention.");
+            }
+            break;
+          }
+        }
+      } finally {
+        syncInFlight.current = false;
+      }
+    };
+
+    void sync();
+    window.addEventListener("online", sync);
+    return () => window.removeEventListener("online", sync);
+  }, [me?.employee_id]);
+
+  const removeQueued = (clientRequestId) => {
+    const employeeId = me?.employee_id;
+    if (!employeeId) return;
+    const next = readOutbox(employeeId).filter((item) => item.client_request_id !== clientRequestId);
+    writeOutbox(employeeId, next);
+    setQueued(next);
+  };
+
+  const enqueueLeave = (item) => {
+    const employeeId = item.employee_id || me?.employee_id;
+    if (!employeeId) return false;
+    const current = readOutbox(employeeId);
+    if (current.some((queuedItem) => queuedItem.client_request_id === item.client_request_id)) return true;
+    const next = [...current, item];
+    writeOutbox(employeeId, next);
+    setQueued(next);
+    return true;
+  };
+
+  const serverRequestIds = new Set(rows.map((row) => row.client_request_id).filter(Boolean));
+  const mine = [
+    ...rows.filter((row) => row.employee_id === me?.employee_id),
+    ...queued.filter((item) => item.employee_id === me?.employee_id
+      && !serverRequestIds.has(item.client_request_id)),
+  ].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
   const reports = rows.filter((r) => r.employee_id !== me?.employee_id && r.status === "pending");
 
   const focusId = useMemo(() => new URLSearchParams(window.location.search).get("focus"), []);
@@ -151,10 +261,23 @@ export default function MobileLeave() {
                   <div className="text-[11px] text-[#525860] mt-0.5">{lv.start_date} → {lv.end_date}</div>
                   {lv.reason && <div className="text-[11px] text-[#686D76] mt-1 italic">"{lv.reason}"</div>}
                 </div>
-                <StatusPill s={lv.status} />
+                <div className="flex items-center gap-2">
+                  <StatusPill s={lv.status} />
+                  {lv.is_offline_queue && (
+                    <button onClick={() => removeQueued(lv.client_request_id)} className="text-[10px] text-[#686D76] underline">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {lv.sync_error && (
+                  <div className="text-[11px] text-[#B03A2E] mt-2">{lv.sync_error}</div>
+                )}
               </div>
             ))}
           </div>
+        )}
+        {queued.some((item) => !item.sync_error) && (
+          <p className="text-[10px] text-[#686D76] mt-2">Saved leave requests stay on this device until they are submitted online.</p>
         )}
       </section>
 
@@ -208,7 +331,15 @@ export default function MobileLeave() {
           </div>
         </div>
       )}
-      {showForm && <LeaveForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); refresh(); }} />}
+      {showForm && (
+        <LeaveForm
+          employeeId={me?.employee_id}
+          employee={me}
+          onQueued={enqueueLeave}
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); refresh(); }}
+        />
+      )}
     </div>
   );
 }
@@ -391,14 +522,15 @@ function TeamCalendar() {
 function StatusPill({ s }) {
   const spec = STATUS_STYLE[s] || STATUS_STYLE.pending;
   const Icon = spec.icon;
+  const label = s === "queued_offline" ? "Saved offline" : s === "needs_attention" ? "Needs attention" : s;
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-widest px-2 py-1 rounded-full ${spec.cls}`}>
-      <Icon className="w-3 h-3" /> {s}
+      <Icon className="w-3 h-3" /> {label}
     </span>
   );
 }
 
-function LeaveForm({ onClose, onSaved }) {
+function LeaveForm({ onClose, onSaved, employeeId, employee, onQueued }) {
   const [type, setType] = useState("annual");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -425,13 +557,51 @@ function LeaveForm({ onClose, onSaved }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!start || !end) return toast.error("Pick start and end dates");
+    const clientRequestId = makeClientRequestId();
+    const payload = {
+      employee_id: employeeId,
+      leave_type: type,
+      start_date: start,
+      end_date: end,
+      reason,
+      client_request_id: clientRequestId,
+    };
+    const saveOffline = () => {
+      if (!employeeId) {
+        toast.error("Connect while signed in once before saving leave requests offline.");
+        return false;
+      }
+      const fullName = [employee?.first_name, employee?.last_name].filter(Boolean).join(" ") || "You";
+      const saved = onQueued({
+        ...payload,
+        employee_name: fullName,
+        days: Math.max(1, reqDays),
+        status: "queued_offline",
+        is_offline_queue: true,
+        created_at: new Date().toISOString(),
+      });
+      if (!saved) return false;
+      toast.success("Saved on this device; it will submit when you reconnect.");
+      onSaved();
+      return true;
+    };
+
     setBusy(true);
     try {
-      await api.post("/leave", { leave_type: type, start_date: start, end_date: end, reason });
+      if (!navigator.onLine) {
+        saveOffline();
+        return;
+      }
+      await api.post("/leave", payload);
       toast.success("Leave request submitted");
       onSaved();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Could not submit");
+      const status = err?.response?.status;
+      if (!err?.response || status >= 500 || !navigator.onLine) {
+        saveOffline();
+      } else {
+        toast.error(err?.response?.data?.detail || "Could not submit");
+      }
     } finally {
       setBusy(false);
     }
