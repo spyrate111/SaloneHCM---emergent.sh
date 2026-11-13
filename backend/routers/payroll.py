@@ -42,12 +42,12 @@ async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
 
 
 @router.get("/runs")
-async def list_runs(user: dict = Depends(get_current_user)):
+async def list_runs(user: dict = Depends(require_admin)):
     return await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.get("/runs/{rid}")
-async def get_run(rid: str, user: dict = Depends(get_current_user)):
+async def get_run(rid: str, user: dict = Depends(require_admin)):
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Not found")
@@ -104,7 +104,7 @@ async def bank_file(rid: str, user: dict = Depends(require_admin)):
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
-    emps = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    emps = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(None)
     emp_map = {e["id"]: e for e in emps}
     buf = io.StringIO()
     writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
@@ -143,7 +143,7 @@ async def send_payslip_sms(
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Payroll run not found")
-    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(None)
     summary = await send_payslip_batch(run, employees, user, dry_run=body.dry_run)
     await audit(
         "sms_bulk_send",

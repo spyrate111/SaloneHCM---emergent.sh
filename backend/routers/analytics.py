@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from fastapi import APIRouter, Depends
 
-from core import db, get_current_user, tenant_filter, require_feature
+from core import db, get_current_user, require_admin, tenant_filter, require_feature
 
-router = APIRouter(prefix="/analytics", tags=["analytics"], dependencies=[Depends(require_feature("analytics"))])
+router = APIRouter(prefix="/analytics", tags=["analytics"], dependencies=[Depends(require_feature("analytics")), Depends(require_admin)])
 
 
 @router.get("/payroll-trend")

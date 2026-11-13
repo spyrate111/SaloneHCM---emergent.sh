@@ -107,7 +107,7 @@ async def invite_magic(body: MagicInviteIn, user: dict = Depends(require_admin))
 
     # Invalidate any existing un-consumed invite for this email
     await db.user_invites.update_many(
-        {"email": email, "consumed_at": None},
+        {"email": email, "consumed_at": None, **tenant_filter(user)},
         {"$set": {"superseded_at": iso(now_utc())}},
     )
 

@@ -29,8 +29,8 @@ class EmployeeIn(BaseModel):
     department: str
     location: str = "Freetown"
     employment_type: Literal["Full-time", "Part-time", "Contract", "Intern"] = "Full-time"
-    basic_salary_sle: float
-    allowances_sle: float = 0
+    basic_salary_sle: float = Field(..., ge=0)
+    allowances_sle: float = Field(0, ge=0)
     nassit_no: Optional[str] = ""
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
