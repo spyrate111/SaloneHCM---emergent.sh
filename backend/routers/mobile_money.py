@@ -288,10 +288,21 @@ async def create_run_mobile_money_batch(
     return batch
 
 
+@router.get("/mobile-money/pending-approvals")
+async def list_pending_mobile_money_approvals(
+    user: dict = Depends(require_roles("manager", "admin", "superadmin")),
+):
+    batches = await db.mobile_money_batches.find(
+        {"status": "pending_approval", **tenant_filter(user)},
+        {"_id": 0, "recipients": 0},
+    ).sort("created_at", -1).to_list(200)
+    return [_batch_summary(batch) for batch in batches]
+
+
 @router.get("/mobile-money/batches/{bid}")
 async def get_mobile_money_batch(
     bid: str,
-    user: dict = Depends(require_roles("payroll")),
+    user: dict = Depends(require_roles("payroll", "manager", "admin", "superadmin")),
 ):
     batch = await db.mobile_money_batches.find_one(
         {"id": bid, **tenant_filter(user)}, {"_id": 0},
@@ -349,9 +360,10 @@ async def export_mobile_money_workbook(
         raise HTTPException(409, "A manager must approve this batch before export.")
     payload = _build_mobile_money_xlsx(batch)
     exported_at = batch.get("exported_at") or iso(now_utc())
+    next_status = "exported" if batch.get("status") == "approved" else batch["status"]
     await db.mobile_money_batches.update_one(
         {"id": bid, **scope},
-        {"$set": {"status": "exported", "exported_at": exported_at}},
+        {"$set": {"status": next_status, "exported_at": exported_at}},
     )
     await audit(
         "mobile_money_batch_workbook_exported",
