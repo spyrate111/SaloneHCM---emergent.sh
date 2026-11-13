@@ -1,6 +1,8 @@
 """Compliance & Tax endpoints — incl. NRA PAYE return + NASSIT schedule exports."""
 import io
 import csv
+import zipfile
+from xml.sax.saxutils import escape as xml_escape
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
@@ -46,6 +48,134 @@ def _build_nra_csv(run: dict, employees: list, company: dict) -> bytes:
                 f'{t["paye"]:.2f}', f'{t["nassit_employee"]:.2f}',
                 f'{t["nassit_employer"]:.2f}', f'{t["net"]:.2f}'])
     return buf.getvalue().encode()
+
+
+
+
+def _xml_safe_text(value) -> str:
+    """Escape text for an OOXML inline string and remove invalid XML control chars."""
+    text = str(value if value is not None else "")
+    text = "".join(ch for ch in text if ch in "\t\n\r" or ord(ch) >= 32)
+    return xml_escape(text)
+
+
+def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
+    """Build a one-sheet Excel contribution schedule using NASSIT's published fields."""
+    emp_map = {e["id"]: e for e in employees}
+    rows = [
+        ["Name of Employer", company.get("name", "")],
+        ["ER Number", company.get("nassit_employer", "")],
+        ["Payment Period", run["period"]],
+        ["Address of Employer", company.get("address", "")],
+        [],
+        [
+            "No.", "Surname", "First Name", "Other Name(s)", "SS Number",
+            "Basic Salary (Le)", "10% (Le)", "5% (Le)", "15% (Le)",
+        ],
+    ]
+    totals = {"basic": 0.0, "employer": 0.0, "employee": 0.0, "total": 0.0}
+    for index, slip in enumerate(run["slips"], start=1):
+        employee = emp_map.get(slip["employee_id"], {})
+        basic = float(slip.get("basic", 0) or 0)
+        employee_share = float(slip.get("nassit_employee", 0) or 0)
+        employer_share = float(slip.get("nassit_employer", 0) or 0)
+        total_share = round(employee_share + employer_share, 2)
+        totals["basic"] += basic
+        totals["employee"] += employee_share
+        totals["employer"] += employer_share
+        totals["total"] += total_share
+        rows.append([
+            index,
+            slip.get("employee_last_name") or employee.get("last_name", ""),
+            slip.get("employee_first_name") or employee.get("first_name", ""),
+            slip.get("employee_middle_name") or employee.get("middle_name", ""),
+            slip.get("employee_nassit_no") or employee.get("nassit_no", ""),
+            basic,
+            employer_share,
+            employee_share,
+            total_share,
+        ])
+    rows.extend([
+        [],
+        [
+            "TOTAL", "", "", "", "",
+            round(totals["basic"], 2),
+            round(totals["employer"], 2),
+            round(totals["employee"], 2),
+            round(totals["total"], 2),
+        ],
+    ])
+
+    def column_name(number: int) -> str:
+        name = ""
+        while number:
+            number, remainder = divmod(number - 1, 26)
+            name = chr(65 + remainder) + name
+        return name
+
+    worksheet_rows = []
+    for row_number, row in enumerate(rows, start=1):
+        cells = []
+        for col_number, value in enumerate(row, start=1):
+            if value is None or value == "":
+                continue
+            cell_ref = f"{column_name(col_number)}{row_number}"
+            if isinstance(value, (int, float)):
+                cell_value = f"{float(value):.2f}" if isinstance(value, float) else str(value)
+                cells.append(f'<c r="{cell_ref}" t="n"><v>{cell_value}</v></c>')
+            else:
+                cells.append(
+                    f'<c r="{cell_ref}" t="inlineStr"><is><t xml:space="preserve">'
+                    f'{_xml_safe_text(value)}</t></is></c>'
+                )
+        worksheet_rows.append(f'<row r="{row_number}">{"".join(cells)}</row>')
+
+    sheet_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<sheetViews><sheetView workbookViewId="0"><pane ySplit="6" topLeftCell="A7" '
+        'activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+        f'<sheetData>{"".join(worksheet_rows)}</sheetData></worksheet>'
+    )
+    workbook_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheets><sheet name="Contribution Schedule" sheetId="1" r:id="rId1"/></sheets></workbook>'
+    )
+    content_types_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '</Types>'
+    )
+    package_rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="xl/workbook.xml"/></Relationships>'
+    )
+    workbook_rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        'Target="worksheets/sheet1.xml"/></Relationships>'
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as workbook:
+        workbook.writestr("[Content_Types].xml", content_types_xml)
+        workbook.writestr("_rels/.rels", package_rels_xml)
+        workbook.writestr("xl/workbook.xml", workbook_xml)
+        workbook.writestr("xl/_rels/workbook.xml.rels", workbook_rels_xml)
+        workbook.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+    return output.getvalue()
 
 
 @router.get("/summary")
@@ -198,6 +328,55 @@ async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nr
     return StreamingResponse(
         io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="NRA-PAYE-Return-{period}.csv"'},
+    )
+
+
+
+
+@router.get("/nassit-schedule.xlsx/{rid}")
+async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("nra_export"))):
+    """Excel contribution schedule using the fields published in NASSIT's Companion Guide."""
+    if not can_role(user, "payroll", "auditor"):
+        raise HTTPException(403, "Payroll, auditor or admin only")
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+    if not company.get("name") or not company.get("nassit_employer"):
+        raise HTTPException(
+            422,
+            "Complete the employer name and NASSIT registration number in the company profile before exporting.",
+        )
+    emp_map = {employee["id"]: employee for employee in employees}
+    missing_ids = [
+        slip.get("employee_name", "Employee")
+        for slip in run["slips"]
+        if not (
+            slip.get("employee_nassit_no")
+            or emp_map.get(slip["employee_id"], {}).get("nassit_no")
+        )
+    ]
+    if missing_ids:
+        raise HTTPException(
+            422,
+            f"Add NASSIT numbers to {len(missing_ids)} employee profile(s) before exporting.",
+        )
+
+    payload = _build_nassit_xlsx(run, employees, company)
+    await audit(
+        "nassit_schedule_xlsx_export",
+        f"payroll_runs/{rid}",
+        user,
+        {"period": run["period"], "rows": len(run["slips"])},
+    )
+    return StreamingResponse(
+        io.BytesIO(payload),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="NASSIT-Contribution-Schedule-{run["period"]}.xlsx"'
+        },
     )
 
 
