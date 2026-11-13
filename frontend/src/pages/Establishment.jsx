@@ -10,20 +10,40 @@ export default function Establishment() {
   const { has } = useFeatures();
   const [tree, setTree] = useState({ ministries: [] });
   const [overruns, setOverruns] = useState([]);
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0")].join("-");
+  });
+  const [costReport, setCostReport] = useState(null);
+  const [costLoading, setCostLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
   const [editing, setEditing] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const [t, o] = await Promise.all([
-      api.get("/establishment/tree"),
-      api.get("/establishment/overruns"),
-    ]);
-    setTree(t.data);
-    setOverruns(o.data);
-    setLoading(false);
-  }, []);
+    setCostLoading(true);
+    try {
+      const [t, o] = await Promise.all([
+        api.get("/establishment/tree"),
+        api.get("/establishment/overruns"),
+      ]);
+      setTree(t.data);
+      setOverruns(o.data);
+      try {
+        const report = await api.get("/establishment/costs", { params: { period } });
+        setCostReport(report.data);
+      } catch (e) {
+        setCostReport(null);
+        toast.error(e?.response?.data?.detail || "Payroll cost comparison could not be loaded");
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Establishment data could not be loaded");
+    } finally {
+      setLoading(false);
+      setCostLoading(false);
+    }
+  }, [period]);
 
   useEffect(() => { if (has("establishment_control")) refresh(); }, [refresh, has]);
 
@@ -44,6 +64,13 @@ export default function Establishment() {
         ministries={tree.ministries.length}
         overruns={overruns.length}
         onNew={() => setEditing({})}
+      />
+
+      <CostTracking
+        period={period}
+        onPeriodChange={setPeriod}
+        report={costReport}
+        loading={costLoading}
       />
 
       {overruns.length > 0 && <OverrunBanner overruns={overruns} />}
@@ -79,6 +106,145 @@ export default function Establishment() {
         />
       )}
     </div>
+  );
+}
+
+function CostTracking({ period, onPeriodChange, report, loading }) {
+  const money = (value) => value == null
+    ? "—"
+    : new Intl.NumberFormat("en-SL", {
+      style: "currency",
+      currency: "SLE",
+      maximumFractionDigits: 2,
+    }).format(value);
+
+  const headcount = (value) => value == null ? "—" : Number(value).toLocaleString();
+  const orgLabel = (row) => (row.organization_units || [])
+    .map((org) => org.ministry + " / " + org.directorate)
+    .join("; ") || "No establishment position mapped";
+
+  return (
+    <section className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="establishment-costs">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-[#525860]">Budget and actuals</div>
+          <h2 className="font-heading text-xl font-semibold mt-1">Headcount and payroll cost</h2>
+          <p className="text-xs text-[#525860] mt-1 max-w-3xl">
+            Gross pay from the latest completed run compared with period IFMIS allocations and approved posts.
+            Shared budget codes stay together in the code view.
+          </p>
+        </div>
+        <label className="text-xs text-[#525860]">
+          Payroll period
+          <input
+            aria-label="Payroll period"
+            type="month"
+            value={period}
+            onChange={(event) => onPeriodChange(event.target.value)}
+            className="block mt-1 border border-[#E2DFD6] rounded-md px-3 py-2 text-sm text-[#1A1C1E]"
+          />
+        </label>
+      </div>
+
+      {loading && <div className="text-sm text-[#525860]">Loading payroll cost comparison…</div>}
+      {!loading && !report && (
+        <div className="text-sm text-[#8B6A14]">Payroll cost comparison is unavailable. Refresh the page to try again.</div>
+      )}
+      {report && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KPI label="Approved posts" value={headcount(report.totals.approved_headcount)} color="text-[#26547C]" />
+            <KPI label="Filled posts" value={headcount(report.totals.filled_headcount)} color="text-[#17A035]" />
+            <KPI label="Latest run gross" value={money(report.totals.actual_gross_sle)} />
+            <KPI label="Period IFMIS allocation" value={money(report.totals.allocated_sle)} />
+          </div>
+
+          <p className="text-[11px] text-[#686D76]">
+            {report.actuals_available
+              ? "Actuals use the most recent completed payroll run for " + report.period + "."
+              : "No completed payroll run exists for " + report.period + "; actual payroll values are shown as —."}
+            {" "}Amounts are in SLE. Directorate allocations are marked incomplete when a budget code is shared or missing.
+          </p>
+
+          <div>
+            <h3 className="font-medium text-sm mb-2">Ministry and directorate view</h3>
+            {report.by_org_unit.length === 0 ? (
+              <div className="border border-[#E2DFD6] rounded-md p-4 text-sm text-[#686D76]">
+                Add approved establishment positions to see headcount by ministry and directorate.
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-[#E2DFD6] rounded-md">
+                <table className="w-full min-w-[900px] text-xs">
+                  <thead className="bg-[#F7F6F2]">
+                    <tr>
+                      {["Ministry", "Directorate", "Approved", "Filled", "On payroll", "Actual gross (SLE)", "IFMIS allocation (SLE)", "Variance (SLE)"].map((label) => (
+                        <th key={label} className="text-left px-3 py-2 uppercase tracking-wider text-[10px] text-[#686D76] font-medium">{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.by_org_unit.map((row) => {
+                      const mappingNote = [
+                        row.shared_budget_codes?.length ? "Shared codes: " + row.shared_budget_codes.join(", ") : "",
+                        row.missing_allocation_codes?.length ? "Missing allocations: " + row.missing_allocation_codes.join(", ") : "",
+                      ].filter(Boolean).join(". ");
+                      return (
+                        <tr key={row.ministry + "|" + row.directorate} className="border-t border-[#F1EEE6]">
+                          <td className="px-3 py-2">{row.ministry}</td>
+                          <td className="px-3 py-2">{row.directorate}</td>
+                          <td className="px-3 py-2 font-data">{headcount(row.approved_headcount)}</td>
+                          <td className="px-3 py-2 font-data">{headcount(row.filled_headcount)}</td>
+                          <td className="px-3 py-2 font-data">{headcount(row.payroll_headcount)}</td>
+                          <td className="px-3 py-2 font-data">{money(row.actual_gross_sle)}</td>
+                          <td className="px-3 py-2 font-data">
+                            {row.allocation_complete ? money(row.allocated_sle) : (
+                              <span title={mappingNote || "No uniquely mapped period allocation"}>Incomplete</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-data">{money(row.variance_sle)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <details className="border border-[#E2DFD6] rounded-md">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">View details by budget code</summary>
+            <div className="overflow-x-auto border-t border-[#E2DFD6]">
+              <table className="w-full min-w-[850px] text-xs">
+                <thead className="bg-[#F7F6F2]">
+                  <tr>
+                    {["Budget code", "Ministry / directorate", "Approved", "Filled", "On payroll", "Actual gross (SLE)", "IFMIS allocation (SLE)", "Used"].map((label) => (
+                      <th key={label} className="text-left px-3 py-2 uppercase tracking-wider text-[10px] text-[#686D76] font-medium">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.by_budget_code.map((row) => (
+                    <tr key={row.budget_code || "unassigned"} className="border-t border-[#F1EEE6]">
+                      <td className="px-3 py-2 font-data">{row.budget_code || "No budget code"}</td>
+                      <td className="px-3 py-2">{orgLabel(row)}{row.shared_across_org_units ? " · shared code" : ""}</td>
+                      <td className="px-3 py-2 font-data">{headcount(row.approved_headcount)}</td>
+                      <td className="px-3 py-2 font-data">{headcount(row.filled_headcount)}</td>
+                      <td className="px-3 py-2 font-data">{headcount(row.payroll_headcount)}</td>
+                      <td className="px-3 py-2 font-data">{money(row.actual_gross_sle)}</td>
+                      <td className="px-3 py-2 font-data">{money(row.allocated_sle)}</td>
+                      <td className="px-3 py-2 font-data">{row.utilization_pct == null ? "—" : row.utilization_pct + "%"}</td>
+                    </tr>
+                  ))}
+                  {report.by_budget_code.length === 0 && (
+                    <tr><td colSpan={8} className="px-3 py-4 text-center text-[#686D76]">No budget codes, payroll actuals, or allocations for this period.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      )}
+    </section>
   );
 }
 
