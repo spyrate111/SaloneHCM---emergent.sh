@@ -107,7 +107,7 @@ async def create_employee_case(
         "events": [{
             "id": str(uuid.uuid4()),
             "event_type": "case_opened",
-            "occurred_on": date.today().isoformat(),
+            "occurred_on": now.date().isoformat(),
             "details": "Case opened and initial summary recorded.",
             "created_by": _actor(user),
             "created_at": iso(now),
@@ -185,7 +185,7 @@ async def update_case_status(
     event = {
         "id": str(uuid.uuid4()),
         "event_type": "status_changed",
-        "occurred_on": date.today().isoformat(),
+        "occurred_on": now.date().isoformat(),
         "details": f"{case.get('status', 'open').replace('_', ' ').title()} → {body.status.replace('_', ' ').title()}. {body.note}",
         "created_by": _actor(user),
         "created_at": iso(now),
