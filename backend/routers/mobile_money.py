@@ -13,6 +13,7 @@ from typing import Literal, Optional
 from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 
@@ -213,15 +214,25 @@ async def create_run_mobile_money_batch(
     if existing:
         return {**existing, "already_exists": True}
 
-    employees = await db.employees.find(scope, {"_id": 0}).to_list(2000)
-    employee_map = {employee["id"]: employee for employee in employees}
+    slips = run.get("slips", [])
+    employee_ids = list({slip.get("employee_id") for slip in slips if slip.get("employee_id")})
     wallet_field = (
         "orange_money_number" if body.provider == "orange_money"
         else "afrimoney_number"
     )
+    employees = []
+    if employee_ids:
+        employees = await db.employees.find(
+            {"id": {"$in": employee_ids}, **scope},
+            {
+                "_id": 0, "id": 1, "first_name": 1, "middle_name": 1,
+                "last_name": 1, wallet_field: 1,
+            },
+        ).to_list(len(employee_ids))
+    employee_map = {employee["id"]: employee for employee in employees}
     invalid = []
     recipients = []
-    for slip in run.get("slips", []):
+    for slip in slips:
         employee = employee_map.get(slip.get("employee_id"), {})
         wallet = _normalize_wallet_number(employee.get(wallet_field))
         amount = round(float(slip.get("net", 0) or 0), 2)
@@ -256,6 +267,7 @@ async def create_run_mobile_money_batch(
     total_amount = round(sum(recipient["amount_sle"] for recipient in recipients), 2)
     batch = {
         "id": batch_id,
+        "batch_type": "initial",
         "company_id": user["company_id"],
         "run_id": rid,
         "period": run["period"],
@@ -347,6 +359,7 @@ async def retry_failed_mobile_money_payments(
     total_amount = round(sum(row["amount_sle"] for row in recipients), 2)
     retry = {
         "id": str(uuid.uuid4()),
+        "batch_type": "retry",
         "company_id": user["company_id"],
         "run_id": parent["run_id"],
         "period": parent["period"],
@@ -436,10 +449,12 @@ async def approve_mobile_money_batch(
     if batch.get("status") != "pending_approval":
         raise HTTPException(409, f"Cannot approve a batch with status {batch.get('status')}.")
     now = iso(now_utc())
-    await db.mobile_money_batches.update_one(
+    result = await db.mobile_money_batches.update_one(
         {"id": bid, **tenant_filter(user), "status": "pending_approval"},
         {"$set": {"status": "approved", "approved_by": user["email"], "approved_at": now}},
     )
+    if result.matched_count != 1:
+        raise HTTPException(409, "Another manager changed this batch. Refresh and review its current status.")
     approved = await db.mobile_money_batches.find_one(
         {"id": bid, **tenant_filter(user)}, {"_id": 0},
     )
