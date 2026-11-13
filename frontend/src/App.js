@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import EmployeeDetail from "./pages/EmployeeDetail";
 import Payroll from "./pages/Payroll";
+import MobileMoneyApprovals from "./pages/MobileMoneyApprovals";
 import Compliance from "./pages/Compliance";
 import Leave from "./pages/Leave";
 import Attendance from "./pages/Attendance";
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="/employees" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><Employees /></ProtectedRoute>} />
             <Route path="/employees/:id" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><EmployeeDetail /></ProtectedRoute>} />
             <Route path="/payroll" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Payroll /></ProtectedRoute>} />
+            <Route path="/mobile-money-approvals" element={<ProtectedRoute roles={["admin", "superadmin", "manager"]}><MobileMoneyApprovals /></ProtectedRoute>} />
             <Route path="/schedules" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Schedules /></ProtectedRoute>} />
             <Route path="/vouchers" element={<Vouchers />} />
             <Route path="/simulator" element={<ProtectedRoute roles={["admin", "superadmin", "payroll"]}><Simulator /></ProtectedRoute>} />
