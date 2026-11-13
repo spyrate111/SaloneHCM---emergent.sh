@@ -10,6 +10,7 @@ const empty = {
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
   nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
+  orange_money_number: "", afrimoney_number: "",
   hire_date: "2025-01-01", status: "active",
 };
 
@@ -138,6 +139,8 @@ export default function Employees() {
                 ["tin", "TIN", "text"],
                 ["bank_name", "Bank name", "text"],
                 ["bank_account", "Bank account", "text"],
+                ["orange_money_number", "Orange Money wallet number", "tel"],
+                ["afrimoney_number", "Afrimoney wallet number", "tel"],
                 ["basic_salary_sle", "Basic salary (SLE)", "number"],
                 ["allowances_sle", "Allowances (SLE)", "number"],
               ].map(([k, label, type]) => (
