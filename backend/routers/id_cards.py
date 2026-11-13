@@ -21,7 +21,7 @@ router = APIRouter(prefix="/employees", tags=["staff-id-cards"])
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
 MAX_PHOTO_PIXELS = 20_000_000
 CARD_SIZE = (85.6 * mm, 54 * mm)
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "").rstrip("/")
 
 
 def _normalized_photo(data: bytes) -> bytes:
@@ -205,6 +205,8 @@ async def get_id_photo(eid: str, user: dict = Depends(require_roles("hr"))):
 
 @router.get("/{eid}/id-card.pdf")
 async def download_id_card(eid: str, user: dict = Depends(require_roles("hr"))):
+    if not FRONTEND_URL:
+        raise HTTPException(503, "Staff ID card links are unavailable until FRONTEND_URL is configured")
     tf = tenant_filter(user)
     employee = await db.employees.find_one({"id": eid, **tf}, {"_id": 0})
     if not employee:
