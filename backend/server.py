@@ -34,7 +34,7 @@ async def lifespan(_app: FastAPI):
     await db.mobile_money_batches.create_index(
         [("company_id", 1), ("run_id", 1), ("provider", 1)],
         unique=True,
-        partialFilterExpression={"retry_of": {"$exists": False}},
+        partialFilterExpression={"batch_type": "initial"},
         name="unique_initial_mobile_money_batch",
     )
     await db.mobile_money_batches.create_index(
