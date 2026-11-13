@@ -97,7 +97,8 @@ async def _employee_ministry_map(company_id: str) -> dict[str, str]:
 
 async def _hire_date_map(company_id: str) -> dict[str, str]:
     emps = await db.employees.find(
-        {"company_id": company_id}, {"_id": 0, "id": 1, "hire_date": 1, "status": 1},
+        {"company_id": company_id},
+        {"_id": 0, "id": 1, "hire_date": 1, "status": 1, "first_name": 1, "last_name": 1, "nassit_no": 1, "tin": 1},
     ).to_list(5000)
     return {e["id"]: e for e in emps}
 
@@ -173,6 +174,59 @@ def _terminated_paid_anomalies(cur_by_id: dict, emp_index: dict) -> list[dict]:
     return out
 
 
+def _duplicate_identifier_anomalies(cur_slips: list[dict], emp_index: dict) -> list[dict]:
+    """Flag shared NASSIT/TIN identifiers among employees on this payroll run.
+
+    Identifier values are normalized for whitespace/hyphen differences but are
+    never included in the response, so the reviewer sees the affected employees
+    without exposing full statutory identifiers in the anomaly feed.
+    """
+    slip_by_id = {
+        str(s.get("employee_id")): s
+        for s in cur_slips
+        if s.get("employee_id")
+    }
+    if len(slip_by_id) < 2:
+        return []
+
+    out = []
+    for field, kind, label in (
+        ("nassit_no", "duplicate_nassit", "NASSIT number"),
+        ("tin", "duplicate_tin", "TIN"),
+    ):
+        grouped = defaultdict(list)
+        for eid in slip_by_id:
+            raw = (emp_index.get(eid) or {}).get(field)
+            normalized = re.sub(r"[\s-]+", "", str(raw or "")).upper()
+            if normalized:
+                grouped[normalized].append(eid)
+
+        for employee_ids in grouped.values():
+            if len(employee_ids) < 2:
+                continue
+            names = []
+            for eid in sorted(employee_ids):
+                emp = emp_index.get(eid) or {}
+                slip = slip_by_id[eid]
+                name = slip.get("employee_name") or " ".join(
+                    part for part in (emp.get("first_name"), emp.get("last_name")) if part
+                ) or "Employee"
+                if name not in names:
+                    names.append(name)
+            if len(names) < 2:
+                names = [f"{len(employee_ids)} employee records"]
+            shown = ", ".join(names[:3])
+            if len(names) > 3:
+                shown += f" and {len(names) - 3} more"
+            out.append({
+                "severity": "high",
+                "kind": kind,
+                "subject": f"Duplicate {label} · {shown}",
+                "message": f"The same {label} is assigned to {len(employee_ids)} employees on this run. Verify the records before approval.",
+            })
+    return out
+
+
 def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict]:
     """Return a list of {severity, kind, subject, before, after, delta, delta_pct, message}."""
     prev_by_id = {s["employee_id"]: s for s in prev_slips}
@@ -181,6 +235,7 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
         _raise_anomalies(cur_by_id, prev_by_id)
         + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
         + _terminated_paid_anomalies(cur_by_id, emp_index)
+        + _duplicate_identifier_anomalies(cur_slips, emp_index)
     )
 
 
