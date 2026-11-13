@@ -26,8 +26,13 @@ function readOutbox(employeeId) {
 }
 
 function writeOutbox(employeeId, items) {
-  if (!employeeId) return;
-  try { localStorage.setItem(outboxKey(employeeId), JSON.stringify(items)); } catch { /* noop */ }
+  if (!employeeId) return false;
+  try {
+    localStorage.setItem(outboxKey(employeeId), JSON.stringify(items));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function makeClientRequestId() {
@@ -106,6 +111,7 @@ export default function MobileLeave() {
               writeOutbox(employeeId, items);
               setQueued(items);
               toast.error("An offline leave request needs your attention.");
+              continue;
             }
             break;
           }
@@ -134,8 +140,9 @@ export default function MobileLeave() {
     const current = readOutbox(employeeId);
     if (current.some((queuedItem) => queuedItem.client_request_id === item.client_request_id)) return true;
     const next = [...current, item];
-    writeOutbox(employeeId, next);
+    if (!writeOutbox(employeeId, next)) return false;
     setQueued(next);
+    if (navigator.onLine) window.dispatchEvent(new Event("online"));
     return true;
   };
 
@@ -557,6 +564,7 @@ function LeaveForm({ onClose, onSaved, employeeId, employee, onQueued }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!start || !end) return toast.error("Pick start and end dates");
+    if (start > end) return toast.error("End date must be on or after start date");
     const clientRequestId = makeClientRequestId();
     const payload = {
       employee_id: employeeId,
@@ -580,7 +588,10 @@ function LeaveForm({ onClose, onSaved, employeeId, employee, onQueued }) {
         is_offline_queue: true,
         created_at: new Date().toISOString(),
       });
-      if (!saved) return false;
+      if (!saved) {
+        toast.error("Could not save this request on your device. Check available storage and try again.");
+        return false;
+      }
       toast.success("Saved on this device; it will submit when you reconnect.");
       onSaved();
       return true;
