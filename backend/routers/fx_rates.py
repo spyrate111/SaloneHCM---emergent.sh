@@ -36,6 +36,15 @@ class FxRateSetIn(BaseModel):
     notes: str = Field("", max_length=500)
     revision: int = Field(1, ge=1, le=100)
 
+    @field_validator("publication_date")
+    @classmethod
+    def validate_publication_date(cls, value: str) -> str:
+        try:
+            date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("Publication date must be a real YYYY-MM-DD date") from exc
+        return value
+
     @field_validator("rates_sle_per_unit")
     @classmethod
     def validate_rates(cls, values: dict[str, float]) -> dict[str, float]:
