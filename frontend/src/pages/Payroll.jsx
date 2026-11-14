@@ -157,6 +157,40 @@ export default function Payroll() {
         {step === 2 && preview && (
           <div className="space-y-5">
             <ClaimsSummaryCard />
+            <section
+              className="border border-[#EAD9AE] bg-[#FDF8EC] rounded-lg p-4 space-y-3"
+              data-testid="payroll-anomaly-review"
+              aria-live="polite"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#8B6A14] mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-[#674B0D]">
+                    Payroll review flags · {preview.anomaly_summary?.count || 0}
+                  </h2>
+                  <p className="text-xs text-[#725511] mt-1">
+                    Review these signals before confirming the run. They are checks for review, not proof of error.
+                  </p>
+                </div>
+              </div>
+              {preview.anomalies?.length ? (
+                <ul className="space-y-2">
+                  {preview.anomalies.map((item, index) => (
+                    <li key={item.kind + "-" + index} className="border-t border-[#E8D3A6] pt-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-[10px] uppercase font-semibold text-[#8B6A14]">{item.severity}</span>
+                        <div>
+                          <div className="text-xs font-semibold text-[#1A1C1E]">{item.subject}</div>
+                          <p className="text-xs text-[#525860] mt-0.5">{item.message}</p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-[#525860]">No anomalies were flagged by the available checks.</p>
+              )}
+            </section>
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               {[
                 ["Employees", preview.totals.employee_count],
