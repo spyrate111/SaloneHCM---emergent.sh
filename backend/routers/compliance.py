@@ -33,7 +33,7 @@ def _build_nra_csv(run: dict, employees: list, company: dict) -> bytes:
         "nassit_employee_sle", "nassit_employer_sle", "net_sle",
     ])
     for s in run["slips"]:
-        emp = emp_map.get(s["employee_id"], {})
+        emp = emp_map.get(s.get("employee_id"), {})
         taxable = round(s["gross"] - s["nassit_employee"], 2)
         w.writerow([
             _payroll_identity_value(s, "employee_tin", emp, "tin"),
