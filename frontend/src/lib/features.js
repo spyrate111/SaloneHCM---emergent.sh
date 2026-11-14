@@ -1,4 +1,5 @@
 /** Feature-flag helpers driven by the user's company tier. */
+import { useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export const TIER_COLORS = {
@@ -17,8 +18,8 @@ export const TIER_DESCRIPTIONS = {
 
 export function useFeatures() {
   const { user } = useAuth();
-  const features = user?.company?.features || [];
-  const has = (f) => features.includes(f);
+  const features = useMemo(() => user?.company?.features || [], [user]);
+  const has = useCallback((f) => features.includes(f), [features]);
   const role = user?.role;
   return {
     features,
