@@ -472,10 +472,9 @@ async def payroll_variance(rid: str, user: dict = Depends(require_roles("payroll
                 "period": {"$lt": cur["period"]},
             }},
             {"$sort": {"period": -1, "created_at": -1}},
-            {"$group": {"_id": "$period", "run": {"$first": "$ROOT"}}},
+            {"$group": {"_id": "$period", "period": {"$first": "$period"}, "slips": {"$first": "$slips"}}},
             {"$sort": {"_id": -1}},
             {"$limit": HISTORICAL_BASELINE_PERIODS},
-            {"$replaceRoot": {"newRoot": "$run"}},
             {"$project": {"_id": 0, "period": 1, "slips": 1}},
         ]).to_list(length=HISTORICAL_BASELINE_PERIODS)
 
