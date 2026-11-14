@@ -310,6 +310,19 @@ async def get_active_allowance_amounts(emp: dict, company_id: str, period: str) 
     return out
 
 
+# ============ Annual step-increment history ============
+
+@router.get("/step-increments")
+async def list_step_increments(year: Optional[int] = None, user: dict = Depends(require_admin)):
+    """Return this company's recorded annual salary step changes."""
+    query = tenant_filter(user)
+    if year is not None:
+        query["year"] = year
+    return await db.step_increments.find(
+        query, {"_id": 0}
+    ).sort("applied_at", -1).to_list(1000)
+
+
 # ============ Reports ============
 
 @router.get("/reports/by-budget-code/{run_id}")
