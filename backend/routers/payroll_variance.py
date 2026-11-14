@@ -100,7 +100,7 @@ def _by_ministry(slips: list[dict], emp_ministry: dict[str, str]) -> dict[str, d
 async def _employee_ministry_map(company_id: str) -> dict[str, str]:
     emps = await db.employees.find(
         {"company_id": company_id}, {"_id": 0, "id": 1, "ministry": 1, "department": 1, "hire_date": 1},
-    ).to_list(5000)
+    ).to_list(None)
     return {e["id"]: (e.get("ministry") or e.get("department") or "Unassigned") for e in emps}
 
 
@@ -494,6 +494,27 @@ async def preview_anomalies_for_period(cur_slips: list[dict], period: str, user:
             "delta_pct": gross_pct,
             "message": f"Total gross rose {gross_pct}% — inspect the payroll preview before confirming this run.",
         })
+
+    ministry_map = await _employee_ministry_map(user["company_id"])
+    current_by_ministry = _by_ministry(cur_slips, ministry_map)
+    previous_by_ministry = _by_ministry(prev_slips, ministry_map) if prev else {}
+    for ministry in sorted(set(current_by_ministry) | set(previous_by_ministry)):
+        current = current_by_ministry.get(ministry, {"headcount": 0, "gross": 0.0})
+        previous = previous_by_ministry.get(ministry, {"headcount": 0, "gross": 0.0})
+        ministry_pct = _pct(current["gross"], previous["gross"])
+        if ministry_pct is not None and ministry_pct >= MINISTRY_PCT and previous["gross"] > 0:
+            anomalies.append({
+                "severity": "warn",
+                "kind": "ministry_jump",
+                "subject": ministry,
+                "before": previous["gross"],
+                "after": current["gross"],
+                "delta_pct": ministry_pct,
+                "message": (
+                    f"{ministry} gross rose {ministry_pct}% "
+                    f"({previous['headcount']}→{current['headcount']} headcount)."
+                ),
+            })
 
     return {
         "prior_period": prev_period,
