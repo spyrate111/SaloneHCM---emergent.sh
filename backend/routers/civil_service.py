@@ -4,6 +4,7 @@ acting allowances, Ministry-of-Finance approval workflow, ghost-worker controls.
 Gov tier-only. Feature flag: `civil_service`.
 """
 import uuid
+from datetime import date
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -229,9 +230,21 @@ async def patch_employee_cs(eid: str, body: EmployeeCivilServicePatch, user: dic
 class ActingIn(BaseModel):
     employee_id: str
     acting_role_title: str = Field(..., min_length=2, max_length=160)
-    monthly_allowance_sle: float = Field(..., ge=0)
-    start_date: str  # YYYY-MM-DD
-    end_date: Optional[str] = None  # open-ended if null
+    acting_grade_code: Optional[str] = Field(default=None, max_length=12)
+    monthly_allowance_sle: Optional[float] = Field(default=None, ge=0)
+    pct_of_basic: Optional[float] = Field(default=None, ge=0, le=2.0)
+    start_date: str = Field(..., pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    end_date: Optional[str] = Field(default=None, pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+
+
+def _validate_acting_period(start_date: str, end_date: Optional[str]) -> None:
+    try:
+        start = date.fromisoformat(start_date)
+        end = date.fromisoformat(end_date) if end_date else None
+    except ValueError:
+        raise HTTPException(400, "Acting assignment dates must be valid YYYY-MM-DD dates")
+    if end and end < start:
+        raise HTTPException(400, "End date must be on or after start date")
 
 
 @router.get("/actings")
@@ -258,10 +271,22 @@ async def create_acting(body: ActingIn, user: dict = Depends(require_roles("hr")
     emp = await db.employees.find_one({"id": body.employee_id, **tf}, {"_id": 0, "id": 1})
     if not emp:
         raise HTTPException(404, "Employee not found")
+    if (body.monthly_allowance_sle is None) == (body.pct_of_basic is None):
+        raise HTTPException(400, "Provide exactly one of monthly_allowance_sle or pct_of_basic")
+    _validate_acting_period(body.start_date, body.end_date)
+    if body.acting_grade_code:
+        grade = await db.civil_service_grades.find_one(
+            {"code": body.acting_grade_code, **tf}, {"_id": 0, "code": 1}
+        )
+        if not grade:
+            raise HTTPException(404, f"Acting grade {body.acting_grade_code} not found")
     doc = with_tenant({**body.model_dump(), "id": str(uuid.uuid4()), "created_at": iso(now_utc())}, user)
     await db.civil_service_actings.insert_one(doc)
     doc.pop("_id", None)
-    await audit("acting_create", f"civil_service_actings/{doc['id']}", user, {"employee_id": body.employee_id})
+    await audit("acting_create", f"civil_service_actings/{doc['id']}", user, {
+        "employee_id": body.employee_id,
+        "acting_grade_code": body.acting_grade_code,
+    })
     return doc
 
 
@@ -307,7 +332,11 @@ async def get_active_allowance_amounts(emp: dict, company_id: str, period: str) 
     }, {"_id": 0}).to_list(20)
     for a in active_actings:
         label = f"Acting: {a['acting_role_title']}"
-        out[label] = round(out.get(label, 0) + float(a["monthly_allowance_sle"]), 2)
+        if a.get("pct_of_basic") is not None:
+            amount = round(basic * float(a["pct_of_basic"]), 2)
+        else:
+            amount = float(a.get("monthly_allowance_sle", 0) or 0)
+        out[label] = round(out.get(label, 0) + amount, 2)
 
     # Sector preset allowances (private-sector industry templates).
     # These are additive to civil-service allowances. Stored directly on the employee.
@@ -675,22 +704,37 @@ async def step_increment_history(user: dict = Depends(require_roles("hr"))):
 # ============ Acting Allowance edit ============
 
 class ActingPatch(BaseModel):
-    acting_role_title: Optional[str] = None
+    acting_role_title: Optional[str] = Field(default=None, min_length=2, max_length=160)
+    acting_grade_code: Optional[str] = Field(default=None, max_length=12)
     monthly_allowance_sle: Optional[float] = Field(default=None, ge=0)
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    pct_of_basic: Optional[float] = Field(default=None, ge=0, le=2.0)
+    start_date: Optional[str] = Field(default=None, pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    end_date: Optional[str] = Field(default=None, pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 
 
 @router.patch("/actings/{aid}")
 async def patch_acting(aid: str, body: ActingPatch, user: dict = Depends(require_roles("hr"))):
-    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    tf = tenant_filter(user)
+    existing = await db.civil_service_actings.find_one({"id": aid, **tf}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Acting not found")
+    patch = body.model_dump(exclude_unset=True)
     if not patch:
         return {"ok": True, "updated": 0}
-    r = await db.civil_service_actings.update_one(
-        {"id": aid, **tenant_filter(user)}, {"$set": patch}
-    )
-    if not r.matched_count:
-        raise HTTPException(404, "Acting not found")
+    updated = {**existing, **patch}
+    if ("monthly_allowance_sle" in patch or "pct_of_basic" in patch) and (
+        (updated.get("monthly_allowance_sle") is None) == (updated.get("pct_of_basic") is None)
+    ):
+        raise HTTPException(400, "Provide exactly one of monthly_allowance_sle or pct_of_basic")
+    if "acting_grade_code" in patch and patch["acting_grade_code"]:
+        grade = await db.civil_service_grades.find_one(
+            {"code": patch["acting_grade_code"], **tf}, {"_id": 0, "code": 1}
+        )
+        if not grade:
+            raise HTTPException(404, f"Acting grade {patch['acting_grade_code']} not found")
+    if "start_date" in patch or "end_date" in patch:
+        _validate_acting_period(updated["start_date"], updated.get("end_date"))
+    await db.civil_service_actings.update_one({"id": aid, **tf}, {"$set": patch})
     await audit("acting_update", f"civil_service_actings/{aid}", user, patch)
     return {"ok": True, "updated": patch}
 
