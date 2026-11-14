@@ -199,6 +199,11 @@ async def create_run_mobile_money_batch(
         raise HTTPException(404, "Payroll run not found")
     if run.get("status") != "completed":
         raise HTTPException(409, "Only a completed payroll run can be disbursed.")
+    if str(run.get("currency") or "SLE").upper() != "SLE":
+        raise HTTPException(
+            409,
+            "Mobile-money salary payouts require SLE-denominated payroll; FX conversion is not supported.",
+        )
     company = await db.companies.find_one(
         {"id": user["company_id"]}, {"_id": 0, "features": 1},
     ) or {}
@@ -327,6 +332,11 @@ async def retry_failed_mobile_money_payments(
     )
     if not parent:
         raise HTTPException(404, "Mobile-money batch not found")
+    if str(parent.get("currency") or "SLE").upper() != "SLE":
+        raise HTTPException(
+            409,
+            "Mobile-money retry batches require SLE-denominated payroll; FX conversion is not supported.",
+        )
     failed = [row for row in parent.get("recipients", []) if row.get("status") == "failed"]
     if not failed:
         raise HTTPException(409, "This batch has no failed payments to retry.")
