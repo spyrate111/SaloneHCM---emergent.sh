@@ -464,7 +464,7 @@ async def payroll_variance(rid: str, user: dict = Depends(require_roles("payroll
     prev_slips = (prev or {}).get("slips") or []
 
     history_runs = []
-    if re.match(r"^\\d{4}-(0[1-9]|1[0-2])$", str(cur.get("period") or "")):
+    if re.match(r"^\d{4}-(0[1-9]|1[0-2])$", str(cur.get("period") or "")):
         history_runs = await db.payroll_runs.aggregate([
             {"$match": {
                 **tf,
