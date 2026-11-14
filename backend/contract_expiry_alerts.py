@@ -165,7 +165,7 @@ async def _deliver_pending_alerts() -> dict:
 
         end_date = alert.get("contract_end_date", "")
         try:
-            contract_expired = date.fromisoformat(end_date) < now_utc().date()
+            contract_expired = date.fromisoformat(end_date) <= now_utc().date()
         except (TypeError, ValueError):
             contract_expired = True
             logger.warning("Cancelling contract alert %s with an invalid end date", alert["id"])
