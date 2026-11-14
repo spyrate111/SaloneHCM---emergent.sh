@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../lib/api";
 import { toast } from "sonner";
 import { AlertTriangle, CalendarDays, Clock3, Plus, X } from "lucide-react";
@@ -61,21 +61,28 @@ export default function DisciplinaryPanel({ employee }) {
   const [eventForm, setEventForm] = useState(emptyEvent);
   const [eventBusy, setEventBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(null);
+  const requestVersion = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestVersion.current;
     setLoading(true);
     setLoadError(false);
     try {
       const r = await api.get("/disciplinary/employees/" + encodeURIComponent(employee.id) + "/cases");
-      setCases(Array.isArray(r.data) ? r.data : []);
+      if (requestId === requestVersion.current) {
+        setCases(Array.isArray(r.data) ? r.data : []);
+      }
     } catch {
-      setLoadError(true);
+      if (requestId === requestVersion.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (requestId === requestVersion.current) setLoading(false);
     }
   }, [employee.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    return () => { requestVersion.current += 1; };
+  }, [load]);
 
   const openCase = async (ev) => {
     ev.preventDefault();
