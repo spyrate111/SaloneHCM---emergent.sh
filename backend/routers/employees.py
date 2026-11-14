@@ -30,6 +30,8 @@ async def list_employees(user: dict = Depends(get_current_user)):
 @router.post("")
 async def create_employee(body: EmployeeIn, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "hiring a new employee")
+    if body.contract_end_date and body.hire_date and body.contract_end_date < body.hire_date:
+        raise HTTPException(422, "Contract end date cannot be before the hire date")
     eid = str(uuid.uuid4())
     doc = with_tenant({**body.model_dump(), "id": eid, "created_at": iso(now_utc())}, user)
     await db.employees.insert_one(doc)
@@ -56,8 +58,14 @@ async def update_contract_end_date(
     )
     if old_date != new_date:
         await db.contract_expiry_alerts.update_many(
-            {"company_id": user["company_id"], "employee_id": eid, "status": "pending"},
-            {"$set": {"status": "cancelled", "cancelled_at": iso(now_utc())}},
+            {
+                "company_id": user["company_id"], "employee_id": eid,
+                "status": {"$in": ["pending", "processing"]},
+            },
+            {
+                "$set": {"status": "cancelled", "cancelled_at": iso(now_utc())},
+                "$unset": {"claim_token": "", "claim_expires_at": ""},
+            },
         )
     await audit(
         "contract_end_date_updated", f"employees/{eid}", user,
@@ -94,16 +102,36 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
     update_doc = body.model_dump()
-    # Older clients send the original employee payload without this new optional
-    # field, so a normal profile edit must not erase a saved contract end date.
-    if body.contract_end_date is None and existing and existing.get("contract_end_date"):
-        update_doc["contract_end_date"] = existing["contract_end_date"]
+    # Older clients omit this field; an explicit null still clears the contract date.
+    if "contract_end_date" not in body.model_fields_set:
+        update_doc.pop("contract_end_date", None)
+    effective_contract_end = update_doc.get(
+        "contract_end_date", (existing or {}).get("contract_end_date"),
+    )
+    if effective_contract_end and body.hire_date and effective_contract_end < body.hire_date:
+        raise HTTPException(422, "Contract end date cannot be before the hire date")
+    contract_date_changed = bool(
+        existing and "contract_end_date" in body.model_fields_set
+        and existing.get("contract_end_date") != update_doc.get("contract_end_date")
+    )
+    employee_inactive = body.status not in ("active", "on_leave")
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
         {"$set": update_doc},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
+    if contract_date_changed or (employee_inactive and existing and existing.get("status") != body.status):
+        await db.contract_expiry_alerts.update_many(
+            {
+                "company_id": user["company_id"], "employee_id": eid,
+                "status": {"$in": ["pending", "processing"]},
+            },
+            {
+                "$set": {"status": "cancelled", "cancelled_at": iso(now_utc())},
+                "$unset": {"claim_token": "", "claim_expires_at": ""},
+            },
+        )
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return e
@@ -112,6 +140,16 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
 @router.delete("/{eid}")
 async def delete_employee(eid: str, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "terminating/deleting an employee")
+    await db.contract_expiry_alerts.update_many(
+        {
+            "company_id": user["company_id"], "employee_id": eid,
+            "status": {"$in": ["pending", "processing"]},
+        },
+        {
+            "$set": {"status": "cancelled", "cancelled_at": iso(now_utc())},
+            "$unset": {"claim_token": "", "claim_expires_at": ""},
+        },
+    )
     await db.employees.delete_one({"id": eid, **tenant_filter(user)})
     await db.offboardings.delete_many({"employee_id": eid, **tenant_filter(user)})
     await audit("delete", f"employees/{eid}", user)
