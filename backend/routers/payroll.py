@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature, now_utc, iso
 from models import PayrollRunIn
-from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf
+from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf, _compute_slips
 from sms import send_payslip_batch, is_configured as sms_is_configured
 
 from core import require_roles
@@ -25,21 +25,30 @@ class SendSmsIn(BaseModel):
 
 
 @router.post("/preview")
-async def preview_payroll(user: dict = Depends(require_roles("payroll"))):
+async def preview_payroll(
+    body: Optional[PayrollRunIn] = None,
+    user: dict = Depends(require_roles("payroll")),
+):
     emps = await db.employees.find(
         {"status": "active", **tenant_filter(user)},
         {"_id": 0},
     ).to_list(2000)
-    slips = [calc_payslip(e) for e in emps]
+    current = now_utc()
+    period = (
+        f"{body.period_year}-{body.period_month:02d}"
+        if body else f"{current.year}-{current.month:02d}"
+    )
+    slips, _ = await _compute_slips(emps, user["company_id"], period)
     totals = {
         "employee_count": len(slips),
         "gross": round(sum(s["gross"] for s in slips), 2),
         "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
         "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
         "paye": round(sum(s["paye"] for s in slips), 2),
+        "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
         "net": round(sum(s["net"] for s in slips), 2),
     }
-    return {"slips": slips, "totals": totals}
+    return {"period": period, "slips": slips, "totals": totals}
 
 
 @router.post("/run")
