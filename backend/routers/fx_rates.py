@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from datetime import date
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -16,7 +17,7 @@ from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from core import (
-    audit, get_current_user, is_admin, iso, now_utc, require_feature,
+    audit, db, get_current_user, is_admin, iso, now_utc, require_feature,
     tenant_filter, with_tenant,
 )
 
@@ -28,7 +29,7 @@ router = APIRouter(
 
 
 class FxRateSetIn(BaseModel):
-    publication_date: str = Field(..., pattern=r"^\\d{4}-\\d{2}-\\d{2}$")
+    publication_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     source_type: Literal["bsl_reference", "manual_override"] = "bsl_reference"
     source_url: AnyHttpUrl
     rates_sle_per_unit: dict[str, float] = Field(..., min_length=1)
@@ -63,10 +64,6 @@ async def _require_fx_manager(user: dict = Depends(get_current_user)) -> dict:
         raise HTTPException(403, "Finance officer, payroll officer, or admin only")
     return user
 
-
-def _clean(row: dict) -> dict:
-    row.pop("_id", None)
-    return row
 
 
 @router.get("")
