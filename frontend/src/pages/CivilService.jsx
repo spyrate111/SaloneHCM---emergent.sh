@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import {
   Award, Building2, Coins, UserCog, Plus, Trash2, AlertTriangle,
-  Layers, Tag, ShieldAlert, X, CheckCircle2,
+  Layers, Tag, ShieldAlert, TrendingUp, X, CheckCircle2,
 } from "lucide-react";
 
 const TABS = [
@@ -13,6 +13,7 @@ const TABS = [
   { id: "allowances", label: "Allowance Rules", icon: Coins },
   { id: "budgets", label: "Budget Codes", icon: Tag },
   { id: "ghosts", label: "Ghost-Worker Audit", icon: ShieldAlert },
+  { id: "increments", label: "Step Increments", icon: TrendingUp },
 ];
 
 export default function CivilService() {
@@ -61,6 +62,7 @@ export default function CivilService() {
       {tab === "allowances" && <AllowancesTab />}
       {tab === "budgets" && <BudgetCodesTab />}
       {tab === "ghosts" && <GhostsTab />}
+      {tab === "increments" && <StepIncrementsTab />}
     </div>
   );
 }
@@ -374,6 +376,71 @@ function BudgetCodesTab() {
           </form>
         </Modal>
       )}
+    </div>
+  );
+}
+
+// =============== Annual Step Increment History ===============
+
+function StepIncrementsTab() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await api.get("/civil-service/step-increments");
+      setRows(r.data);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not load step-increment history");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="space-y-4" data-testid="step-increment-history">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-xl font-semibold">Annual step-increment history</h2>
+          <p className="text-xs text-[#686D76] mt-1">Recorded grade-step and basic salary changes, newest first.</p>
+        </div>
+        <button onClick={load} disabled={loading} className="text-sm px-3 py-2 border border-[#E2DFD6] rounded-md disabled:opacity-50">
+          {loading ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-[#F7F6F2]">
+            <tr>
+              {["Employee", "Grade", "Step", "Basic salary (SLE)", "Change", "Applied", "Source"].map((h) => (
+                <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id || row.employee_id + "-" + row.year} className="border-t border-[#E2DFD6]">
+                <td className="py-3 px-4 font-medium">{row.employee_name || row.employee_id}</td>
+                <td className="py-3 px-4 font-data">{row.grade_code}</td>
+                <td className="py-3 px-4 font-data">{row.from_step} → {row.to_step}</td>
+                <td className="py-3 px-4 font-data">{fmtSLE(row.from_basic_sle)} → {fmtSLE(row.to_basic_sle)}</td>
+                <td className="py-3 px-4 font-data text-[#2D7A5D]">{fmtSLE(row.delta_sle)}</td>
+                <td className="py-3 px-4 font-data text-xs">{row.applied_at ? new Date(row.applied_at).toLocaleDateString() : "—"}</td>
+                <td className="py-3 px-4 text-xs text-[#686D76]">{row.applied_by || "system"}</td>
+              </tr>
+            ))}
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">No annual step increments recorded yet.</td></tr>
+            )}
+            {loading && (
+              <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">Loading history…</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
