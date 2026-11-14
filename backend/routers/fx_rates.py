@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from datetime import date
 from typing import Literal
 from urllib.parse import urlsplit
@@ -52,7 +53,7 @@ class FxRateSetIn(BaseModel):
         for raw_code, raw_rate in values.items():
             code = str(raw_code).strip().upper()
             rate = float(raw_rate)
-            if len(code) != 3 or not code.isalpha():
+            if not re.fullmatch(r"[A-Z]{3}", code):
                 raise ValueError("Currency codes must be three letters")
             if code in {"SLE", "SLL"}:
                 raise ValueError("Reference rates must be for foreign currencies against SLE")
@@ -101,8 +102,8 @@ async def create_fx_rate_set(
 ):
     source_url = str(body.source_url)
     parsed = urlsplit(source_url)
-    if parsed.scheme != "https":
-        raise HTTPException(422, "FX source links must use HTTPS")
+    if parsed.scheme != "https" or parsed.port not in (None, 443):
+        raise HTTPException(422, "FX source links must use standard HTTPS")
     if body.source_type == "bsl_reference" and parsed.hostname not in {"bsl.gov.sl", "www.bsl.gov.sl"}:
         raise HTTPException(422, "BSL reference rates must link to an official bsl.gov.sl document")
     if body.source_type == "manual_override" and not body.notes.strip():
