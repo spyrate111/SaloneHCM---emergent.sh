@@ -10,14 +10,15 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 from core import db, audit, now_utc, iso, logger
 
-# NRA PAYE bands (monthly SLE, post-2022 redenomination)
+# Resident NRA PAYE bands in monthly SLE, post-2022 redenomination.
+# The NRA's 2022 tax guide sets 600/600/600/600/remaining monthly bands;
+# its February 2026 employer guidance reconfirms the 600 monthly threshold.
 PAYE_BANDS = [
-    (800, 0.0),
-    (2200, 0.15),
-    (3600, 0.20),
-    (5000, 0.25),
-    (7500, 0.30),
-    (float("inf"), 0.35),
+    (600, 0.0),
+    (1200, 0.15),
+    (1800, 0.20),
+    (2400, 0.25),
+    (float("inf"), 0.30),
 ]
 NASSIT_EMPLOYEE = 0.05
 NASSIT_EMPLOYER = 0.10
