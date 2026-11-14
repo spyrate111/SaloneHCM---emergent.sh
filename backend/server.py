@@ -20,7 +20,7 @@ from routers import (
     documents, company, admin, users, schedules, ministry, public, integrations,
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
-    expenses, recruitment, announcements, offboarding, mobile_money,
+    expenses, fx_rates, recruitment, announcements, offboarding, mobile_money,
     vouchers, training, mobile, webauthn, onboarding, training_progress,
 )
 
@@ -94,6 +94,7 @@ api.include_router(sector_presets.router)
 api.include_router(promotion.router)
 api.include_router(marketing.router)
 api.include_router(payroll_budget.router)
+api.include_router(fx_rates.router)
 api.include_router(payroll_variance.router)
 api.include_router(expenses.router)
 api.include_router(recruitment.router)
