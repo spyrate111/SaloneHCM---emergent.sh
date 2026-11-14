@@ -12,7 +12,7 @@ from datetime import date
 from typing import Literal, Optional
 from xml.sax.saxutils import escape as xml_escape
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
@@ -410,8 +410,10 @@ async def retry_failed_mobile_money_payments(
 
 @router.get("/mobile-money/pending-approvals")
 async def list_pending_mobile_money_approvals(
+    response: Response,
     user: dict = Depends(require_roles("manager", "admin", "superadmin")),
 ):
+    response.headers["Cache-Control"] = "private, no-store"
     batches = await db.mobile_money_batches.find(
         {"status": "pending_approval", **tenant_filter(user)},
         {"_id": 0, "recipients": 0},
@@ -422,8 +424,10 @@ async def list_pending_mobile_money_approvals(
 @router.get("/mobile-money/batches/{bid}")
 async def get_mobile_money_batch(
     bid: str,
+    response: Response,
     user: dict = Depends(require_roles("payroll", "manager", "admin", "superadmin")),
 ):
+    response.headers["Cache-Control"] = "private, no-store"
     batch = await db.mobile_money_batches.find_one(
         {"id": bid, **tenant_filter(user)}, {"_id": 0},
     )
@@ -513,7 +517,10 @@ async def export_mobile_money_workbook(
     return StreamingResponse(
         io.BytesIO(payload),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
