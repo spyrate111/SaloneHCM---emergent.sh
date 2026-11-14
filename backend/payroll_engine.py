@@ -24,9 +24,11 @@ NASSIT_EMPLOYEE = 0.05
 NASSIT_EMPLOYER = 0.10
 
 
-def calc_paye(taxable: float) -> float:
+def calc_paye(taxable: float, tax_residency: str = "resident") -> float:
     if taxable <= 0:
         return 0.0
+    if tax_residency == "non_resident":
+        return round(taxable * 0.25, 2)
     tax = 0.0
     prev = 0.0
     for upper, rate in PAYE_BANDS:
@@ -51,7 +53,8 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
     nassit_emp = round(basic * NASSIT_EMPLOYEE, 2)
     nassit_er = round(basic * NASSIT_EMPLOYER, 2)
     taxable = max(0.0, gross - nassit_emp)
-    paye = calc_paye(taxable)
+    tax_residency = "non_resident" if emp.get("tax_residency") == "non_resident" else "resident"
+    paye = calc_paye(taxable, tax_residency)
     # Loan deductions are post-tax — they reduce take-home pay but don't change tax liability.
     loan = round(max(0.0, float(loan_deduction or 0.0)), 2)
     net = round(gross - nassit_emp - paye - loan, 2)
@@ -65,6 +68,7 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
         "nassit_employee": nassit_emp,
         "nassit_employer": nassit_er,
         "paye": paye,
+        "tax_residency": tax_residency,
         "loan_deduction": loan,
         "net": net,
         "grade_code": emp.get("grade_code"),
