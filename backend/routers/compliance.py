@@ -381,20 +381,29 @@ async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("n
             "Complete the employer name and NASSIT registration number in the company profile before exporting.",
         )
     emp_map = {employee["id"]: employee for employee in employees}
-    missing_ids = [
-        slip.get("employee_name", "Employee")
-        for slip in run["slips"]
-        if not (
-            _payroll_identity_value(
-                slip, "employee_nassit_no",
-                emp_map.get(slip["employee_id"], {}), "nassit_no",
+    missing_nassit_ids = []
+    missing_staff_number_ids = []
+    for slip in run["slips"]:
+        employee = emp_map.get(slip.get("employee_id"), {})
+        if not _payroll_identity_value(slip, "employee_nassit_no", employee, "nassit_no"):
+            missing_nassit_ids.append(slip.get("employee_name", "Employee"))
+        if not _payroll_identity_value(slip, "employee_staff_number", employee, "staff_number"):
+            missing_staff_number_ids.append(slip.get("employee_name", "Employee"))
+    if missing_nassit_ids or missing_staff_number_ids:
+        missing_fields = []
+        if missing_nassit_ids:
+            missing_fields.append(
+                f"NASSIT numbers for {len(missing_nassit_ids)} employee(s)"
             )
-        )
-    ]
-    if missing_ids:
+        if missing_staff_number_ids:
+            missing_fields.append(
+                f"staff numbers for {len(missing_staff_number_ids)} employee(s)"
+            )
         raise HTTPException(
             422,
-            f"NASSIT numbers are missing for {len(missing_ids)} employee(s). Complete their profiles and rerun payroll before exporting.",
+            "Complete the following employee fields and rerun payroll before exporting: "
+            + "; ".join(missing_fields)
+            + ".",
         )
 
     payload = _build_nassit_xlsx(run, employees, company)
