@@ -10,7 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from core import client, limiter, csrf_protect
+from core import client, db, limiter, csrf_protect
 from seeders import seed
 from storage import init_storage
 import scheduler as payroll_scheduler
@@ -31,6 +31,11 @@ logger = logging.getLogger("salonehcm")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await seed()
+    await db.contract_expiry_alerts.create_index(
+        [("company_id", 1), ("employee_id", 1), ("contract_end_date", 1), ("days_before", 1), ("user_id", 1)],
+        unique=True,
+        name="unique_contract_expiry_alert",
+    )
     try:
         init_storage()
     except Exception as e:
