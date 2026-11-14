@@ -114,7 +114,7 @@ export default function MobileLeave() {
       first_name: authUser.first_name,
       last_name: authUser.last_name,
     } : null));
-    setQueued(readOutbox(authUser?.employee_id));
+    setQueued(readOutbox(authUserId, authUser?.employee_id));
   }, [authUserId, authUser?.employee_id, authUser?.first_name, authUser?.last_name]);
 
   const refresh = useCallback(() => {
@@ -180,7 +180,7 @@ export default function MobileLeave() {
               items = items.map((queuedItem) => queuedItem.client_request_id === item.client_request_id
                 ? { ...queuedItem, status: "needs_attention", sync_error: message }
                 : queuedItem);
-              writeOutbox(employeeId, items);
+              writeOutbox(authUserId, employeeId, items);
               setQueued(items);
               toast.error("An offline leave request needs your attention.");
               continue;
@@ -204,7 +204,7 @@ export default function MobileLeave() {
   const removeQueued = (clientRequestId) => {
     const employeeId = me?.employee_id;
     if (!employeeId) return;
-    const next = readOutbox(employeeId).filter((item) => item.client_request_id !== clientRequestId);
+    const next = readOutbox(authUserId, employeeId).filter((item) => item.client_request_id !== clientRequestId);
     writeOutbox(authUserId, employeeId, next);
     setQueued(next);
   };
@@ -212,10 +212,10 @@ export default function MobileLeave() {
   const enqueueLeave = (item) => {
     const employeeId = item.employee_id || me?.employee_id;
     if (!employeeId) return false;
-    const current = readOutbox(employeeId);
+    const current = readOutbox(authUserId, employeeId);
     if (current.some((queuedItem) => queuedItem.client_request_id === item.client_request_id)) return true;
     const next = [...current, item];
-    if (!writeOutbox(employeeId, next)) return false;
+    if (!writeOutbox(authUserId, employeeId, next)) return false;
     setQueued(next);
     if (navigator.onLine) window.dispatchEvent(new Event("online"));
     return true;
