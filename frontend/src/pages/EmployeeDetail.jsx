@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
 import OffboardingPanel from "../components/OffboardingPanel";
@@ -9,8 +10,12 @@ import OffboardingPanel from "../components/OffboardingPanel";
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { has } = useFeatures();
+  const { user } = useAuth();
+  const canEditTaxResidency = ["admin", "superadmin", "hr"].includes(user?.role);
   const [e, setE] = useState(null);
   const [slip, setSlip] = useState(null);
+  const [taxResidency, setTaxResidency] = useState("resident");
+  const [savingTaxResidency, setSavingTaxResidency] = useState(false);
   // Civil-service refs
   const [grades, setGrades] = useState([]);
   const [budgets, setBudgets] = useState([]);
@@ -33,6 +38,7 @@ export default function EmployeeDetail() {
 
   const load = useCallback(() => api.get(`/employees/${id}`).then((r) => {
     setE(r.data);
+    setTaxResidency(r.data.tax_residency || "resident");
     setCs({
       grade_code: r.data.grade_code || "",
       step_number: r.data.step_number || "",
@@ -81,6 +87,19 @@ export default function EmployeeDetail() {
       toast.error(err?.response?.data?.detail || "Save failed");
     } finally {
       setSavingCs(false);
+    }
+  };
+
+  const saveTaxResidency = async () => {
+    setSavingTaxResidency(true);
+    try {
+      const r = await api.patch(`/employees/${id}/tax-residency`, { tax_residency: taxResidency });
+      setE(r.data);
+      toast.success("PAYE tax residency updated");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not update tax residency");
+    } finally {
+      setSavingTaxResidency(false);
     }
   };
 
@@ -139,6 +158,32 @@ export default function EmployeeDetail() {
               </div>
             ))}
           </div>
+
+          {canEditTaxResidency && <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-3" data-testid="employee-tax-residency">
+            <div>
+              <h3 className="font-heading text-lg font-semibold">PAYE tax residency</h3>
+              <p className="text-xs text-[#686D76] mt-1">Choose the employee’s tax-residency treatment. This classification is separate from citizenship.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                data-testid="employee-tax-residency-select"
+                value={taxResidency}
+                onChange={(event) => setTaxResidency(event.target.value)}
+                className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
+              >
+                <option value="resident">Resident</option>
+                <option value="non_resident">Non-resident</option>
+              </select>
+              <button
+                data-testid="employee-tax-residency-save"
+                onClick={saveTaxResidency}
+                disabled={savingTaxResidency || taxResidency === (e.tax_residency || "resident")}
+                className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs px-3 py-2 rounded-md disabled:opacity-50"
+              >
+                <Save className="w-3.5 h-3.5" /> {savingTaxResidency ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>}
 
           {has("civil_service") && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="cs-profile-editor">
