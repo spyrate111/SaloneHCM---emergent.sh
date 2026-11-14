@@ -125,7 +125,7 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     emps = await db.employees.find(
         {"status": "active", "company_id": user["company_id"]},
         {"_id": 0},
-    ).to_list(2000)
+    ).to_list(None)
     period = f"{year}-{month:02d}"
 
     slips, applied_loan_rows = await _compute_slips(emps, user["company_id"], period)
@@ -133,7 +133,7 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     # Approved, un-reimbursed expense claims become a reimbursement line.
     claims = await db.expense_claims.find(
         {"company_id": user["company_id"], "status": "approved", "payroll_run_id": None},
-        {"_id": 0, "id": 1, "employee_id": 1, "amount_sle": 1}).to_list(2000)
+        {"_id": 0, "id": 1, "employee_id": 1, "amount_sle": 1}).to_list(None)
     reimb_by_emp: dict = {}
     for c in claims:
         reimb_by_emp[c["employee_id"]] = round(
