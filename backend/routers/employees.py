@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn
+from models import EmployeeIn, EmployeeTaxResidencyIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
@@ -65,15 +65,52 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             await assert_not_cutoff_locked(
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
+    updates = body.model_dump()
+    # Older clients omit this field; preserve an existing tax-residency choice.
+    if "tax_residency" not in body.model_fields_set:
+        updates.pop("tax_residency", None)
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
-        {"$set": body.model_dump()},
+        {"$set": updates},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return e
+
+  
+@router.patch("/{eid}/tax-residency")
+async def update_employee_tax_residency(
+    eid: str,
+    body: EmployeeTaxResidencyIn,
+    user: dict = Depends(require_roles("hr")),
+):
+    existing = await db.employees.find_one(
+        {"id": eid, **tenant_filter(user)}, {"_id": 0},
+    )
+    if not existing:
+        raise HTTPException(404, "Not found")
+
+    previous = existing.get("tax_residency", "resident")
+    if previous == body.tax_residency:
+        return existing
+
+    await assert_not_cutoff_locked(user, "changing an employee's PAYE tax residency")
+    await db.employees.update_one(
+        {"id": eid, **tenant_filter(user)},
+        {"$set": {"tax_residency": body.tax_residency}},
+    )
+    updated = await db.employees.find_one(
+        {"id": eid, **tenant_filter(user)}, {"_id": 0},
+    )
+    await audit(
+        "employee_tax_residency_update",
+        f"employees/{eid}",
+        user,
+        {"from": previous, "to": body.tax_residency},
+    )
+    return updated
 
 
 @router.delete("/{eid}")
