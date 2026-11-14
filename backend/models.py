@@ -33,6 +33,7 @@ class EmployeeIn(BaseModel):
     basic_salary_sle: float
     allowances_sle: float = 0
     nassit_no: Optional[str] = ""
+    staff_number: Optional[str] = Field(default="", max_length=64)
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
     bank_account: Optional[str] = ""
