@@ -32,13 +32,15 @@ async def preview_payroll(
     emps = await db.employees.find(
         {"status": "active", **tenant_filter(user)},
         {"_id": 0},
-    ).to_list(2000)
+    ).to_list(None)
     current = now_utc()
     period = (
         f"{body.period_year}-{body.period_month:02d}"
         if body else f"{current.year}-{current.month:02d}"
     )
     slips, _ = await _compute_slips(emps, user["company_id"], period)
+    from routers.payroll_variance import preview_anomalies_for_period
+    anomaly_report = await preview_anomalies_for_period(slips, period, user)
     totals = {
         "employee_count": len(slips),
         "gross": round(sum(s["gross"] for s in slips), 2),
@@ -48,7 +50,7 @@ async def preview_payroll(
         "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
         "net": round(sum(s["net"] for s in slips), 2),
     }
-    return {"period": period, "slips": slips, "totals": totals}
+    return {"period": period, "slips": slips, "totals": totals, **anomaly_report}
 
 
 @router.post("/run")
