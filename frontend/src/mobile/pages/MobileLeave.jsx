@@ -174,7 +174,7 @@ export default function MobileLeave() {
           } catch (e) {
             if (activeUserId.current !== authUserId) return;
             const status = e?.response?.status;
-            if (status >= 400 && status < 500 && status !== 429) {
+            if ([400, 404, 409, 410, 422].includes(status)) {
               const detail = e?.response?.data?.detail;
               const message = typeof detail === "string" ? detail : "The request was rejected. Remove it and submit again.";
               items = items.map((queuedItem) => queuedItem.client_request_id === item.client_request_id
