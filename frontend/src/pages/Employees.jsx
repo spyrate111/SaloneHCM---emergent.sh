@@ -26,7 +26,14 @@ export default function Employees() {
   const { user } = useAuth();
   const canEditCivilProfile = ["admin", "superadmin", "hr"].includes(user?.role);
 
-  const load = useCallback(() => api.get("/employees").then((r) => setList(r.data)), []);
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get("/employees");
+      setList(r.data);
+    } catch {
+      toast.error("Could not load employees");
+    }
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   const filtered = list.filter((e) => {
@@ -294,7 +301,7 @@ function CivilServiceProfileEditor({ employee, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] grid place-items-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 z-[60] grid place-items-center p-4" onClick={() => !saving && onClose()}>
       <form
         onSubmit={submit}
         onClick={(event) => event.stopPropagation()}
@@ -309,7 +316,7 @@ function CivilServiceProfileEditor({ employee, onClose, onSaved }) {
             <h2 id="civil-service-profile-title" className="font-heading text-xl font-semibold">Civil-service payroll profile</h2>
             <p className="text-xs text-[#686D76] mt-1">{employee.first_name} {employee.last_name}</p>
           </div>
-          <button type="button" onClick={onClose} className="p-1 text-[#686D76]" aria-label="Close profile editor"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} disabled={saving} className="p-1 text-[#686D76] disabled:opacity-50" aria-label="Close profile editor"><X className="w-4 h-4" /></button>
         </div>
 
         {loading ? (
@@ -408,7 +415,7 @@ function CivilServiceProfileEditor({ employee, onClose, onSaved }) {
 
         {error && <div role="alert" className="mt-4 rounded-md bg-[#FDEBE7] px-3 py-2 text-sm text-[#9B2C1F]">{error}</div>}
         <div className="flex items-center justify-end gap-2 mt-6">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md disabled:opacity-50">Cancel</button>
           <button data-testid="civil-profile-submit" disabled={loading || saving} type="submit" className="px-4 py-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md disabled:opacity-60">
             {saving ? "Saving…" : "Save profile"}
           </button>
