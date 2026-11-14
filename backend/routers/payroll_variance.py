@@ -108,7 +108,7 @@ async def _hire_date_map(company_id: str) -> dict[str, str]:
     emps = await db.employees.find(
         {"company_id": company_id},
         {"_id": 0, "id": 1, "hire_date": 1, "status": 1, "first_name": 1, "last_name": 1, "nassit_no": 1, "tin": 1},
-    ).to_list(5000)
+    ).to_list(None)
     return {e["id"]: e for e in emps}
 
 
@@ -441,6 +441,70 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period, history_runs
         + _loan_deduction_anomalies(cur_by_id, prev_by_id)
         + _historical_gross_anomalies(cur_slips, history_runs or [])
     )
+
+
+async def preview_anomalies_for_period(cur_slips: list[dict], period: str, user: dict) -> dict:
+    """Return employee and headline payroll anomalies before a run is saved."""
+    tf = tenant_filter(user)
+    prev_period = _prev_period(period)
+    prev = None
+    if prev_period:
+        prev = await db.payroll_runs.find_one(
+            {**tf, "period": prev_period, "status": "completed"},
+            {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+    prev_slips = (prev or {}).get("slips") or []
+
+    history_runs = []
+    if re.match(r"^\\d{4}-(0[1-9]|1[0-2])$", str(period or "")):
+        history_runs = await db.payroll_runs.aggregate([
+            {"$match": {
+                **tf,
+                "status": "completed",
+                "period": {"$lt": period},
+            }},
+            {"$sort": {"period": -1, "created_at": -1}},
+            {"$group": {"_id": "$period", "period": {"$first": "$period"}, "slips": {"$first": "$slips"}}},
+            {"$sort": {"_id": -1}},
+            {"$limit": HISTORICAL_BASELINE_PERIODS},
+            {"$project": {"_id": 0, "period": 1, "slips": 1}},
+        ]).to_list(length=HISTORICAL_BASELINE_PERIODS)
+
+    emp_index = await _hire_date_map(user["company_id"])
+    anomalies = _detect_anomalies(cur_slips, prev_slips, emp_index, period, history_runs)
+    cur_totals = _totals(cur_slips)
+    prev_totals = _totals(prev_slips) if prev else {key: 0 for key in cur_totals}
+    headcount_pct = _pct(cur_totals["headcount"], prev_totals["headcount"])
+    gross_pct = _pct(cur_totals["gross"], prev_totals["gross"])
+
+    if headcount_pct is not None and abs(headcount_pct) >= HEADCOUNT_PCT:
+        anomalies.insert(0, {
+            "severity": "warn", "kind": "headcount",
+            "subject": "Overall headcount",
+            "before": prev_totals["headcount"], "after": cur_totals["headcount"],
+            "delta_pct": headcount_pct,
+            "message": f"Headcount shifted by {headcount_pct}% vs {prev_period} — verify joiners/leavers.",
+        })
+    if gross_pct is not None and gross_pct >= GROSS_PCT:
+        anomalies.insert(0, {
+            "severity": "warn", "kind": "total_gross",
+            "subject": "Total gross",
+            "before": prev_totals["gross"], "after": cur_totals["gross"],
+            "delta_pct": gross_pct,
+            "message": f"Total gross rose {gross_pct}% — inspect the payroll preview before confirming this run.",
+        })
+
+    return {
+        "prior_period": prev_period,
+        "prior_exists": prev is not None,
+        "anomalies": anomalies,
+        "anomaly_summary": {
+            "count": len(anomalies),
+            "high": sum(1 for item in anomalies if item["severity"] == "high"),
+            "warn": sum(1 for item in anomalies if item["severity"] == "warn"),
+        },
+    }
 
 
 @router.get("/runs/{rid}/variance")
