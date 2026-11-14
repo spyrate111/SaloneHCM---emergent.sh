@@ -161,7 +161,19 @@ def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, c
 def _terminated_paid_anomalies(cur_by_id: dict, emp_index: dict) -> list[dict]:
     out = []
     for eid, cur in cur_by_id.items():
-        emp = emp_index.get(eid) or {}
+        emp = emp_index.get(eid)
+        if not emp:
+            out.append({
+                "severity": "high",
+                "kind": "missing_employee_record",
+                "subject": cur.get("employee_name") or eid,
+                "employee_id": eid,
+                "before": 0,
+                "after": _round(cur.get("net", 0)),
+                "delta_pct": None,
+                "message": "This payslip has no matching employee record in the organization. Verify the employee or investigate a possible ghost record.",
+            })
+            continue
         if emp.get("status") == "terminated" and (cur.get("net") or 0) > 0:
             out.append({
                 "severity": "high",
@@ -229,6 +241,29 @@ def _duplicate_identifier_anomalies(cur_slips: list[dict], emp_index: dict) -> l
     return out
 
 
+def _duplicate_employee_slip_anomalies(cur_slips: list[dict]) -> list[dict]:
+    """Flag repeated payslip rows for the same employee identifier."""
+    by_employee = defaultdict(list)
+    for slip in cur_slips:
+        eid = str(slip.get("employee_id") or "").strip()
+        if eid:
+            by_employee[eid].append(slip)
+
+    out = []
+    for eid, slips in by_employee.items():
+        if len(slips) < 2:
+            continue
+        name = next((s.get("employee_name") for s in slips if s.get("employee_name")), eid)
+        out.append({
+            "severity": "high",
+            "kind": "duplicate_employee_slip",
+            "subject": name,
+            "employee_id": eid,
+            "message": f"Employee appears in {len(slips)} payslip rows in this run. Verify the duplicate entries before approval.",
+        })
+    return out
+
+
 def _loan_deduction_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
     """Flag new, stopped, or sharply changed loan deductions before approval."""
     out = []
@@ -281,6 +316,7 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict
         + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
         + _terminated_paid_anomalies(cur_by_id, emp_index)
         + _duplicate_identifier_anomalies(cur_slips, emp_index)
+        + _duplicate_employee_slip_anomalies(cur_slips)
         + _loan_deduction_anomalies(cur_by_id, prev_by_id)
     )
 
