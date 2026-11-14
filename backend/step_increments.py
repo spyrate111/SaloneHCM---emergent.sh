@@ -136,6 +136,7 @@ async def apply_increments(company_id: str, eligible: list[dict], user_email: st
                     "status": "active",
                     "grade_code": e["grade_code"],
                     "step_number": it["old_step_number"],
+                    "basic_salary_sle": it["old_basic"],
                     "last_step_bump_year": {"$ne": year},
                 },
                 {"$set": {
