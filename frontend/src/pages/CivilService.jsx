@@ -19,6 +19,17 @@ const TABS = [
   { id: "ghosts", label: "Ghost-Worker Audit", icon: ShieldAlert },
 ];
 
+function downloadReportFile(data, filename) {
+  const objectUrl = URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 export default function CivilService() {
   const { user } = useAuth();
   const { has, loaded } = useFeatures();
@@ -303,14 +314,51 @@ function AllowancesTab() {
 
 function BudgetCodesTab() {
   const [codes, setCodes] = useState([]);
+  const [runs, setRuns] = useState([]);
+  const [selectedRun, setSelectedRun] = useState("");
+  const [runsLoading, setRunsLoading] = useState(true);
+  const [exporting, setExporting] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ code: "", name: "", ministry: "", program: "", fiscal_year: 2026 });
 
   const load = useCallback(async () => {
-    const r = await api.get("/civil-service/budget-codes");
-    setCodes(r.data);
+    try {
+      const r = await api.get("/civil-service/budget-codes");
+      setCodes(r.data);
+    } catch {
+      toast.error("Could not load budget codes");
+    }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  const loadRuns = useCallback(async () => {
+    setRunsLoading(true);
+    try {
+      const r = await api.get("/payroll/runs");
+      setRuns(r.data);
+    } catch {
+      toast.error("Could not load payroll runs");
+    } finally {
+      setRunsLoading(false);
+    }
+  }, []);
+  useEffect(() => { load(); loadRuns(); }, [load, loadRuns]);
+
+  const completedRuns = runs.filter((run) => run.status === "completed");
+  const downloadReport = async (kind) => {
+    if (!selectedRun || exporting) return;
+    const selected = completedRuns.find((run) => run.id === selectedRun);
+    setExporting(kind);
+    try {
+      const response = await api.get(
+        "/civil-service/reports/by-budget-code/" + selectedRun + "." + kind,
+        { responseType: "blob" },
+      );
+      downloadReportFile(response.data, "budget-spend-" + (selected?.period || "report") + "." + kind);
+    } catch {
+      toast.error("Could not download the budget-code report");
+    } finally {
+      setExporting("");
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -335,11 +383,48 @@ function BudgetCodesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-xl font-semibold">MDA budget codes</h2>
-        <button data-testid="budget-new" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#D1603D] hover:bg-[#B84F2F] text-white text-sm px-4 py-2 rounded-md">
-          <Plus className="w-4 h-4" /> New code
-        </button>
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-xl font-semibold">MDA budget codes</h2>
+          <p className="text-xs text-[#686D76] mt-0.5">Export payroll spend by code from a completed run.</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label htmlFor="budget-report-run" className="block text-[10px] uppercase tracking-wider text-[#525860] mb-1">Payroll run</label>
+            <select
+              id="budget-report-run"
+              data-testid="budget-report-run"
+              value={selectedRun}
+              disabled={runsLoading || !completedRuns.length || Boolean(exporting)}
+              onChange={(event) => setSelectedRun(event.target.value)}
+              className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm disabled:bg-[#F7F6F2]"
+            >
+              <option value="">{runsLoading ? "Loading runs…" : "Select completed run…"}</option>
+              {completedRuns.map((run) => (
+                <option key={run.id} value={run.id}>{run.period} · {run.totals?.employee_count ?? "—"} employees</option>
+              ))}
+            </select>
+          </div>
+          <button
+            data-testid="budget-report-pdf"
+            disabled={!selectedRun || Boolean(exporting)}
+            onClick={() => downloadReport("pdf")}
+            className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md disabled:opacity-50"
+          >
+            <FileText className="w-3.5 h-3.5" /> {exporting === "pdf" ? "Preparing PDF…" : "PDF"}
+          </button>
+          <button
+            data-testid="budget-report-csv"
+            disabled={!selectedRun || Boolean(exporting)}
+            onClick={() => downloadReport("csv")}
+            className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" /> {exporting === "csv" ? "Preparing CSV…" : "CSV"}
+          </button>
+          <button data-testid="budget-new" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#D1603D] hover:bg-[#B84F2F] text-white text-sm px-4 py-2 rounded-md">
+            <Plus className="w-4 h-4" /> New code
+          </button>
+        </div>
       </div>
       <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
         <table className="w-full text-sm">
@@ -617,10 +702,16 @@ function GhostsTab() {
   const [runs, setRuns] = useState([]);
   const [selected, setSelected] = useState(null);
   const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState("");
 
   useEffect(() => {
-    api.get("/payroll/runs").then((r) => setRuns(r.data));
+    let current = true;
+    api.get("/payroll/runs")
+      .then((r) => { if (current) setRuns(r.data); })
+      .catch(() => toast.error("Could not load payroll runs"))
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, []);
 
   const loadReport = async (rid) => {
@@ -633,17 +724,17 @@ function GhostsTab() {
     } finally { setLoading(false); }
   };
 
+  const completedRuns = runs.filter((run) => run.status === "completed");
   const downloadReport = async (kind) => {
-    if (!selected) return;
-    const url = `/civil-service/ghost-workers/${selected}.${kind}`;
+    if (!selected || exporting) return;
+    setExporting(kind);
     try {
-      const resp = await api.get(url, { responseType: "blob" });
-      const blob = URL.createObjectURL(resp.data);
-      const a = document.createElement("a");
-      a.href = blob; a.download = `ghost-worker-${report?.period || "report"}.${kind}`; a.click();
-      URL.revokeObjectURL(blob);
-    } catch (e) {
-      toast.error("Download failed");
+      const resp = await api.get("/civil-service/ghost-workers/" + selected + "." + kind, { responseType: "blob" });
+      downloadReportFile(resp.data, "ghost-worker-" + (report?.period || "report") + "." + kind);
+    } catch {
+      toast.error("Could not download the ghost-worker report");
+    } finally {
+      setExporting("");
     }
   };
 
@@ -656,16 +747,16 @@ function GhostsTab() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <select data-testid="ghost-run-select" value={selected || ""} onChange={(e) => e.target.value && loadReport(e.target.value)} className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-            <option value="">Select payroll run…</option>
-            {runs.map((r) => <option key={r.id} value={r.id}>{r.period} — {r.totals?.employee_count} slips</option>)}
+            <option value="">Select completed payroll run…</option>
+            {completedRuns.map((r) => <option key={r.id} value={r.id}>{r.period} — {r.totals?.employee_count} slips</option>)}
           </select>
           {report && (
             <>
-              <button data-testid="ghost-pdf" onClick={() => downloadReport("pdf")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md">
-                <FileText className="w-3.5 h-3.5" /> PDF
+              <button data-testid="ghost-pdf" disabled={Boolean(exporting)} onClick={() => downloadReport("pdf")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md disabled:opacity-50">
+                <FileText className="w-3.5 h-3.5" /> {exporting === "pdf" ? "Preparing PDF…" : "PDF"}
               </button>
-              <button data-testid="ghost-csv" onClick={() => downloadReport("csv")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md">
-                <Download className="w-3.5 h-3.5" /> CSV
+              <button data-testid="ghost-csv" disabled={Boolean(exporting)} onClick={() => downloadReport("csv")} className="inline-flex items-center gap-1.5 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-3 py-2 rounded-md disabled:opacity-50">
+                <Download className="w-3.5 h-3.5" /> {exporting === "csv" ? "Preparing CSV…" : "CSV"}
               </button>
             </>
           )}
