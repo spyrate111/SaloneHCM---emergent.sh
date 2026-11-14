@@ -60,6 +60,7 @@ export default function MobileProfile() {
   const [slips, setSlips] = useState(() => readPackMeta(accountId));
   const [savedIds, setSavedIds] = useState({});
   const [savingId, setSavingId] = useState(null);
+  const [viewer, setViewer] = useState(null);
   const activeUserId = useRef(accountId);
 
   useLayoutEffect(() => {
@@ -68,7 +69,13 @@ export default function MobileProfile() {
     setSlips(readPackMeta(accountId));
     setSavedIds({});
     setSavingId(null);
+    setViewer(null);
   }, [accountId]);
+
+  useEffect(() => {
+    if (!viewer?.url) return undefined;
+    return () => URL.revokeObjectURL(viewer.url);
+  }, [viewer?.url]);
 
   const checkSaved = async (rows, forAccountId) => {
     if (!forAccountId || !("caches" in window)) return;
@@ -126,19 +133,24 @@ export default function MobileProfile() {
   };
 
   const openSaved = async (row) => {
-    if (!accountId) return;
-    const c = await caches.open(PACK_CACHE);
-    const hit = await c.match(packKey(accountId, row));
-    if (!hit) { toast.error("Not saved offline yet"); return; }
-    const blob = await hit.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `payslip-${row.period}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const requestAccountId = accountId;
+    if (!requestAccountId) return;
+    try {
+      const c = await caches.open(PACK_CACHE);
+      const hit = await c.match(packKey(requestAccountId, row));
+      if (!hit) {
+        if (activeUserId.current === requestAccountId) toast.error("Not saved offline yet");
+        return;
+      }
+      const blob = await hit.blob();
+      if (activeUserId.current !== requestAccountId) return;
+      setViewer({
+        url: URL.createObjectURL(blob),
+        period: row.period,
+      });
+    } catch {
+      if (activeUserId.current === requestAccountId) toast.error("Could not open the saved payslip");
+    }
   };
 
   const refresh = () => {
@@ -387,6 +399,46 @@ export default function MobileProfile() {
           </div>
         )}
       </section>
+
+      {viewer && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={"Payslip for " + viewer.period}
+          data-testid="mobile-profile-payslip-viewer"
+        >
+          <section className="mx-auto flex h-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <header className="flex items-center justify-between gap-3 border-b border-[#E2DFD6] px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold">Payslip · {viewer.period}</h2>
+                <p className="text-[10px] text-[#525860]">Saved on this device; viewing works offline.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={viewer.url}
+                  download={"payslip-" + viewer.period + ".pdf"}
+                  className="text-[10px] font-semibold border border-[#E2DFD6] px-2.5 py-1.5 rounded-lg"
+                >
+                  Download
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setViewer(null)}
+                  className="text-[10px] font-semibold bg-[#0A4A1E] text-white px-2.5 py-1.5 rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </header>
+            <iframe
+              title={"Payslip " + viewer.period}
+              src={viewer.url}
+              className="w-full min-h-0 flex-1 border-0"
+            />
+          </section>
+        </div>
+      )}
 
       {/* About */}
       <section className="bg-white border border-[#E2DFD6] rounded-xl p-4" data-testid="mobile-profile-about">
