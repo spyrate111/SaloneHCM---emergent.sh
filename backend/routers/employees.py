@@ -121,7 +121,7 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
-    if contract_date_changed or (employee_inactive and existing and existing.get("status") != body.status):
+    if contract_date_changed or employee_inactive:
         await db.contract_expiry_alerts.update_many(
             {
                 "company_id": user["company_id"], "employee_id": eid,
