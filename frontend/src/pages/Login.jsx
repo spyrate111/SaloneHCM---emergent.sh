@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle, Fingerprint } from "lucide-react";
 import api from "../lib/api";
@@ -35,6 +35,11 @@ export default function Login() {
   const [bioBusy, setBioBusy] = useState(false);
   const { login, applyAuth } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from;
+  const returnTo = typeof from?.pathname === "string" && from.pathname.startsWith("/") && !from.pathname.startsWith("//")
+    ? from.pathname + (from.search || "") + (from.hash || "")
+    : "/dashboard";
 
   // Show the biometric button only on devices with a platform authenticator
   useEffect(() => {
@@ -67,7 +72,7 @@ export default function Login() {
       };
       const r = await api.post("/auth/webauthn/login/finish", { credential: assertion });
       applyAuth(r.data);
-      nav("/dashboard");
+      nav(returnTo);
     } catch (e) {
       const d = e?.response?.data?.detail;
       if (e?.name === "NotAllowedError") setErr("Biometric prompt was cancelled or timed out");
@@ -110,7 +115,7 @@ export default function Login() {
     setErr(""); setLoading(true);
     try {
       await login(email, password, needsTotp ? totpCode : undefined);
-      nav("/dashboard");
+      nav(returnTo);
     } catch (err) {
       const d = err?.response?.data?.detail;
       if (d && typeof d === "object" && d.code === "totp_required") {

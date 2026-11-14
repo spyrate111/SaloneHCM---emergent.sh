@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
 import OffboardingPanel from "../components/OffboardingPanel";
 import DisciplinaryPanel from "../components/DisciplinaryPanel";
+import StaffIdCardActions from "../components/StaffIdCardActions";
 import { useAuth } from "../context/AuthContext";
 
 export default function EmployeeDetail() {
@@ -228,6 +229,7 @@ export default function EmployeeDetail() {
         </div>
       </div>
 
+      {["admin", "superadmin", "hr"].includes(user?.role) && <StaffIdCardActions employee={e} />}
       {["admin", "superadmin", "hr"].includes(user?.role) && <DisciplinaryPanel employee={e} />}
       <OffboardingPanel employee={e} onChanged={load} />
     </div>
