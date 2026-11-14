@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
 import OffboardingPanel from "../components/OffboardingPanel";
 
 export default function EmployeeDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const { has } = useFeatures();
   const [e, setE] = useState(null);
   const [slip, setSlip] = useState(null);
@@ -16,6 +18,8 @@ export default function EmployeeDetail() {
   const [budgets, setBudgets] = useState([]);
   const [cs, setCs] = useState({});
   const [savingCs, setSavingCs] = useState(false);
+  const [contractEndDate, setContractEndDate] = useState("");
+  const [savingContract, setSavingContract] = useState(false);
   const [qr, setQr] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
 
@@ -33,6 +37,7 @@ export default function EmployeeDetail() {
 
   const load = useCallback(() => api.get(`/employees/${id}`).then((r) => {
     setE(r.data);
+    setContractEndDate(r.data.contract_end_date || "");
     setCs({
       grade_code: r.data.grade_code || "",
       step_number: r.data.step_number || "",
@@ -84,6 +89,22 @@ export default function EmployeeDetail() {
     }
   };
 
+  const saveContractEndDate = async () => {
+    setSavingContract(true);
+    try {
+      await api.patch(`/employees/${id}/contract`, {
+        contract_end_date: contractEndDate || null,
+      });
+      toast.success(contractEndDate ? "Contract expiry saved" : "Contract expiry cleared");
+      await load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not save contract expiry");
+    } finally {
+      setSavingContract(false);
+    }
+  };
+
+  const canEditContract = ["admin", "superadmin", "hr"].includes(user?.role);
   const selectedGrade = grades.find((g) => g.code === cs.grade_code);
 
   if (!e) return <div className="text-sm text-[#525860]">Loading…</div>;
@@ -129,6 +150,7 @@ export default function EmployeeDetail() {
               [MapPin, "Location", e.location],
               [Briefcase, "Job title", e.job_title],
               [Calendar, "Hire date", e.hire_date],
+              [Calendar, "Contract end date", e.contract_end_date],
               [Hash, "NASSIT No.", e.nassit_no],
               [Hash, "TIN", e.tin],
             ].map(([Icon, label, val]) => (
@@ -139,6 +161,35 @@ export default function EmployeeDetail() {
               </div>
             ))}
           </div>
+
+          <section className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-3" data-testid="contract-expiry-editor">
+            <div>
+              <h3 className="font-heading text-lg font-semibold">Contract expiry</h3>
+              <p className="text-xs text-[#686D76] mt-1">Optional for fixed-term roles. HR receives reminders 90, 60, and 30 days before the end date.</p>
+            </div>
+            {canEditContract ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  data-testid="contract-end-date"
+                  type="date"
+                  value={contractEndDate}
+                  onChange={(event) => setContractEndDate(event.target.value)}
+                  className="bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
+                />
+                <button
+                  data-testid="contract-end-date-save"
+                  type="button"
+                  disabled={savingContract}
+                  onClick={saveContractEndDate}
+                  className="inline-flex items-center gap-1.5 text-sm bg-[#0A4A1E] text-white px-3 py-2 rounded-md disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" /> {savingContract ? "Saving…" : "Save"}
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-[#1A1C1E]">{e.contract_end_date || "No contract end date set"}</p>
+            )}
+          </section>
 
           {has("civil_service") && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="cs-profile-editor">
