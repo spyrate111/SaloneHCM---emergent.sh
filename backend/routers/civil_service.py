@@ -326,6 +326,8 @@ async def _budget_rows(run_id: str, tf: dict) -> tuple[dict, list]:
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Run not found")
+    if run.get("status") != "completed":
+        raise HTTPException(409, "Budget reports are only available for completed payroll runs")
     emps = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(5000)}
     by_code: dict = {}
     for s in run.get("slips", []):
@@ -448,6 +450,8 @@ async def _ghost_data(run_id: str, tf: dict) -> dict:
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Run not found")
+    if run.get("status") != "completed":
+        raise HTTPException(409, "Ghost-worker reports are only available for completed payroll runs")
     acked = set([a["employee_id"] for a in await db.payslip_acks.find(
         {"run_id": run_id, **tf}, {"_id": 0, "employee_id": 1}
     ).to_list(5000)])
