@@ -299,7 +299,7 @@ async def payroll_variance(rid: str, user: dict = Depends(require_roles("payroll
     if prev_period:
         # Prefer completed runs of the previous period.
         prev = await db.payroll_runs.find_one(
-            {**tf, "period": prev_period}, {"_id": 0}, sort=[("created_at", -1)],
+            {**tf, "period": prev_period, "status": "completed"}, {"_id": 0}, sort=[("created_at", -1)],
         )
 
     cur_slips = cur.get("slips") or []
