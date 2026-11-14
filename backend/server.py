@@ -30,15 +30,12 @@ logger = logging.getLogger("salonehcm")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    try:
-        await db.leave_requests.create_index(
-            [("company_id", 1), ("employee_id", 1), ("client_request_id", 1)],
-            unique=True,
-            partialFilterExpression={"client_request_id": {"$type": "string"}},
-            name="leave_client_request_unique",
-        )
-    except Exception as e:
-        logger.warning("Leave request idempotency index unavailable: %s", e)
+    await db.leave_requests.create_index(
+        [("company_id", 1), ("employee_id", 1), ("client_request_id", 1)],
+        unique=True,
+        partialFilterExpression={"client_request_id": {"$type": "string"}},
+        name="leave_client_request_unique",
+    )
     await seed()
     try:
         init_storage()
