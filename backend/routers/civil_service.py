@@ -14,6 +14,7 @@ from core import (
 )
 
 from core import require_roles
+from routers.payroll_rails import assert_not_cutoff_locked
 
 router = APIRouter(prefix="/civil-service", tags=["civil-service"])
 
@@ -194,32 +195,67 @@ class EmployeeCivilServicePatch(BaseModel):
 @router.patch("/employees/{eid}/profile")
 async def patch_employee_cs(eid: str, body: EmployeeCivilServicePatch, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
-    payload = {k: v for k, v in body.model_dump().items() if v is not None}
+    employee = await db.employees.find_one(
+        {"id": eid, **tf}, {"_id": 0, "basic_salary_sle": 1, "grade_code": 1, "step_number": 1}
+    )
+    if not employee:
+        raise HTTPException(404, "Employee not found")
+
+    # Keep explicitly supplied nulls so the editor can clear an old grade or budget code.
+    payload = body.model_dump(exclude_unset=True)
     if not payload:
         return {"ok": True, "updated": 0}
 
-    # If grade_code provided, validate it exists
-    if "grade_code" in payload:
-        g = await db.civil_service_grades.find_one({"code": payload["grade_code"], **tf}, {"_id": 0, "code": 1})
-        if not g:
+    clear_grade = "grade_code" in payload and payload["grade_code"] is None
+    if clear_grade:
+        if payload.get("step_number") not in (None,):
+            raise HTTPException(400, "Clear the grade and step together")
+        payload["step_number"] = None
+
+    if "grade_code" in payload and payload["grade_code"] is not None:
+        grade = await db.civil_service_grades.find_one(
+            {"code": payload["grade_code"], **tf}, {"_id": 0, "code": 1}
+        )
+        if not grade:
             raise HTTPException(404, f"Grade {payload['grade_code']} not found")
-    if "step_number" in payload and "grade_code" in payload:
-        s = await db.civil_service_steps.find_one(
-            {"grade_code": payload["grade_code"], "step_number": payload["step_number"], **tf},
+
+    # A grade/step change is validated as a pair against the configured schedule.
+    if not clear_grade and (
+        ("grade_code" in payload and payload["grade_code"] is not None)
+        or "step_number" in payload
+    ):
+        grade_code = payload.get("grade_code", employee.get("grade_code"))
+        step_number = payload.get("step_number", employee.get("step_number"))
+        if not grade_code:
+            raise HTTPException(400, "Select a grade before assigning a step")
+        if step_number is None:
+            raise HTTPException(400, "Select a configured step for the grade")
+        grade = await db.civil_service_grades.find_one(
+            {"code": grade_code, **tf}, {"_id": 0, "code": 1}
+        )
+        if not grade:
+            raise HTTPException(404, f"Grade {grade_code} not found")
+        step = await db.civil_service_steps.find_one(
+            {"grade_code": grade_code, "step_number": step_number, **tf},
             {"_id": 0, "monthly_amount_sle": 1},
         )
-        if not s:
-            raise HTTPException(404, f"Step {payload['step_number']} not configured for grade {payload['grade_code']}")
-        # Auto-sync basic salary to step amount
-        payload["basic_salary_sle"] = float(s["monthly_amount_sle"])
-    if "budget_code" in payload:
-        bc = await db.civil_service_budget_codes.find_one({"code": payload["budget_code"], **tf}, {"_id": 0, "code": 1})
-        if not bc:
+        if not step:
+            raise HTTPException(404, f"Step {step_number} not configured for grade {grade_code}")
+        payload["grade_code"] = grade_code
+        payload["step_number"] = step_number
+        payload["basic_salary_sle"] = float(step["monthly_amount_sle"])
+
+    if "budget_code" in payload and payload["budget_code"] is not None:
+        budget = await db.civil_service_budget_codes.find_one(
+            {"code": payload["budget_code"], **tf}, {"_id": 0, "code": 1}
+        )
+        if not budget:
             raise HTTPException(404, f"Budget code {payload['budget_code']} not found")
 
-    r = await db.employees.update_one({"id": eid, **tf}, {"$set": payload})
-    if not r.matched_count:
-        raise HTTPException(404, "Employee not found")
+    if "basic_salary_sle" in payload and employee.get("basic_salary_sle") != payload["basic_salary_sle"]:
+        await assert_not_cutoff_locked(user, "changing a civil-service salary step")
+
+    await db.employees.update_one({"id": eid, **tf}, {"$set": payload})
     await audit("employee_cs_update", f"employees/{eid}", user, payload)
     return {"ok": True, "updated": payload}
 
