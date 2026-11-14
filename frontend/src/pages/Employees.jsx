@@ -8,7 +8,7 @@ import { DatePicker } from "../components/ui/date-picker";
 const empty = {
   first_name: "", last_name: "", email: "", phone: "",
   job_title: "", department: "", location: "Freetown",
-  employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
+  employment_type: "Full-time", tax_residency: "resident", basic_salary_sle: 0, allowances_sle: 0,
   nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
   hire_date: "2025-01-01", status: "active",
 };
@@ -147,6 +147,14 @@ export default function Employees() {
                     className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]" />
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">PAYE tax residency</label>
+                <select data-testid="emp-tax-residency" value={form.tax_residency} onChange={(e) => setForm({ ...form, tax_residency: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                  <option value="resident">Resident</option>
+                  <option value="non_resident">Non-resident</option>
+                </select>
+                <p className="mt-1 text-[11px] text-[#686D76]">Set from the employee’s tax status, not citizenship.</p>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Hire date</label>
                 <DatePicker data-testid="emp-hire_date" value={form.hire_date} onChange={(v) => setForm({ ...form, hire_date: v })} />
