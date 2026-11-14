@@ -94,7 +94,7 @@ def _annotate(pos: dict, filled: int) -> dict:
 @router.get("/positions")
 async def list_positions(user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
-    positions = await db.establishment_positions.find(tf, {"_id": 0}).to_list(5000)
+    positions = await db.establishment_positions.find(tf, {"_id": 0}).to_list(None)
     filled = await _filled_counts(user["company_id"])
     return [_annotate(p, filled.get(p["id"], 0)) for p in positions]
 
@@ -276,7 +276,7 @@ async def cost_tracking(period: str, user: dict = Depends(require_roles("hr"))):
     balance_rows = await db.budget_balances.find(
         {**tf, "period": period},
         {"_id": 0, "budget_code": 1, "allocated_sle": 1, "updated_at": 1},
-    ).sort("updated_at", -1).to_list(2000)
+    ).sort("updated_at", -1).to_list(None)
     allocations = {}
     for balance in balance_rows:
         code = _code(balance.get("budget_code"))
