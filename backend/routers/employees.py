@@ -52,10 +52,13 @@ async def update_contract_end_date(
 
     old_date = emp.get("contract_end_date")
     new_date = body.contract_end_date
-    await db.employees.update_one(
-        {"id": eid, **tenant_filter(user)},
+    update_filter = {"id": eid, **tenant_filter(user), "contract_end_date": old_date}
+    result = await db.employees.update_one(
+        update_filter,
         {"$set": {"contract_end_date": new_date, "updated_at": iso(now_utc())}},
     )
+    if result.matched_count != 1:
+        raise HTTPException(409, "Employee contract changed; refresh the record and try again")
     if old_date != new_date:
         await db.contract_expiry_alerts.update_many(
             {
@@ -134,6 +137,14 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
         )
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
+    if contract_date_changed:
+        await audit(
+            "contract_end_date_updated", f"employees/{eid}", user,
+            {
+                "previous_end_date": (existing or {}).get("contract_end_date"),
+                "contract_end_date": update_doc.get("contract_end_date"),
+            },
+        )
     return e
 
 
