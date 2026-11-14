@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
 import api, { fmtSLE } from "../lib/api";
 import { Plus, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -22,6 +23,8 @@ export default function Employees() {
   const [busy, setBusy] = useState(false);
   const [civilEmployee, setCivilEmployee] = useState(null);
   const { has, loaded } = useFeatures();
+  const { user } = useAuth();
+  const canEditCivilProfile = ["admin", "superadmin", "hr"].includes(user?.role);
 
   const load = useCallback(() => api.get("/employees").then((r) => setList(r.data)), []);
   useEffect(() => { load(); }, [load]);
@@ -110,7 +113,7 @@ export default function Employees() {
                   <td className="py-3 px-4 font-data text-[#1A1C1E]">{fmtSLE(e.basic_salary_sle)}</td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {loaded && has("civil_service") && (
+                      {loaded && has("civil_service") && canEditCivilProfile && (
                         <button
                           type="button"
                           data-testid={"civil-profile-" + e.id}
@@ -132,15 +135,6 @@ export default function Employees() {
           </table>
         </div>
       </div>
-
-      {civilEmployee && (
-        <CivilServiceProfileEditor
-          key={civilEmployee.id}
-          employee={civilEmployee}
-          onClose={() => setCivilEmployee(null)}
-          onSaved={load}
-        />
-      )}
 
       {civilEmployee && (
         <CivilServiceProfileEditor
