@@ -14,6 +14,7 @@ import Leave from "./pages/Leave";
 import Attendance from "./pages/Attendance";
 import Assistant from "./pages/Assistant";
 import Settings from "./pages/Settings";
+import FxRates from "./pages/FxRates";
 import SelfService from "./pages/SelfService";
 import AuditLog from "./pages/AuditLog";
 import Benefits from "./pages/Benefits";
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="/sector-presets" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><SectorPresets /></ProtectedRoute>} />
             <Route path="/promotion" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Promotion /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><Analytics /></ProtectedRoute>} />
+            <Route path="/fx-rates" element={<FxRates />} />
             <Route path="/assistant" element={<Assistant />} />
             <Route path="/self-service" element={<SelfService />} />
             <Route path="/audit" element={<ProtectedRoute roles={["admin", "superadmin", "auditor"]}><AuditLog /></ProtectedRoute>} />
