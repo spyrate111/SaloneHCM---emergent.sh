@@ -20,16 +20,28 @@ export default function Loans() {
   const isAdmin = ["admin", "superadmin"].includes(user?.role);
   const [loans, setLoans] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
   const [scheduleFor, setScheduleFor] = useState(null);
 
   const refresh = useCallback(async () => {
-    const [l, e] = await Promise.all([
-      api.get("/loans"),
-      isAdmin ? api.get("/employees") : Promise.resolve({ data: [] }),
-    ]);
-    setLoans(l.data);
-    setEmployees(e.data);
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const [l, e] = await Promise.all([
+        api.get("/loans"),
+        isAdmin ? api.get("/employees") : Promise.resolve({ data: [] }),
+      ]);
+      setLoans(l.data);
+      setEmployees(e.data);
+    } catch (e) {
+      setLoadError(true);
+      toast.error(typeof e?.response?.data?.detail === "string"
+        ? e.response.data.detail : "Could not load loans");
+    } finally {
+      setLoading(false);
+    }
   }, [isAdmin]);
 
   useEffect(() => { if (has("loans_advances")) refresh(); }, [refresh, has]);
@@ -79,7 +91,15 @@ export default function Loans() {
         </div>
       </div>
 
-      {active.length === 0 && paid.length === 0 && cancelled.length === 0 && (
+      {loading && <div className="text-sm text-[#525860]">Loading loans…</div>}
+      {loadError && (
+        <div role="alert" className="flex items-center justify-between gap-3 bg-[#FBE9E9] border border-[#E7B7B3] rounded-md p-3 text-sm text-[#8F2F27]">
+          <span>Could not load loans.</span>
+          <button onClick={refresh} className="underline font-medium">Try again</button>
+        </div>
+      )}
+
+      {!loading && !loadError && active.length === 0 && paid.length === 0 && cancelled.length === 0 && (
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center" data-testid="loans-empty">
           <Banknote className="w-10 h-10 text-[#A1A5AB] mx-auto mb-3" strokeWidth={1.4} />
           <p className="text-sm text-[#525860]">No loans on record yet.</p>

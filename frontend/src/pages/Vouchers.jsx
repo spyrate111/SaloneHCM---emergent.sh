@@ -24,6 +24,8 @@ export default function Vouchers() {
   const [vouchers, setVouchers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [period, setPeriod] = useState("");
   const [branchId, setBranchId] = useState("");
   const [status, setStatus] = useState("");
@@ -33,6 +35,8 @@ export default function Vouchers() {
   const [packHistory, setPackHistory] = useState([]);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
     const params = {};
     if (period) params.period = period;
     if (branchId) params.branch_id = branchId;
@@ -46,12 +50,20 @@ export default function Vouchers() {
       setVouchers(v.data);
       setBranches(b.data);
       setSummary(s.data);
-    } catch {
-      // transient failure (e.g. rate limit) — keep the current UI instead of
-      // surfacing an unhandled rejection overlay
-    }
-    if (canManage) {
-      api.get("/vouchers/pack-history").then((r) => setPackHistory(r.data || [])).catch(() => {});
+      if (canManage) {
+        try {
+          const history = await api.get("/vouchers/pack-history");
+          setPackHistory(history.data || []);
+        } catch {
+          // Keep the last successful pack history if this optional request fails.
+        }
+      }
+    } catch (e) {
+      setLoadError(true);
+      toast.error(typeof e?.response?.data?.detail === "string"
+        ? e.response.data.detail : "Could not load vouchers");
+    } finally {
+      setLoading(false);
     }
   }, [period, branchId, status, canManage]);
 
@@ -107,6 +119,13 @@ export default function Vouchers() {
             )}
           </div>
         </div>
+        {loading && <div className="text-sm text-[#525860] mt-4">Loading vouchers…</div>}
+        {loadError && (
+          <div role="alert" className="mt-4 flex items-center justify-between gap-3 bg-[#FBE9E9] border border-[#E7B7B3] rounded-md p-3 text-sm text-[#8F2F27]">
+            <span>Could not load vouchers.</span>
+            <button onClick={refresh} className="underline font-medium">Try again</button>
+          </div>
+        )}
         {summary && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5" data-testid="vouchers-kpis">
             <KPI label="Branches submitted" value={`${summary.branches_submitted}/${summary.branches_total}`} color="text-[#26547C]" />
@@ -195,14 +214,13 @@ export default function Vouchers() {
             )}
           </div>
 
-          {vouchers.length === 0 ? (
+          {!loading && !loadError && vouchers.length === 0 && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center" data-testid="vouchers-empty">
               <FileCheck2 className="w-10 h-10 text-[#A1A5AB] mx-auto mb-3" strokeWidth={1.4} />
               <p className="text-sm text-[#525860]">No vouchers match — create one manually or generate from a payroll run.</p>
             </div>
-          ) : (
-            <VoucherTable vouchers={vouchers} onOpen={setDetailId} />
           )}
+          {vouchers.length > 0 && <VoucherTable vouchers={vouchers} onOpen={setDetailId} />}
         </>
       )}
 
