@@ -241,6 +241,20 @@ def _duplicate_identifier_anomalies(cur_slips: list[dict], emp_index: dict) -> l
     return out
 
 
+def _missing_employee_id_anomalies(cur_slips: list[dict]) -> list[dict]:
+    out = []
+    for slip in cur_slips:
+        if str(slip.get("employee_id") or "").strip():
+            continue
+        out.append({
+            "severity": "high",
+            "kind": "missing_employee_id",
+            "subject": slip.get("employee_name") or "Unidentified payslip row",
+            "message": "This payslip row has no employee ID. Resolve the identity before approving payroll.",
+        })
+    return out
+
+
 def _duplicate_employee_slip_anomalies(cur_slips: list[dict]) -> list[dict]:
     """Flag repeated payslip rows for the same employee identifier."""
     by_employee = defaultdict(list)
@@ -309,13 +323,22 @@ def _loan_deduction_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
 
 def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict]:
     """Return a list of {severity, kind, subject, before, after, delta, delta_pct, message}."""
-    prev_by_id = {s["employee_id"]: s for s in prev_slips}
-    cur_by_id = {s["employee_id"]: s for s in cur_slips}
+    prev_by_id = {
+        str(s.get("employee_id")): s
+        for s in prev_slips
+        if str(s.get("employee_id") or "").strip()
+    }
+    cur_by_id = {
+        str(s.get("employee_id")): s
+        for s in cur_slips
+        if str(s.get("employee_id") or "").strip()
+    }
     return (
         _raise_anomalies(cur_by_id, prev_by_id)
         + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
         + _terminated_paid_anomalies(cur_by_id, emp_index)
         + _duplicate_identifier_anomalies(cur_slips, emp_index)
+        + _missing_employee_id_anomalies(cur_slips)
         + _duplicate_employee_slip_anomalies(cur_slips)
         + _loan_deduction_anomalies(cur_by_id, prev_by_id)
     )
