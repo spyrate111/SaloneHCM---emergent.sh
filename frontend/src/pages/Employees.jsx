@@ -30,7 +30,7 @@ export default function Employees() {
   const todayKey = new Date().toISOString().slice(0, 10);
   const dateKeyToUtc = (value) => Date.parse(`${value}T00:00:00Z`);
   const expiringContracts = list
-    .filter((e) => e.status === "active" && e.contract_end_date)
+    .filter((e) => ["active", "on_leave"].includes(e.status) && e.contract_end_date)
     .map((employee) => ({
       ...employee,
       daysRemaining: Math.round((dateKeyToUtc(employee.contract_end_date) - dateKeyToUtc(todayKey)) / 86400000),
