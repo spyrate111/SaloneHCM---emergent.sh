@@ -10,6 +10,11 @@ function canManageFx(user) {
   return ["admin", "superadmin", "payroll"].includes(user?.role) || !!user?.finance_officer;
 }
 
+function localDateString() {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+}
+
 function formatRate(value) {
   return Number(value).toLocaleString("en-US", {
     minimumFractionDigits: 4,
@@ -24,8 +29,7 @@ export default function FxRates() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(null);
-  const today = new Date().toISOString().slice(0, 10);
-  const [publicationDate, setPublicationDate] = useState(today);
+  const [publicationDate, setPublicationDate] = useState(localDateString);
   const [sourceType, setSourceType] = useState("bsl_reference");
   const [sourceUrl, setSourceUrl] = useState("");
   const [notes, setNotes] = useState("");
@@ -233,7 +237,7 @@ export default function FxRates() {
                       </td>
                       <td className="px-3 py-3">
                         <a href={row.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#26547C] hover:underline">
-                          Source PDF <ExternalLink className="w-3 h-3" />
+                          Source document <ExternalLink className="w-3 h-3" />
                         </a>
                         <div className="text-[10px] text-[#686D76] mt-1">Recorded {row.retrieved_at}</div>
                         {row.notes && <div className="text-[11px] text-[#525860] mt-1 max-w-xs">{row.notes}</div>}
