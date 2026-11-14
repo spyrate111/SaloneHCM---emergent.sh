@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
 import OffboardingPanel from "../components/OffboardingPanel";
@@ -9,6 +10,8 @@ import OffboardingPanel from "../components/OffboardingPanel";
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { has } = useFeatures();
+  const { user } = useAuth();
+  const canEditTaxResidency = ["admin", "superadmin", "hr"].includes(user?.role);
   const [e, setE] = useState(null);
   const [slip, setSlip] = useState(null);
   const [taxResidency, setTaxResidency] = useState("resident");
@@ -156,7 +159,7 @@ export default function EmployeeDetail() {
             ))}
           </div>
 
-          <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-3" data-testid="employee-tax-residency">
+          {canEditTaxResidency && <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-3" data-testid="employee-tax-residency">
             <div>
               <h3 className="font-heading text-lg font-semibold">PAYE tax residency</h3>
               <p className="text-xs text-[#686D76] mt-1">Choose the employee’s tax-residency treatment. This classification is separate from citizenship.</p>
@@ -180,7 +183,7 @@ export default function EmployeeDetail() {
                 <Save className="w-3.5 h-3.5" /> {savingTaxResidency ? "Saving…" : "Save"}
               </button>
             </div>
-          </div>
+          </div>}
 
           {has("civil_service") && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="cs-profile-editor">
