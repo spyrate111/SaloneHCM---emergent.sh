@@ -229,7 +229,7 @@ async def cost_tracking(period: str, user: dict = Depends(require_roles("hr"))):
         tf,
         {"_id": 0, "id": 1, "ministry": 1, "directorate": 1,
          "approved_count": 1, "budget_code": 1},
-    ).to_list(5000)
+    ).to_list(None)
     filled_by_position = await _filled_counts(company_id)
 
     def _code(value):
