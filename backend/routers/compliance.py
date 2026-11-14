@@ -98,7 +98,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
         [],
         [
             "No.", "Surname", "First Name", "Other Name(s)", "SS Number",
-            "Basic Salary (Le)", "10% (Le)", "5% (Le)", "15% (Le)",
+            "Employee Staff Number", "Basic Salary (Le)", "10% (Le)", "5% (Le)", "15% (Le)",
         ],
     ]
     totals = {"basic": 0.0, "employer": 0.0, "employee": 0.0, "total": 0.0}
@@ -118,6 +118,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
             _payroll_identity_value(slip, "employee_first_name", employee, "first_name"),
             _payroll_identity_value(slip, "employee_middle_name", employee, "middle_name"),
             _payroll_identity_value(slip, "employee_nassit_no", employee, "nassit_no"),
+            _payroll_identity_value(slip, "employee_staff_number", employee, "staff_number"),
             basic,
             employer_share,
             employee_share,
@@ -126,7 +127,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
     rows.extend([
         [],
         [
-            "TOTAL", "", "", "", "",
+            "TOTAL", "", "", "", "", "",
             round(totals["basic"], 2),
             round(totals["employer"], 2),
             round(totals["employee"], 2),
