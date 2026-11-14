@@ -49,24 +49,26 @@ function readCachedMe(accountId) {
   }
 }
 
-function outboxKey(employeeId) {
-  return OUTBOX_PREFIX + ":" + employeeId;
+function outboxKey(accountId, employeeId) {
+  return accountId && employeeId ? OUTBOX_PREFIX + ":" + accountId + ":" + employeeId : null;
 }
 
-function readOutbox(employeeId) {
-  if (!employeeId) return [];
+function readOutbox(accountId, employeeId) {
+  const key = outboxKey(accountId, employeeId);
+  if (!key) return [];
   try {
-    const items = JSON.parse(localStorage.getItem(outboxKey(employeeId)) || "[]");
+    const items = JSON.parse(localStorage.getItem(key) || "[]");
     return Array.isArray(items) ? items : [];
   } catch {
     return [];
   }
 }
 
-function writeOutbox(employeeId, items) {
-  if (!employeeId) return false;
+function writeOutbox(accountId, employeeId, items) {
+  const key = outboxKey(accountId, employeeId);
+  if (!key) return false;
   try {
-    localStorage.setItem(outboxKey(employeeId), JSON.stringify(items));
+    localStorage.setItem(key, JSON.stringify(items));
     return true;
   } catch {
     return false;
@@ -99,7 +101,7 @@ export default function MobileLeave() {
       last_name: authUser.last_name,
     } : null
   ));
-  const [queued, setQueued] = useState(() => readOutbox(authUser?.employee_id));
+  const [queued, setQueued] = useState(() => readOutbox(authUserId, authUser?.employee_id));
   const syncInFlight = useRef(new Set());
   const activeUserId = useRef(authUserId);
 
@@ -135,7 +137,7 @@ export default function MobileLeave() {
       if (key) {
         try { localStorage.setItem(key, JSON.stringify(offlineIdentity)); } catch { /* noop */ }
       }
-      setQueued(readOutbox(r.data?.employee_id || authUser?.employee_id));
+      setQueued(readOutbox(requestUserId, r.data?.employee_id || authUser?.employee_id));
     }).catch(() => {});
   }, [authUserId, authUser?.employee_id]);
   useEffect(() => { refresh(); }, [refresh]);
@@ -147,7 +149,7 @@ export default function MobileLeave() {
     const sync = async () => {
       if (!navigator.onLine || syncInFlight.current.has(authUserId)) return;
       syncInFlight.current.add(authUserId);
-      let items = readOutbox(employeeId);
+      let items = readOutbox(authUserId, employeeId);
       try {
         for (const item of items) {
           if (item.sync_error) continue;
@@ -162,7 +164,7 @@ export default function MobileLeave() {
             });
             if (activeUserId.current !== authUserId) return;
             items = items.filter((queuedItem) => queuedItem.client_request_id !== item.client_request_id);
-            writeOutbox(employeeId, items);
+            writeOutbox(authUserId, employeeId, items);
             setQueued(items);
             setRows((current) => {
               const next = [response.data, ...current.filter((row) => row.client_request_id !== item.client_request_id)];
@@ -203,7 +205,7 @@ export default function MobileLeave() {
     const employeeId = me?.employee_id;
     if (!employeeId) return;
     const next = readOutbox(employeeId).filter((item) => item.client_request_id !== clientRequestId);
-    writeOutbox(employeeId, next);
+    writeOutbox(authUserId, employeeId, next);
     setQueued(next);
   };
 
