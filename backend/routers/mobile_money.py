@@ -548,6 +548,11 @@ async def reconcile_mobile_money_recipient(
         and recipient.get("failure_reason", "") == failure_reason
     ):
         return batch
+    if recipient.get("status", "pending") != "pending":
+        raise HTTPException(
+            409,
+            "This recipient is already reconciled. Create a retry batch for failed payments.",
+        )
 
     recorded_at = iso(now_utc())
     event = {
@@ -557,8 +562,12 @@ async def reconcile_mobile_money_recipient(
         "recorded_by": user["email"],
         "recorded_at": recorded_at,
     }
-    await db.mobile_money_batches.update_one(
-        {"id": bid, **scope, "recipients.id": pid},
+    result = await db.mobile_money_batches.update_one(
+        {
+            "id": bid,
+            **scope,
+            "recipients": {"$elemMatch": {"id": pid, "status": "pending"}},
+        },
         {
             "$set": {
                 "recipients.$.status": body.status,
@@ -569,29 +578,54 @@ async def reconcile_mobile_money_recipient(
             "$push": {"recipients.$.reconciliation_history": event},
         },
     )
-    updated = await db.mobile_money_batches.find_one(
-        {"id": bid, **scope}, {"_id": 0},
-    )
-    statuses = [row.get("status", "pending") for row in updated["recipients"]]
-    updated["paid_count"] = statuses.count("paid")
-    updated["failed_count"] = statuses.count("failed")
-    updated["pending_count"] = statuses.count("pending")
-    if updated["pending_count"] == len(statuses):
-        updated["status"] = "exported"
-    elif updated["pending_count"]:
-        updated["status"] = "partially_reconciled"
-    else:
-        updated["status"] = "reconciled"
-        updated["reconciled_at"] = recorded_at
+    if result.matched_count != 1:
+        raise HTTPException(
+            409,
+            "This recipient was reconciled by another user. Refresh the batch before continuing.",
+        )
+
+    # Recalculate from the latest recipient states in one atomic update. Concurrent
+    # reconciliations can finish in any order without leaving stale batch totals.
     await db.mobile_money_batches.update_one(
         {"id": bid, **scope},
-        {"$set": {
-            "status": updated["status"],
-            "paid_count": updated["paid_count"],
-            "failed_count": updated["failed_count"],
-            "pending_count": updated["pending_count"],
-            "reconciled_at": updated.get("reconciled_at"),
-        }},
+        [
+            {"$set": {
+                "paid_count": {"$size": {"$filter": {
+                    "input": {"$ifNull": ["$recipients", []]},
+                    "as": "recipient",
+                    "cond": {"$eq": ["$recipient.status", "paid"]},
+                }}},
+                "failed_count": {"$size": {"$filter": {
+                    "input": {"$ifNull": ["$recipients", []]},
+                    "as": "recipient",
+                    "cond": {"$eq": ["$recipient.status", "failed"]},
+                }}},
+                "pending_count": {"$size": {"$filter": {
+                    "input": {"$ifNull": ["$recipients", []]},
+                    "as": "recipient",
+                    "cond": {"$eq": ["$recipient.status", "pending"]},
+                }}},
+            }},
+            {"$set": {
+                "status": {"$cond": [
+                    {"$eq": ["$pending_count", 0]},
+                    "reconciled",
+                    {"$cond": [
+                        {"$eq": [{"$add": ["$paid_count", "$failed_count"]}, 0]},
+                        "exported",
+                        "partially_reconciled",
+                    ]},
+                ]},
+                "reconciled_at": {"$cond": [
+                    {"$eq": ["$pending_count", 0]},
+                    {"$ifNull": ["$reconciled_at", recorded_at]},
+                    None,
+                ]},
+            }},
+        ],
+    )
+    updated = await db.mobile_money_batches.find_one(
+        {"id": bid, **scope}, {"_id": 0},
     )
     await audit(
         "mobile_money_payment_reconciled",
