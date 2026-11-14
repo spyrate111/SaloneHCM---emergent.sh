@@ -2,13 +2,18 @@
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
-from core import db, require_feature, tenant_filter
+from core import db, require_feature, require_roles, tenant_filter
 from payroll_engine import calc_payslip
+
+_MINISTRY_ACCESS = require_roles("admin", "superadmin", "payroll")
 
 router = APIRouter(
     prefix="/ministry",
     tags=["ministry"],
-    dependencies=[Depends(require_feature("ministry_reports"))],
+    dependencies=[
+        Depends(require_feature("ministry_reports")),
+        Depends(_MINISTRY_ACCESS),
+    ],
 )
 
 
@@ -58,7 +63,7 @@ def _finalize(bucket: dict) -> None:
 
 
 @router.get("/rollup")
-async def ministry_rollup(user: dict = Depends(require_feature("ministry_reports"))):
+async def ministry_rollup(user: dict = Depends(_MINISTRY_ACCESS)):
     """Aggregate KPIs grouped by department (treated as ministry)."""
     tf = tenant_filter(user)
     employees = await db.employees.find(tf, {"_id": 0}).to_list(5000)
