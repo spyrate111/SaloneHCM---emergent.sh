@@ -17,12 +17,14 @@ export default function Establishment() {
   const [costReport, setCostReport] = useState(null);
   const [costLoading, setCostLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [expanded, setExpanded] = useState({});
   const [editing, setEditing] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setCostLoading(true);
+    setLoadError(false);
     try {
       const [t, o] = await Promise.all([
         api.get("/establishment/tree"),
@@ -38,7 +40,9 @@ export default function Establishment() {
         toast.error(e?.response?.data?.detail || "Payroll cost comparison could not be loaded");
       }
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Establishment data could not be loaded");
+      setLoadError(true);
+      toast.error(typeof e?.response?.data?.detail === "string"
+        ? e.response.data.detail : "Could not load establishment data");
     } finally {
       setLoading(false);
       setCostLoading(false);
@@ -76,8 +80,14 @@ export default function Establishment() {
       {overruns.length > 0 && <OverrunBanner overruns={overruns} />}
 
       {loading && <div className="text-sm text-[#525860]">Loading establishment…</div>}
+      {loadError && (
+        <div role="alert" className="flex items-center justify-between gap-3 bg-[#FBE9E9] border border-[#E7B7B3] rounded-md p-3 text-sm text-[#8F2F27]">
+          <span>Could not load establishment data.</span>
+          <button onClick={refresh} className="underline font-medium">Try again</button>
+        </div>
+      )}
 
-      {!loading && tree.ministries.length === 0 && (
+      {!loading && !loadError && tree.ministries.length === 0 && (
         <div className="bg-white border border-[#E2DFD6] rounded-lg p-10 text-center" data-testid="establishment-empty">
           <Building2 className="w-10 h-10 text-[#A1A5AB] mx-auto mb-3" strokeWidth={1.4} />
           <p className="text-sm text-[#525860]">No positions yet. Create your first establishment position to start tracking approved vs. filled headcount.</p>
