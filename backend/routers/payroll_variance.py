@@ -457,7 +457,7 @@ async def preview_anomalies_for_period(cur_slips: list[dict], period: str, user:
     prev_slips = (prev or {}).get("slips") or []
 
     history_runs = []
-    if re.match(r"^\\d{4}-(0[1-9]|1[0-2])$", str(period or "")):
+    if re.match(r"^\d{4}-(0[1-9]|1[0-2])$", str(period or "")):
         history_runs = await db.payroll_runs.aggregate([
             {"$match": {
                 **tf,
