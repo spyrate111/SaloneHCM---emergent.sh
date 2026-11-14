@@ -103,7 +103,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
     ]
     totals = {"basic": 0.0, "employer": 0.0, "employee": 0.0, "total": 0.0}
     for index, slip in enumerate(run["slips"], start=1):
-        employee = emp_map.get(slip["employee_id"], {})
+        employee = emp_map.get(slip.get("employee_id"), {})
         basic = float(slip.get("basic", 0) or 0)
         employee_share = float(slip.get("nassit_employee", 0) or 0)
         employer_share = float(slip.get("nassit_employer", 0) or 0)
