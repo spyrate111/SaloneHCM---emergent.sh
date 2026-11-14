@@ -5,10 +5,13 @@ import { useFeatures } from "../lib/features";
 import { toast } from "sonner";
 import { ChevronLeft, Mail, Phone, MapPin, Briefcase, Calendar, Hash, Award, Tag, Save, QrCode, Printer, X } from "lucide-react";
 import OffboardingPanel from "../components/OffboardingPanel";
+import DisciplinaryPanel from "../components/DisciplinaryPanel";
+import { useAuth } from "../context/AuthContext";
 
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { has } = useFeatures();
+  const { user } = useAuth();
   const [e, setE] = useState(null);
   const [slip, setSlip] = useState(null);
   // Civil-service refs
@@ -225,6 +228,7 @@ export default function EmployeeDetail() {
         </div>
       </div>
 
+      {["admin", "superadmin", "hr"].includes(user?.role) && <DisciplinaryPanel employee={e} />}
       <OffboardingPanel employee={e} onChanged={load} />
     </div>
   );
