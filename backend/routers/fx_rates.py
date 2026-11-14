@@ -75,9 +75,18 @@ async def _require_fx_manager(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+async def _require_fx_reader(user: dict = Depends(get_current_user)) -> dict:
+    if not (
+        is_admin(user)
+        or user.get("role") in {"payroll", "auditor"}
+        or user.get("finance_officer")
+    ):
+        raise HTTPException(403, "Finance officer, payroll officer, auditor, or admin only")
+    return user
+
 
 @router.get("")
-async def list_fx_rate_sets(user: dict = Depends(get_current_user)):
+async def list_fx_rate_sets(user: dict = Depends(_require_fx_reader)):
     """List this company's reference-rate sets, including approval provenance."""
     rows = await db.fx_rate_sets.find(
         tenant_filter(user), {"_id": 0},
@@ -86,7 +95,7 @@ async def list_fx_rate_sets(user: dict = Depends(get_current_user)):
 
 
 @router.get("/{rate_set_id}")
-async def get_fx_rate_set(rate_set_id: str, user: dict = Depends(get_current_user)):
+async def get_fx_rate_set(rate_set_id: str, user: dict = Depends(_require_fx_reader)):
     row = await db.fx_rate_sets.find_one(
         {"id": rate_set_id, **tenant_filter(user)}, {"_id": 0},
     )
