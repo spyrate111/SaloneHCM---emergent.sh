@@ -29,6 +29,7 @@ class EmployeeIn(BaseModel):
     department: str
     location: str = "Freetown"
     employment_type: Literal["Full-time", "Part-time", "Contract", "Intern"] = "Full-time"
+    tax_residency: Literal["resident", "non_resident"] = "resident"
     basic_salary_sle: float
     allowances_sle: float = 0
     nassit_no: Optional[str] = ""
@@ -39,6 +40,10 @@ class EmployeeIn(BaseModel):
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
     is_manager: bool = False
+
+
+class EmployeeTaxResidencyIn(BaseModel):
+    tax_residency: Literal["resident", "non_resident"]
 
 
 # ---------- Leave ----------
