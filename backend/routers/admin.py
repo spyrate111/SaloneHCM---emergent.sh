@@ -17,7 +17,7 @@ class CompanyCreateIn(BaseModel):
     tin: str = Field("", max_length=40)
     nassit_employer: str = Field("", max_length=40)
     country: str = "Sierra Leone"
-    currency: str = "SLE"
+    currency: Literal["SLE"] = "SLE"
     tier: Tier = "professional"
     # Seed an initial admin user for this company
     admin_email: EmailStr
