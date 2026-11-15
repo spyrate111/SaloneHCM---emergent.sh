@@ -238,8 +238,8 @@ async def mark_reconciled(rid: str, body: ReconcileIn, user: dict = Depends(requ
     if run.get("ifmis_reconciled"):
         raise HTTPException(409, "Run already reconciled")
     ts = iso(now_utc())
-    await db.payroll_runs.update_one(
-        {"id": rid, **tenant_filter(user)},
+    updated = await db.payroll_runs.update_one(
+        {"id": rid, **tenant_filter(user), "ifmis_reconciled": {"$ne": True}},
         {"$set": {
             "ifmis_reconciled": True,
             "ifmis_reference": body.ifmis_reference,
@@ -247,6 +247,8 @@ async def mark_reconciled(rid: str, body: ReconcileIn, user: dict = Depends(requ
             "ifmis_reconciled_by": user["email"],
         }},
     )
+    if updated.matched_count != 1:
+        raise HTTPException(409, "Another user reconciled this run. Refresh and check its current reference.")
     await audit("ifmis_mark_reconciled", f"payroll_runs/{rid}", user,
                 {"period": run["period"], "ifmis_reference": body.ifmis_reference})
     return {"ok": True, "ifmis_reference": body.ifmis_reference, "reconciled_at": ts}
