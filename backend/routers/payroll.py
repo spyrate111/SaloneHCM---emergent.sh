@@ -4,7 +4,7 @@ import csv
 import os
 import uuid
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -106,7 +106,9 @@ async def get_run(rid: str, user: dict = Depends(require_roles("hr", "payroll"))
 
 
 @router.get("/my-payslip")
-async def my_payslip(user: dict = Depends(get_current_user)):
+async def my_payslip(response: Response, user: dict = Depends(get_current_user)):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Pragma"] = "no-cache"
     eid = user.get("employee_id")
     if not eid:
         return {"slip": None}
@@ -117,14 +119,24 @@ async def my_payslip(user: dict = Depends(get_current_user)):
 
 
 @router.get("/my-payslips")
-async def my_payslips(user: dict = Depends(get_current_user)):
+async def my_payslips(response: Response, user: dict = Depends(get_current_user)):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Pragma"] = "no-cache"
     eid = user.get("employee_id")
     if not eid:
         return []
-    runs = await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(50)
+    company = await db.companies.find_one(
+        {"id": user["company_id"]}, {"_id": 0, "features": 1},
+    ) or {}
+    government_payroll = "gov_payroll" in (company.get("features") or [])
+    runs = await db.payroll_runs.find(
+        {"status": "completed", **tenant_filter(user)}, {"_id": 0},
+    ).sort("created_at", -1).to_list(50)
     out = []
     seen_periods = set()
     for r in runs:
+        if government_payroll and r.get("mof_status") not in ("approved", "released"):
+            continue
         if r["period"] in seen_periods:
             continue  # keep only the latest run per period
         slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
@@ -141,10 +153,26 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
+    if (
+        user.get("employee_id") == eid
+        and not can_role(user, "payroll")
+        and r.get("status") != "completed"
+    ):
+        raise HTTPException(404, "Payslip not found")
     slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
     if not slip:
         raise HTTPException(404, "Payslip not found")
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+    company = await db.companies.find_one(
+        {"id": user["company_id"]},
+        {"_id": 0, "name": 1, "features": 1},
+    ) or {}
+    if (
+        user.get("employee_id") == eid
+        and not can_role(user, "payroll")
+        and "gov_payroll" in (company.get("features") or [])
+        and r.get("mof_status") not in ("approved", "released")
+    ):
+        raise HTTPException(404, "Payslip not found")
 
     # Upsert a verification record + QR so banks can confirm authenticity.
     ver = await db.payslip_verifications.find_one({"run_id": rid, "employee_id": eid}, {"_id": 0})
@@ -166,7 +194,12 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
     fname = f"payslip-{slip['employee_name'].replace(' ', '_')}-{r['period']}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf), media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{fname}"',
+            "Cache-Control": "private, no-store",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

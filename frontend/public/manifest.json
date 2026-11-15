@@ -2,7 +2,7 @@
   "name": "SaloneHCM — Sierra Leone HCM & Payroll",
   "short_name": "SaloneHCM",
   "description": "Sierra Leone Human Capital Management & Payroll — pay, leave, NRA & NASSIT compliance.",
-  "start_url": "/dashboard",
+  "start_url": "/m",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
