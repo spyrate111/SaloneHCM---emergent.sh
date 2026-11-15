@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn
+from models import EmployeeIn, EmployeeNassitDetailsIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
@@ -79,6 +79,30 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return e
+
+
+@router.patch("/{eid}/nassit-details")
+async def update_nassit_details(
+    eid: str,
+    body: EmployeeNassitDetailsIn,
+    user: dict = Depends(require_roles("hr")),
+):
+    scope = tenant_filter(user)
+    employee = await db.employees.find_one({"id": eid, **scope}, {"_id": 0, "id": 1})
+    if not employee:
+        raise HTTPException(404, "Not found")
+    details = body.model_dump()
+    await db.employees.update_one({"id": eid, **scope}, {"$set": details})
+    await audit(
+        "employee_nassit_identity_updated",
+        f"employees/{eid}",
+        user,
+        {
+            "nassit_number_updated": bool(details.get("nassit_no")),
+            "member_name_updated": bool(details.get("nassit_member_name")),
+        },
+    )
+    return await db.employees.find_one({"id": eid, **scope}, {"_id": 0})
 
 
 @router.delete("/{eid}")
