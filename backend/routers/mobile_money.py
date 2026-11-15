@@ -104,6 +104,19 @@ def _build_batch_csv(batch: dict) -> bytes:
     return adapter.build_workpaper(batch)
 
 
+async def ensure_latest_payroll_run(run_id: str, period: str, user: dict) -> None:
+    latest = await db.payroll_runs.find_one(
+        {"period": period, **tenant_filter(user)},
+        {"_id": 0, "id": 1},
+        sort=[("created_at", -1)],
+    )
+    if not latest or latest.get("id") != run_id:
+        raise HTTPException(
+            409,
+            "Disbursement workpapers can only be created from the latest payroll run for this period.",
+        )
+
+
 async def _find_batch(run_id: str, batch_id: str, user: dict) -> dict:
     batch = await db.mobile_money_batches.find_one(
         {"id": batch_id, "run_id": run_id, **tenant_filter(user)},
@@ -144,6 +157,7 @@ async def create_mobile_money_batch(
     )
     if not run:
         raise HTTPException(404, "Payroll run not found")
+    await ensure_latest_payroll_run(rid, run.get("period", ""), user)
 
     company_id = user["company_id"]
     batch_id = _batch_id(company_id, rid, body.provider)
