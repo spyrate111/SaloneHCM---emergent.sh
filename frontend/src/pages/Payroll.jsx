@@ -79,7 +79,10 @@ export default function Payroll() {
   };
 
   const doPreview = async () => {
-    const { data } = await api.post("/payroll/preview");
+    const { data } = await api.post("/payroll/preview", {
+      period_year: Number(year),
+      period_month: Number(month),
+    });
     setPreview(data); setStep(2);
   };
 
@@ -154,12 +157,47 @@ export default function Payroll() {
         {step === 2 && preview && (
           <div className="space-y-5">
             <ClaimsSummaryCard />
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <section
+              className="border border-[#EAD9AE] bg-[#FDF8EC] rounded-lg p-4 space-y-3"
+              data-testid="payroll-anomaly-review"
+              aria-live="polite"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#8B6A14] mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-[#674B0D]">
+                    Payroll review flags · {preview.anomaly_summary?.count || 0}
+                  </h2>
+                  <p className="text-xs text-[#725511] mt-1">
+                    Review these signals before confirming the run. They are checks for review, not proof of error.
+                  </p>
+                </div>
+              </div>
+              {preview.anomalies?.length ? (
+                <ul className="space-y-2">
+                  {preview.anomalies.map((item, index) => (
+                    <li key={item.kind + "-" + index} className="border-t border-[#E8D3A6] pt-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-[10px] uppercase font-semibold text-[#8B6A14]">{item.severity}</span>
+                        <div>
+                          <div className="text-xs font-semibold text-[#1A1C1E]">{item.subject}</div>
+                          <p className="text-xs text-[#525860] mt-0.5">{item.message}</p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-[#525860]">No anomalies were flagged by the available checks.</p>
+              )}
+            </section>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               {[
                 ["Employees", preview.totals.employee_count],
                 ["Gross", fmtSLE(preview.totals.gross)],
                 ["NASSIT (10%+5%)", fmtSLE(preview.totals.nassit_employer + preview.totals.nassit_employee)],
                 ["PAYE", fmtSLE(preview.totals.paye)],
+                ["Loan deductions", fmtSLE(preview.totals.loan_deductions)],
                 ["Net pay", fmtSLE(preview.totals.net)],
               ].map(([k, v]) => (
                 <div key={k} className="border border-[#E2DFD6] rounded-md p-3">
@@ -171,7 +209,7 @@ export default function Payroll() {
             <div className="overflow-x-auto border border-[#E2DFD6] rounded-md">
               <table className="w-full text-sm" data-testid="payroll-preview-table">
                 <thead className="bg-[#F7F6F2]">
-                  <tr>{["Employee", "Gross", "NASSIT 5%", "PAYE", "Net"].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
+                  <tr>{["Employee", "Gross", "NASSIT 5%", "PAYE", "Loan repayment", "Net"].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {preview.slips.map((s) => (
@@ -180,6 +218,7 @@ export default function Payroll() {
                       <td className="py-2.5 px-4 font-data">{fmtSLE(s.gross)}</td>
                       <td className="py-2.5 px-4 font-data text-[#3A7CB8]">− {fmtSLE(s.nassit_employee)}</td>
                       <td className="py-2.5 px-4 font-data text-[#3A7CB8]">− {fmtSLE(s.paye)}</td>
+                      <td className="py-2.5 px-4 font-data text-[#3A7CB8]">{s.loan_deduction ? `− ${fmtSLE(s.loan_deduction)}` : "—"}</td>
                       <td className="py-2.5 px-4 font-data font-semibold">{fmtSLE(s.net)}</td>
                     </tr>
                   ))}

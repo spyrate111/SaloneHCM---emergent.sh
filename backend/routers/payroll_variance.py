@@ -1,23 +1,25 @@
-"""Payroll variance analysis — Option B fraud-detection guardrail.
+"""Payroll variance analysis — explainable anomaly-review flags.
 
-When an MoF approver reviews a payroll run for sign-off, they need to know at
-a glance what changed vs the prior period and whether any of it looks anomalous.
-Auto-computed from stored payroll_runs data — no schema changes required.
+Payroll staff can review changes against the prior period and each employee's
+available completed-run history before approving payroll. Flags are computed
+from stored payroll_runs and employee records; they do not prove an error or
+fraud and do not block payroll.
 
-Anomaly heuristics (thresholds tuned for typical Sierra Leone civil-service
-payroll where salaries change monthly by ≤2%, headcount by ≤1%):
+Initial global review thresholds (not empirically calibrated to each company):
 
   HEADCOUNT      Δ headcount ≥ ±5%
   TOTAL_GROSS    Δ gross    ≥ +10%
   MINISTRY_JUMP  any single ministry gross change ≥ +15%
   RAISE          any single employee net change    ≥ +10%
   NEW_STARTER    employee on this run but hired > 30 days ago (should have prior slip)
-  RESURRECTED    employee on this run, missing from prior run for ≥ 2 consecutive periods
+  RESURRECTED    employee absent from the two latest completed periods and hired before both
   TERMINATED     employee marked terminated but still receiving > 0 net pay
 """
 from __future__ import annotations
 import re
 from collections import defaultdict
+from math import isfinite
+from statistics import median
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -29,12 +31,19 @@ from core import require_roles
 
 router = APIRouter(prefix="/payroll", tags=["payroll-variance"])
 
-# ---- Tunable thresholds ----
+# ---- Initial review thresholds (not tenant-calibrated) ----
 HEADCOUNT_PCT = 5.0
 GROSS_PCT = 10.0
 MINISTRY_PCT = 15.0
 RAISE_PCT = 10.0
 NEW_STARTER_STALE_DAYS = 30
+LOAN_DEDUCTION_MIN_CHANGE_SLE = 100.0
+LOAN_DEDUCTION_CHANGE_PCT = 25.0
+HISTORICAL_BASELINE_PERIODS = 6
+HISTORICAL_MIN_PERIODS = 3
+HISTORICAL_GROSS_MIN_CHANGE = 500.0
+HISTORICAL_GROSS_CHANGE_PCT = 25.0
+HISTORICAL_ROBUST_Z = 3.5
 
 
 def _prev_period(period: str) -> Optional[str]:
@@ -91,14 +100,15 @@ def _by_ministry(slips: list[dict], emp_ministry: dict[str, str]) -> dict[str, d
 async def _employee_ministry_map(company_id: str) -> dict[str, str]:
     emps = await db.employees.find(
         {"company_id": company_id}, {"_id": 0, "id": 1, "ministry": 1, "department": 1, "hire_date": 1},
-    ).to_list(5000)
+    ).to_list(None)
     return {e["id"]: (e.get("ministry") or e.get("department") or "Unassigned") for e in emps}
 
 
 async def _hire_date_map(company_id: str) -> dict[str, str]:
     emps = await db.employees.find(
-        {"company_id": company_id}, {"_id": 0, "id": 1, "hire_date": 1, "status": 1},
-    ).to_list(5000)
+        {"company_id": company_id},
+        {"_id": 0, "id": 1, "hire_date": 1, "status": 1, "first_name": 1, "last_name": 1, "nassit_no": 1, "tin": 1},
+    ).to_list(None)
     return {e["id"]: e for e in emps}
 
 
@@ -123,14 +133,15 @@ def _raise_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
     return out
 
 
-def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, cur_period: str) -> list[dict]:
+def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, cur_period: str, excluded_ids=None) -> list[dict]:
     try:
         cur_date = datetime.strptime(cur_period + "-01", "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except Exception:
         cur_date = datetime.now(timezone.utc)
     out = []
+    excluded_ids = set(excluded_ids or [])
     for eid, cur in cur_by_id.items():
-        if eid in prev_by_id:
+        if eid in prev_by_id or eid in excluded_ids:
             continue
         emp = emp_index.get(eid) or {}
         hd = emp.get("hire_date")
@@ -155,10 +166,85 @@ def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, c
     return out
 
 
-def _terminated_paid_anomalies(cur_by_id: dict, emp_index: dict) -> list[dict]:
+def _resurrected_anomalies(cur_by_id: dict, history_runs: list[dict], emp_index: dict) -> list[dict]:
+    """Flag long-tenured employees returning after two completed payroll periods."""
+    completed_runs = sorted(
+        (
+            run for run in history_runs
+            if re.match(r"^\d{4}-(0[1-9]|1[0-2])$", str(run.get("period") or ""))
+        ),
+        key=lambda run: str(run.get("period") or ""),
+        reverse=True,
+    )[:2]
+    if len(completed_runs) < 2:
+        return []
+
+    periods = [str(run.get("period") or "") for run in completed_runs]
+    if len(set(periods)) < 2:
+        return []
+    period_employee_ids = []
+    for run in completed_runs:
+        slips = run.get("slips")
+        if not isinstance(slips, list) or not slips:
+            return []
+        period_employee_ids.append({
+            str(slip.get("employee_id") or "").strip()
+            for slip in slips
+            if str(slip.get("employee_id") or "").strip()
+        })
+
+    try:
+        oldest_period_start = datetime.strptime(periods[1] + "-01", "%Y-%m-%d")
+    except ValueError:
+        return []
+
     out = []
     for eid, cur in cur_by_id.items():
         emp = emp_index.get(eid) or {}
+        if emp.get("status") == "terminated" or any(eid in ids for ids in period_employee_ids):
+            continue
+        hire_date = emp.get("hire_date")
+        try:
+            hired = datetime.strptime(str(hire_date)[:10], "%Y-%m-%d")
+        except (TypeError, ValueError):
+            continue
+        # A recent hire may legitimately have no payslip in the prior periods.
+        if hired >= oldest_period_start:
+            continue
+        out.append({
+            "severity": "warn",
+            "kind": "resurrected",
+            "subject": cur.get("employee_name") or eid,
+            "employee_id": eid,
+            "before": 0,
+            "after": _round(cur.get("net", 0)),
+            "delta_pct": None,
+            "periods_absent": periods,
+            "message": (
+                f"Employee is present after being absent from the two latest completed "
+                f"payroll periods ({periods[0]} and {periods[1]}). Confirm reinstatement "
+                "or return from leave before approval."
+            ),
+        })
+    return out
+
+
+def _terminated_paid_anomalies(cur_by_id: dict, emp_index: dict) -> list[dict]:
+    out = []
+    for eid, cur in cur_by_id.items():
+        emp = emp_index.get(eid)
+        if not emp:
+            out.append({
+                "severity": "high",
+                "kind": "missing_employee_record",
+                "subject": cur.get("employee_name") or eid,
+                "employee_id": eid,
+                "before": 0,
+                "after": _round(cur.get("net", 0)),
+                "delta_pct": None,
+                "message": "This payslip has no matching employee record in the organization. Verify the employee or investigate a possible ghost record.",
+            })
+            continue
         if emp.get("status") == "terminated" and (cur.get("net") or 0) > 0:
             out.append({
                 "severity": "high",
@@ -173,15 +259,340 @@ def _terminated_paid_anomalies(cur_by_id: dict, emp_index: dict) -> list[dict]:
     return out
 
 
-def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period) -> list[dict]:
+def _duplicate_identifier_anomalies(cur_slips: list[dict], emp_index: dict) -> list[dict]:
+    """Flag shared NASSIT/TIN identifiers among employees on this payroll run.
+
+    Identifier values are normalized for whitespace/hyphen differences but are
+    never included in the response, so the reviewer sees the affected employees
+    without exposing full statutory identifiers in the anomaly feed.
+    """
+    slip_by_id = {
+        str(s.get("employee_id")): s
+        for s in cur_slips
+        if s.get("employee_id")
+    }
+    if len(slip_by_id) < 2:
+        return []
+
+    out = []
+    for field, kind, label in (
+        ("nassit_no", "duplicate_nassit", "NASSIT number"),
+        ("tin", "duplicate_tin", "TIN"),
+    ):
+        grouped = defaultdict(list)
+        for eid in slip_by_id:
+            raw = (emp_index.get(eid) or {}).get(field)
+            normalized = re.sub(r"[\s-]+", "", str(raw or "")).upper()
+            if normalized:
+                grouped[normalized].append(eid)
+
+        for employee_ids in grouped.values():
+            if len(employee_ids) < 2:
+                continue
+            names = []
+            for eid in sorted(employee_ids):
+                emp = emp_index.get(eid) or {}
+                slip = slip_by_id[eid]
+                name = slip.get("employee_name") or " ".join(
+                    part for part in (emp.get("first_name"), emp.get("last_name")) if part
+                ) or "Employee"
+                if name not in names:
+                    names.append(name)
+            if len(names) < 2:
+                names = [f"{len(employee_ids)} employee records"]
+            shown = ", ".join(names[:3])
+            if len(names) > 3:
+                shown += f" and {len(names) - 3} more"
+            out.append({
+                "severity": "high",
+                "kind": kind,
+                "subject": f"Duplicate {label} · {shown}",
+                "message": f"The same {label} is assigned to {len(employee_ids)} employees on this run. Verify the records before approval.",
+            })
+    return out
+
+
+def _missing_employee_id_anomalies(cur_slips: list[dict]) -> list[dict]:
+    out = []
+    for slip in cur_slips:
+        if str(slip.get("employee_id") or "").strip():
+            continue
+        out.append({
+            "severity": "high",
+            "kind": "missing_employee_id",
+            "subject": slip.get("employee_name") or "Unidentified payslip row",
+            "message": "This payslip row has no employee ID. Resolve the identity before approving payroll.",
+        })
+    return out
+
+
+def _duplicate_employee_slip_anomalies(cur_slips: list[dict]) -> list[dict]:
+    """Flag repeated payslip rows for the same employee identifier."""
+    by_employee = defaultdict(list)
+    for slip in cur_slips:
+        eid = str(slip.get("employee_id") or "").strip()
+        if eid:
+            by_employee[eid].append(slip)
+
+    out = []
+    for eid, slips in by_employee.items():
+        if len(slips) < 2:
+            continue
+        name = next((s.get("employee_name") for s in slips if s.get("employee_name")), eid)
+        out.append({
+            "severity": "high",
+            "kind": "duplicate_employee_slip",
+            "subject": name,
+            "employee_id": eid,
+            "message": f"Employee appears in {len(slips)} payslip rows in this run. Verify the duplicate entries before approval.",
+        })
+    return out
+
+
+def _loan_deduction_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
+    """Flag new, stopped, or sharply changed loan deductions before approval."""
+    out = []
+    for eid, cur in cur_by_id.items():
+        prev = prev_by_id.get(eid)
+        if not prev:
+            continue
+        before = _round(prev.get("loan_deduction", 0))
+        after = _round(cur.get("loan_deduction", 0))
+        if before == after:
+            continue
+
+        delta = _round(after - before)
+        delta_pct = _pct(after, before)
+        if before == 0 and after > 0:
+            kind = "new_loan_deduction"
+            severity = "warn"
+            message = "A loan deduction has appeared this period. Verify an approved repayment schedule."
+        elif before > 0 and after == 0:
+            kind = "stopped_loan_deduction"
+            severity = "warn"
+            message = "A loan deduction stopped this period. Confirm the loan was paid off or the deduction was paused."
+        elif abs(delta) >= LOAN_DEDUCTION_MIN_CHANGE_SLE and abs(delta_pct or 0) >= LOAN_DEDUCTION_CHANGE_PCT:
+            kind = "loan_deduction_change"
+            severity = "high" if delta > 0 and delta_pct >= 50 else "warn"
+            message = f"Loan deduction changed by {abs(delta_pct)}%. Verify the approved repayment schedule."
+        else:
+            continue
+
+        out.append({
+            "severity": severity,
+            "kind": kind,
+            "subject": cur.get("employee_name") or eid,
+            "employee_id": eid,
+            "before": before,
+            "after": after,
+            "delta": delta,
+            "delta_pct": delta_pct,
+            "message": message,
+        })
+    return out
+
+
+def _historical_gross_anomalies(cur_slips: list[dict], history_runs: list[dict]) -> list[dict]:
+    """Flag gross-pay outliers against each employee's completed payroll history."""
+    history_by_employee = defaultdict(list)
+    for run in history_runs:
+        period = str(run.get("period") or "")
+        by_employee = {}
+        duplicates = set()
+        for slip in run.get("slips") or []:
+            employee_id = str(slip.get("employee_id") or "").strip()
+            if not employee_id:
+                continue
+            try:
+                gross = float(slip.get("gross") or 0)
+            except (TypeError, ValueError):
+                continue
+            if not isfinite(gross) or gross < 0:
+                continue
+            if employee_id in by_employee:
+                duplicates.add(employee_id)
+            else:
+                by_employee[employee_id] = gross
+        # A duplicate historical row makes that employee's period unreliable.
+        for employee_id in duplicates:
+            by_employee.pop(employee_id, None)
+        for employee_id, gross in by_employee.items():
+            history_by_employee[employee_id].append((period, gross))
+
+    current_by_employee = {}
+    duplicate_current = set()
+    for slip in cur_slips:
+        employee_id = str(slip.get("employee_id") or "").strip()
+        if not employee_id:
+            continue
+        try:
+            gross = float(slip.get("gross") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not isfinite(gross) or gross < 0:
+            continue
+        if employee_id in current_by_employee:
+            duplicate_current.add(employee_id)
+        else:
+            current_by_employee[employee_id] = (slip, gross)
+
+    out = []
+    for employee_id, (slip, current_gross) in current_by_employee.items():
+        if employee_id in duplicate_current:
+            continue
+        records = history_by_employee.get(employee_id, [])
+        if len(records) < HISTORICAL_MIN_PERIODS:
+            continue
+
+        baseline = median(value for _, value in records)
+        deviation = current_gross - baseline
+        minimum_change = max(
+            HISTORICAL_GROSS_MIN_CHANGE,
+            abs(baseline) * HISTORICAL_GROSS_CHANGE_PCT / 100,
+        )
+        if abs(deviation) < minimum_change:
+            continue
+
+        mad = median(abs(value - baseline) for _, value in records)
+        robust_z = (0.6745 * abs(deviation) / mad) if mad else None
+        if mad and robust_z < HISTORICAL_ROBUST_Z:
+            continue
+
+        direction = "higher" if deviation > 0 else "lower"
+        delta_pct = _pct(current_gross, baseline) if baseline else None
+        change_description = (
+            f"{abs(delta_pct)}% {direction}" if delta_pct is not None
+            else f"{_round(abs(deviation))} above the zero baseline"
+        )
+        out.append({
+            "severity": "warn",
+            "kind": "historical_gross_pattern",
+            "subject": slip.get("employee_name") or employee_id,
+            "employee_id": employee_id,
+            "before": _round(baseline),
+            "after": _round(current_gross),
+            "delta": _round(deviation),
+            "delta_pct": delta_pct,
+            "baseline_periods": [period for period, _ in records],
+            "robust_z": round(robust_z, 2) if robust_z is not None else None,
+            "message": (
+                f"Gross pay is {change_description} than this employee's median across "
+                f"{len(records)} completed payroll periods. Verify the change before approval."
+            ),
+        })
+    return out
+
+
+def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period, history_runs=None) -> list[dict]:
     """Return a list of {severity, kind, subject, before, after, delta, delta_pct, message}."""
-    prev_by_id = {s["employee_id"]: s for s in prev_slips}
-    cur_by_id = {s["employee_id"]: s for s in cur_slips}
+    prev_by_id = {
+        str(s.get("employee_id")): s
+        for s in prev_slips
+        if str(s.get("employee_id") or "").strip()
+    }
+    cur_by_id = {
+        str(s.get("employee_id")): s
+        for s in cur_slips
+        if str(s.get("employee_id") or "").strip()
+    }
+    resurrected = _resurrected_anomalies(cur_by_id, history_runs or [], emp_index)
+    resurrected_ids = {item.get("employee_id") for item in resurrected}
     return (
         _raise_anomalies(cur_by_id, prev_by_id)
-        + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
+        + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period, resurrected_ids)
+        + resurrected
         + _terminated_paid_anomalies(cur_by_id, emp_index)
+        + _duplicate_identifier_anomalies(cur_slips, emp_index)
+        + _missing_employee_id_anomalies(cur_slips)
+        + _duplicate_employee_slip_anomalies(cur_slips)
+        + _loan_deduction_anomalies(cur_by_id, prev_by_id)
+        + _historical_gross_anomalies(cur_slips, history_runs or [])
     )
+
+
+async def preview_anomalies_for_period(cur_slips: list[dict], period: str, user: dict) -> dict:
+    """Return employee and headline payroll anomalies before a run is saved."""
+    tf = tenant_filter(user)
+    prev_period = _prev_period(period)
+    prev = None
+    if prev_period:
+        prev = await db.payroll_runs.find_one(
+            {**tf, "period": prev_period, "status": "completed"},
+            {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+    prev_slips = (prev or {}).get("slips") or []
+
+    history_runs = []
+    if re.match(r"^\d{4}-(0[1-9]|1[0-2])$", str(period or "")):
+        history_runs = await db.payroll_runs.aggregate([
+            {"$match": {
+                **tf,
+                "status": "completed",
+                "period": {"$lt": period},
+            }},
+            {"$sort": {"period": -1, "created_at": -1}},
+            {"$group": {"_id": "$period", "period": {"$first": "$period"}, "slips": {"$first": "$slips"}}},
+            {"$sort": {"_id": -1}},
+            {"$limit": HISTORICAL_BASELINE_PERIODS},
+            {"$project": {"_id": 0, "period": 1, "slips": 1}},
+        ]).to_list(length=HISTORICAL_BASELINE_PERIODS)
+
+    emp_index = await _hire_date_map(user["company_id"])
+    anomalies = _detect_anomalies(cur_slips, prev_slips, emp_index, period, history_runs)
+    cur_totals = _totals(cur_slips)
+    prev_totals = _totals(prev_slips) if prev else {key: 0 for key in cur_totals}
+    headcount_pct = _pct(cur_totals["headcount"], prev_totals["headcount"])
+    gross_pct = _pct(cur_totals["gross"], prev_totals["gross"])
+
+    if headcount_pct is not None and abs(headcount_pct) >= HEADCOUNT_PCT:
+        anomalies.insert(0, {
+            "severity": "warn", "kind": "headcount",
+            "subject": "Overall headcount",
+            "before": prev_totals["headcount"], "after": cur_totals["headcount"],
+            "delta_pct": headcount_pct,
+            "message": f"Headcount shifted by {headcount_pct}% vs {prev_period} — verify joiners/leavers.",
+        })
+    if gross_pct is not None and gross_pct >= GROSS_PCT:
+        anomalies.insert(0, {
+            "severity": "warn", "kind": "total_gross",
+            "subject": "Total gross",
+            "before": prev_totals["gross"], "after": cur_totals["gross"],
+            "delta_pct": gross_pct,
+            "message": f"Total gross rose {gross_pct}% — inspect the payroll preview before confirming this run.",
+        })
+
+    ministry_map = await _employee_ministry_map(user["company_id"])
+    current_by_ministry = _by_ministry(cur_slips, ministry_map)
+    previous_by_ministry = _by_ministry(prev_slips, ministry_map) if prev else {}
+    for ministry in sorted(set(current_by_ministry) | set(previous_by_ministry)):
+        current = current_by_ministry.get(ministry, {"headcount": 0, "gross": 0.0})
+        previous = previous_by_ministry.get(ministry, {"headcount": 0, "gross": 0.0})
+        ministry_pct = _pct(current["gross"], previous["gross"])
+        if ministry_pct is not None and ministry_pct >= MINISTRY_PCT and previous["gross"] > 0:
+            anomalies.append({
+                "severity": "warn",
+                "kind": "ministry_jump",
+                "subject": ministry,
+                "before": previous["gross"],
+                "after": current["gross"],
+                "delta_pct": ministry_pct,
+                "message": (
+                    f"{ministry} gross rose {ministry_pct}% "
+                    f"({previous['headcount']}→{current['headcount']} headcount)."
+                ),
+            })
+
+    return {
+        "prior_period": prev_period,
+        "prior_exists": prev is not None,
+        "anomalies": anomalies,
+        "anomaly_summary": {
+            "count": len(anomalies),
+            "high": sum(1 for item in anomalies if item["severity"] == "high"),
+            "warn": sum(1 for item in anomalies if item["severity"] == "warn"),
+        },
+    }
 
 
 @router.get("/runs/{rid}/variance")
@@ -198,11 +609,26 @@ async def payroll_variance(rid: str, user: dict = Depends(require_roles("payroll
     if prev_period:
         # Prefer completed runs of the previous period.
         prev = await db.payroll_runs.find_one(
-            {**tf, "period": prev_period}, {"_id": 0}, sort=[("created_at", -1)],
+            {**tf, "period": prev_period, "status": "completed"}, {"_id": 0}, sort=[("created_at", -1)],
         )
 
     cur_slips = cur.get("slips") or []
     prev_slips = (prev or {}).get("slips") or []
+
+    history_runs = []
+    if re.match(r"^\d{4}-(0[1-9]|1[0-2])$", str(cur.get("period") or "")):
+        history_runs = await db.payroll_runs.aggregate([
+            {"$match": {
+                **tf,
+                "status": "completed",
+                "period": {"$lt": cur["period"]},
+            }},
+            {"$sort": {"period": -1, "created_at": -1}},
+            {"$group": {"_id": "$period", "period": {"$first": "$period"}, "slips": {"$first": "$slips"}}},
+            {"$sort": {"_id": -1}},
+            {"$limit": HISTORICAL_BASELINE_PERIODS},
+            {"$project": {"_id": 0, "period": 1, "slips": 1}},
+        ]).to_list(length=HISTORICAL_BASELINE_PERIODS)
 
     ministry_map = await _employee_ministry_map(user["company_id"])
     emp_index = await _hire_date_map(user["company_id"])
@@ -241,7 +667,9 @@ async def payroll_variance(rid: str, user: dict = Depends(require_roles("payroll
     # Rank by absolute % change desc
     ministry_rows.sort(key=lambda r: abs(r["delta_gross_pct"] or 0), reverse=True)
 
-    anomalies = _detect_anomalies(cur_slips, prev_slips, emp_index, cur["period"])
+    anomalies = _detect_anomalies(
+        cur_slips, prev_slips, emp_index, cur["period"], history_runs,
+    )
 
     # Headline anomaly flags
     if delta_pct.get("headcount") is not None and abs(delta_pct["headcount"]) >= HEADCOUNT_PCT:
