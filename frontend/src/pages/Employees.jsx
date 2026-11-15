@@ -10,6 +10,7 @@ const empty = {
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", tax_residency: "resident", basic_salary_sle: 0, allowances_sle: 0,
   nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
+  mobile_money_provider: "", mobile_money_number: "",
   hire_date: "2025-01-01", status: "active",
 };
 
@@ -138,12 +139,13 @@ export default function Employees() {
                 ["tin", "TIN", "text"],
                 ["bank_name", "Bank name", "text"],
                 ["bank_account", "Bank account", "text"],
+                ["mobile_money_number", "Wallet mobile number", "tel"],
                 ["basic_salary_sle", "Basic salary (SLE)", "number"],
                 ["allowances_sle", "Allowances (SLE)", "number"],
               ].map(([k, label, type]) => (
                 <div key={k}>
                   <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">{label}</label>
-                  <input data-testid={`emp-${k}`} required={["first_name", "last_name", "email", "job_title", "department", "basic_salary_sle"].includes(k)} type={type} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                  <input data-testid={`emp-${k}`} required={["first_name", "last_name", "email", "job_title", "department", "basic_salary_sle"].includes(k) || (k === "mobile_money_number" && Boolean(form.mobile_money_provider))} type={type} value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })}
                     className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]" />
                 </div>
               ))}
@@ -154,6 +156,17 @@ export default function Employees() {
                   <option value="non_resident">Non-resident</option>
                 </select>
                 <p className="mt-1 text-[11px] text-[#686D76]">Set from the employee’s tax status, not citizenship.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Primary mobile-money provider</label>
+                <select data-testid="emp-mobile_money_provider" value={form.mobile_money_provider}
+                  onChange={(e) => setForm({ ...form, mobile_money_provider: e.target.value })}
+                  className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                  <option value="">No mobile-money payout</option>
+                  <option value="orange_money">Orange Money</option>
+                  <option value="afrimoney">Afrimoney</option>
+                </select>
+                <p className="text-[11px] text-[#686D76] mt-1">This wallet number is separate from the employee's contact phone.</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Hire date</label>
