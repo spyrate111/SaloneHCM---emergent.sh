@@ -22,6 +22,8 @@ Verdicts
 - unallocated_employees  : any active employee has no budget_code → hard block
 """
 from __future__ import annotations
+import hashlib
+import json
 import os
 import uuid
 import logging
@@ -105,10 +107,7 @@ async def _project_by_budget_code(company_id: str, period: str) -> tuple[dict, l
     projections_by_code[code] = {gross, headcount}
     """
     from payroll_engine import calc_payslip
-    try:
-        from routers.civil_service import get_active_allowance_amounts
-    except Exception:
-        get_active_allowance_amounts = None
+    from routers.civil_service import get_active_allowance_amounts
 
     emps = await db.employees.find(
         {"status": "active", "company_id": company_id}, {"_id": 0},
@@ -117,11 +116,8 @@ async def _project_by_budget_code(company_id: str, period: str) -> tuple[dict, l
     by_code: dict[str, dict] = defaultdict(lambda: {"gross": 0.0, "headcount": 0})
     unallocated_slips: list[dict] = []
     for e in emps:
-        try:
-            breakdown = await get_active_allowance_amounts(e, company_id, period) if get_active_allowance_amounts else {}
-            slip = calc_payslip(e, allowance_breakdown=breakdown)
-        except Exception:
-            slip = calc_payslip(e)
+        breakdown = await get_active_allowance_amounts(e, company_id, period)
+        slip = calc_payslip(e, allowance_breakdown=breakdown)
         code = (e.get("budget_code") or "").strip().upper()
         if not code:
             unallocated_slips.append({
@@ -151,6 +147,33 @@ async def _spent_prior_by_code(company_id: str, period: str) -> dict[str, float]
             if code:
                 spent[code] += float(s.get("gross") or 0)
     return {k: round(v, 2) for k, v in spent.items()}
+
+
+def _budget_input_fingerprint(by_code: dict, unallocated_slips: list, spent_prior: dict, alloc_map: dict) -> str:
+    """Hash all values that determine whether a payroll budget check is still current."""
+    snapshot = {
+        "by_code": {
+            code: {"gross": round(float(value["gross"]), 2), "headcount": int(value["headcount"])}
+            for code, value in sorted(by_code.items())
+        },
+        "unallocated": sorted(
+            [(str(row["employee_id"]), round(float(row["gross"]), 2)) for row in unallocated_slips]
+        ),
+        "spent_prior": {code: round(float(value), 2) for code, value in sorted(spent_prior.items())},
+        "allocations": {code: round(float(value), 2) for code, value in sorted(alloc_map.items())},
+    }
+    encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+async def current_budget_input_fingerprint(company_id: str, period: str) -> str:
+    by_code, unallocated_slips, _ = await _project_by_budget_code(company_id, period)
+    spent_prior = await _spent_prior_by_code(company_id, period)
+    balances = await db.budget_balances.find(
+        {"company_id": company_id, "period": period}, {"_id": 0, "budget_code": 1, "allocated_sle": 1},
+    ).to_list(2000)
+    alloc_map = {b["budget_code"]: b["allocated_sle"] for b in balances}
+    return _budget_input_fingerprint(by_code, unallocated_slips, spent_prior, alloc_map)
 
 
 def _verdict_row(code: str, projected: float, allocated: float, spent_prior: float, headcount: int) -> dict:
@@ -216,6 +239,7 @@ async def run_budget_check(body: CheckIn, user: dict = Depends(require_roles("pa
         "period": body.period,
         "ran_at": iso(now_utc()),
         "ran_by": user["email"],
+        "input_fingerprint": _budget_input_fingerprint(by_code, unallocated_slips, spent_prior, alloc_map),
         "verdict": worst,
         "totals": {
             "gross_projected_sle": round(total_projected, 2),
