@@ -153,6 +153,7 @@ export default function MobileMoneyBatchActions({ run }) {
 
   const canApprove = ["manager", "admin", "superadmin"].includes(user?.role);
   const batchIsExported = batch && ["exported", "partially_reconciled", "reconciled"].includes(batch.status);
+  const canExportWorkbook = batch?.status === "approved" && !batch?.exported_at && batch.pending_count > 0;
 
   return (
     <>
@@ -282,7 +283,7 @@ export default function MobileMoneyBatchActions({ run }) {
                         {busy === "retry" ? "Preparing retry…" : "Prepare failed-payment retry"}
                       </button>
                     )}
-                    {batch.status !== "pending_approval" && batch.pending_count > 0 && (
+                    {canExportWorkbook && (
                       <button
                         data-testid={"mobile-money-export-" + batch.id}
                         onClick={exportBatch}
@@ -295,6 +296,11 @@ export default function MobileMoneyBatchActions({ run }) {
                   </div>
                 </div>
 
+                {batch.exported_at && (
+                  <div className="mx-4 mt-4 rounded-md border border-[#EAD9AE] bg-[#FDF8EC] px-3 py-2 text-xs text-[#6C5415]" role="status">
+                    This workpaper was exported on {new Date(batch.exported_at).toLocaleString()}. Do not upload another copy; record provider results and create a failed-payment retry if needed.
+                  </div>
+                )}
                 {batchIsExported && (
                   <div className="p-4 bg-[#F7F6F2]">
                     <h4 className="font-medium text-xs uppercase tracking-wider text-[#525860] mb-3">Record provider results</h4>
