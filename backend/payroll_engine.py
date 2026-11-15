@@ -3,6 +3,7 @@ import io
 import uuid
 from typing import Optional
 
+from fastapi import HTTPException
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -130,6 +131,24 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         {"_id": 0},
     ).to_list(2000)
     period = f"{year}-{month:02d}"
+    prior_runs = await db.payroll_runs.find(
+        {"company_id": user["company_id"], "period": period},
+        {"_id": 0, "id": 1},
+    ).to_list(500)
+    prior_run_ids = [run["id"] for run in prior_runs]
+    if prior_run_ids:
+        reserved = await db.mobile_money_assignments.find_one(
+            {
+                "company_id": user["company_id"],
+                "run_id": {"$in": prior_run_ids},
+            },
+            {"_id": 0, "provider": 1},
+        )
+        if reserved:
+            raise HTTPException(
+                409,
+                "A payout workpaper already reserves this payroll period. Resolve that bank or wallet batch before rerunning payroll.",
+            )
 
     slips, applied_loan_rows = await _compute_slips(emps, user["company_id"], period)
 
