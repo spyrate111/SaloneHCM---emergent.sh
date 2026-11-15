@@ -16,6 +16,8 @@ export default function EmployeeDetail() {
   const [slip, setSlip] = useState(null);
   const [taxResidency, setTaxResidency] = useState("resident");
   const [savingTaxResidency, setSavingTaxResidency] = useState(false);
+  const [walletForm, setWalletForm] = useState({ mobile_money_provider: "", mobile_money_number: "" });
+  const [savingWallet, setSavingWallet] = useState(false);
   // Civil-service refs
   const [grades, setGrades] = useState([]);
   const [budgets, setBudgets] = useState([]);
@@ -39,6 +41,10 @@ export default function EmployeeDetail() {
   const load = useCallback(() => api.get(`/employees/${id}`).then((r) => {
     setE(r.data);
     setTaxResidency(r.data.tax_residency || "resident");
+    setWalletForm({
+      mobile_money_provider: r.data.mobile_money_provider || "",
+      mobile_money_number: r.data.mobile_money_number || "",
+    });
     setCs({
       grade_code: r.data.grade_code || "",
       step_number: r.data.step_number || "",
@@ -100,6 +106,19 @@ export default function EmployeeDetail() {
       toast.error(err?.response?.data?.detail || "Could not update tax residency");
     } finally {
       setSavingTaxResidency(false);
+    }
+  };
+
+  const saveWallet = async () => {
+    setSavingWallet(true);
+    try {
+      const r = await api.patch(`/employees/${id}/mobile-money-profile`, walletForm);
+      setE(r.data);
+      toast.success("Mobile-money destination updated");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not update mobile-money destination");
+    } finally {
+      setSavingWallet(false);
     }
   };
 
@@ -183,6 +202,41 @@ export default function EmployeeDetail() {
                 <Save className="w-3.5 h-3.5" /> {savingTaxResidency ? "Saving…" : "Save"}
               </button>
             </div>
+          </div>}
+
+          {canEditTaxResidency && <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-3" data-testid="employee-mobile-money-profile">
+            <div>
+              <h3 className="font-heading text-lg font-semibold">Mobile-money destination</h3>
+              <p className="text-xs text-[#686D76] mt-1">Used only in an approved manual payroll workpaper. Saving this does not send money.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block text-xs font-medium text-[#525860] uppercase tracking-wider">
+                Primary provider
+                <select data-testid="employee-wallet-provider" value={walletForm.mobile_money_provider}
+                  onChange={(event) => setWalletForm({ ...walletForm, mobile_money_provider: event.target.value })}
+                  className="mt-1 w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm normal-case tracking-normal">
+                  <option value="">No mobile-money payout</option>
+                  <option value="orange_money">Orange Money</option>
+                  <option value="afrimoney">Afrimoney</option>
+                </select>
+              </label>
+              <label className="block text-xs font-medium text-[#525860] uppercase tracking-wider">
+                Wallet mobile number
+                <input data-testid="employee-wallet-number" type="tel" maxLength={40}
+                  required={Boolean(walletForm.mobile_money_provider)}
+                  value={walletForm.mobile_money_number}
+                  onChange={(event) => setWalletForm({ ...walletForm, mobile_money_number: event.target.value })}
+                  className="mt-1 w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm normal-case tracking-normal" />
+              </label>
+            </div>
+            <button type="button" data-testid="employee-wallet-save" onClick={saveWallet}
+              disabled={savingWallet || (
+                walletForm.mobile_money_provider === (e.mobile_money_provider || "")
+                && walletForm.mobile_money_number === (e.mobile_money_number || "")
+              )}
+              className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs px-3 py-2 rounded-md disabled:opacity-50">
+              <Save className="w-3.5 h-3.5" /> {savingWallet ? "Saving…" : "Save wallet destination"}
+            </button>
           </div>}
 
           {has("civil_service") && (
