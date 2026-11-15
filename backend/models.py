@@ -48,6 +48,9 @@ class LeaveIn(BaseModel):
     start_date: str
     end_date: str
     reason: Optional[str] = ""
+    client_request_id: Optional[str] = Field(
+        None, min_length=8, max_length=80, pattern=r"^[A-Za-z0-9._:-]+$",
+    )
 
 
 class LeaveDecision(BaseModel):

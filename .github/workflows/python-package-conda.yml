@@ -73,6 +73,13 @@ jobs:
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
 
+      - name: Check offline service worker syntax when present
+        working-directory: frontend
+        run: |
+          if [ -f public/service-worker.js ]; then
+            node --check public/service-worker.js
+          fi
+
       - name: Build frontend
         working-directory: frontend
         env:
