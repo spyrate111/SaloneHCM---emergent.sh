@@ -16,13 +16,18 @@ export default function Establishment() {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const [t, o] = await Promise.all([
-      api.get("/establishment/tree"),
-      api.get("/establishment/overruns"),
-    ]);
-    setTree(t.data);
-    setOverruns(o.data);
-    setLoading(false);
+    try {
+      const [t, o] = await Promise.all([
+        api.get("/establishment/tree"),
+        api.get("/establishment/overruns"),
+      ]);
+      setTree(t.data);
+      setOverruns(o.data);
+    } catch {
+      // keep current UI on transient failure
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { if (has("establishment_control")) refresh(); }, [refresh, has]);

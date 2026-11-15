@@ -24,12 +24,16 @@ export default function Loans() {
   const [scheduleFor, setScheduleFor] = useState(null);
 
   const refresh = useCallback(async () => {
-    const [l, e] = await Promise.all([
-      api.get("/loans"),
-      isAdmin ? api.get("/employees") : Promise.resolve({ data: [] }),
-    ]);
-    setLoans(l.data);
-    setEmployees(e.data);
+    try {
+      const [l, e] = await Promise.all([
+        api.get("/loans"),
+        isAdmin ? api.get("/employees") : Promise.resolve({ data: [] }),
+      ]);
+      setLoans(l.data);
+      setEmployees(e.data);
+    } catch {
+      // keep current UI on transient failure
+    }
   }, [isAdmin]);
 
   useEffect(() => { if (has("loans_advances")) refresh(); }, [refresh, has]);

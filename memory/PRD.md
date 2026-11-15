@@ -779,6 +779,11 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - tests/test_iter53_interviews_reminders_leavers.py (3 pytest). Testing agent: 100% backend+frontend. Post-fix re-run iter49/51/53: 12/12. Full-suite regression run.
 - NOTE: production deployed earlier does NOT include iter50+ features — needs REDEPLOY.
 
+## v1.51.1 (Nov 2026) — Render-loop fix (Establishment/Loans/Vouchers)
+- lib/features.js useFeatures(): features via useMemo([user]), has via useCallback([features]) — previously `has` got a new identity every render and sat in the useEffect deps of Establishment/Loans/Vouchers, causing an infinite refresh loop.
+- Establishment.jsx refresh: try/catch/finally (loading always clears). Loans.jsx refresh: try/catch. Vouchers.jsx already guarded.
+- Verified: all three pages render clean as admin1 (enterprise tier Demo Salone), zero console errors.
+
 ## v1.50 (Nov 2026) — Application emails + read receipts + exit interview notes (iter51)
 ### Application emails (email_service.py + routers/recruitment.py)
 - send_application_confirmation (receipt + "response within 10 working days of closing date") fired as BackgroundTask on public apply; send_application_stage_update with STAGE_EMAIL_COPY for shortlisted/interview/offer/rejected on PATCH stage (no email for applied/hired). Uses existing Resend provider; all sends logged to email_logs with REAL subject + job_title/stage meta. applicant_name/job_title/company HTML-escaped (untrusted public input).
