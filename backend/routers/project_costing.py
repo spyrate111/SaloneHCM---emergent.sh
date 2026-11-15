@@ -493,11 +493,16 @@ async def project_cost_report(period: str, user: dict = Depends(ACCESS)):
         row["gross_sle"] = round(row["gross_sle"], 2)
         row["employer_nassit_sle"] = round(row["employer_nassit_sle"], 2)
         row["employer_cost_sle"] = round(row["gross_sle"] + row["employer_nassit_sle"], 2)
-        if row["budget_sle"] is not None:
+        if run and allocations is not None and row["budget_sle"] is not None:
             row["variance_sle"] = round(row["employer_cost_sle"] - row["budget_sle"], 2)
     ordered = sorted(rows.values(), key=lambda row: (row["project_code"], row["project_name"]))
     total_budget = round(sum(row["budget_sle"] or 0 for row in ordered), 2) if budget else None
-    total_actual = round(sum(row["employer_cost_sle"] for row in ordered) + unallocated_cost, 2) if run else None
+    allocated_actual = round(sum(row["employer_cost_sle"] for row in ordered), 2) if run else None
+    total_actual = round(allocated_actual + unallocated_cost, 2) if run else None
+    allocated_variance = (
+        round(allocated_actual - total_budget, 2)
+        if allocated_actual is not None and total_budget is not None and allocations is not None else None
+    )
 
     return {
         "period": period,
@@ -511,9 +516,9 @@ async def project_cost_report(period: str, user: dict = Depends(ACCESS)):
         "allocation_revision": allocations.get("revision") if allocations else None,
         "totals": {
             "approved_budget_sle": total_budget,
+            "allocated_employer_cost_sle": allocated_actual,
             "actual_employer_cost_sle": total_actual,
-            "variance_sle": round(total_actual - total_budget, 2)
-                if total_actual is not None and total_budget is not None else None,
+            "variance_sle": allocated_variance,
             "unallocated_employer_cost_sle": round(unallocated_cost, 2) if run else None,
             "unallocated_headcount": unallocated_headcount if run else None,
         },
