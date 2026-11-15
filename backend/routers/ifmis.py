@@ -22,6 +22,8 @@ from core import db, tenant_filter, require_admin, require_feature, audit, now_u
 from bank_formats import render_bank_file, available_formats
 
 from core import require_roles
+from pymongo.errors import DuplicateKeyError
+from routers.mobile_money import PROVIDERS, _assignment_id, ensure_latest_payroll_run
 
 router = APIRouter(
     prefix="/ifmis",
@@ -39,22 +41,71 @@ async def list_formats(_: dict = Depends(require_roles("payroll"))):
 
 
 @router.get("/runs/{rid}/disbursement/{bank_code}")
-async def disbursement_file(rid: str, bank_code: str, user: dict = Depends(require_roles("payroll"))):
-    """Download a bank-specific disbursement file."""
+async def disbursement_file(
+    rid: str,
+    bank_code: str,
+    user: dict = Depends(require_roles("payroll")),
+):
+    """Download a bank-specific workpaper and reserve its payout channel."""
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Run not found")
-    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(5000)
-    body, media, ext, label = render_bank_file(bank_code, run, employees)
+    await ensure_latest_payroll_run(rid, run.get("period", ""), user)
+
+    scope = tenant_filter(user)
+    assignments = await db.mobile_money_assignments.find(
+        {"run_id": rid, **scope}, {"_id": 0},
+    ).to_list(5000)
+    assignment_by_employee = {item["employee_id"]: item for item in assignments}
+    included_slips = []
+    wallet_excluded = 0
+    for slip in run.get("slips", []):
+        if float(slip.get("net", 0) or 0) <= 0:
+            continue
+        employee_id = slip["employee_id"]
+        assignment = assignment_by_employee.get(employee_id)
+        if assignment and assignment.get("provider") in PROVIDERS:
+            wallet_excluded += 1
+            continue
+        if assignment is None:
+            assignment_key = _assignment_id(user["company_id"], rid, employee_id)
+            reservation = {
+                "_id": assignment_key,
+                "company_id": user["company_id"],
+                "run_id": rid,
+                "employee_id": employee_id,
+                "batch_id": f"bank-file:{rid}",
+                "provider": "bank",
+                "created_at": iso(now_utc()),
+            }
+            try:
+                await db.mobile_money_assignments.insert_one(reservation)
+                assignment_by_employee[employee_id] = reservation
+            except DuplicateKeyError:
+                assignment = await db.mobile_money_assignments.find_one(
+                    {"_id": assignment_key, **scope}, {"_id": 0},
+                )
+                assignment_by_employee[employee_id] = assignment
+                if assignment and assignment.get("provider") in PROVIDERS:
+                    wallet_excluded += 1
+                    continue
+        included_slips.append(slip)
+
+    employees = await db.employees.find(scope, {"_id": 0}).to_list(5000)
+    export_run = {**run, "slips": included_slips}
+    body, media, ext, label = render_bank_file(bank_code, export_run, employees)
     await audit("ifmis_disbursement_download", f"payroll_runs/{rid}", user,
-                {"bank": bank_code, "period": run["period"], "rows": len(run["slips"])})
+                {"bank": bank_code, "period": run["period"], "rows": len(included_slips),
+                 "wallet_excluded": wallet_excluded})
     fn = f"disbursement-{bank_code.lower()}-{run['period']}.{ext}"
     return StreamingResponse(
         io.BytesIO(body), media_type=media,
         headers={
             "Content-Disposition": f'attachment; filename="{fn}"',
             "X-Bank-Label": label,
-            "X-Record-Count": str(len(run["slips"])),
+            "X-Record-Count": str(len(included_slips)),
+            "X-Mobile-Money-Excluded": str(wallet_excluded),
+            "Cache-Control": "private, no-store",
         },
     )
 
