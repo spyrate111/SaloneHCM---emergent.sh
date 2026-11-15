@@ -405,13 +405,19 @@ def _split_cents(amount: float, percentages: list[float]) -> list[int]:
 @router.get("/report")
 async def project_cost_report(period: str, user: dict = Depends(ACCESS)):
     period = _period(period)
-    budget = await _latest(db.project_budget_sets, user, period, "approved")
-    allocations = await _latest(db.project_allocation_sets, user, period, "approved")
     runs = await db.payroll_runs.find(
         {**tenant_filter(user), "period": period, "status": "completed"},
-        {"_id": 0, "id": 1, "created_at": 1, "slips": 1},
+        {"_id": 0, "id": 1, "created_at": 1, "slips": 1, "project_costing_snapshot": 1},
     ).sort("created_at", -1).limit(1).to_list(1)
     run = runs[0] if runs else None
+    snapshot = run.get("project_costing_snapshot") if run else None
+    if snapshot:
+        budget = snapshot.get("budget_set")
+        allocations = snapshot.get("allocation_set")
+    else:
+        # Backward-compatible for runs created before payroll snapshots existed.
+        budget = await _latest(db.project_budget_sets, user, period, "approved")
+        allocations = await _latest(db.project_allocation_sets, user, period, "approved")
 
     rows = {}
     for source in (budget or {}).get("rows", []):
