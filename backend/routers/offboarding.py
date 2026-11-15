@@ -152,28 +152,71 @@ async def complete_item(oid: str, key: str, user: dict = Depends(get_current_use
 
     now = iso(now_utc())
     who = user.get("name") or user["email"]
-    for i in ob["items"]:
-        if i["key"] == key:
-            i.update({"completed": True, "completed_by": who, "completed_at": now})
-    all_done = all(i["completed"] for i in ob["items"])
-    update = {"items": ob["items"]}
+    all_done = all(
+        item["completed"] or item["key"] == key for item in ob["items"]
+    )
+    update_filter = {
+        "id": oid,
+        **tenant_filter(user),
+        "status": "in_progress",
+        "items": {"$elemMatch": {"key": key, "completed": False}},
+    }
+    if key == "final_settlement":
+        update_filter["$or"] = [
+            {"final_settlement.status": "paid"},
+            {
+                "final_settlement.status": "approved",
+                "final_settlement.net_settlement_sle": 0,
+            },
+        ]
+    result = await db.offboardings.update_one(
+        update_filter,
+        {"$set": {
+            "items.$.completed": True,
+            "items.$.completed_by": who,
+            "items.$.completed_at": now,
+        }},
+    )
+    if result.matched_count != 1:
+        raise HTTPException(409, "The checklist or settlement changed. Refresh and review it again.")
     await audit("offboarding_item_completed", f"offboardings/{oid}", user,
                 {"item": key, "employee": ob["employee_name"]})
 
     deactivated = False
     if all_done:
-        update["status"] = "completed"
-        update["completed_at"] = now
-        await db.employees.update_one({"id": ob["employee_id"], **tenant_filter(user)},
-                                      {"$set": {"status": "exited"}})
-        res = await db.users.update_many(
-            {"employee_id": ob["employee_id"], **tenant_filter(user)},
-            {"$set": {"disabled": True, "deactivated_at": now}})
-        deactivated = res.modified_count > 0
-        await audit("offboarding_completed", f"offboardings/{oid}", user,
-                    {"employee": ob["employee_name"], "account_deactivated": deactivated})
+        # Recheck the full checklist and settlement in the database before finalizing.
+        completed_filter = {
+            "id": oid,
+            **tenant_filter(user),
+            "status": "in_progress",
+            "items": {"$not": {"$elemMatch": {"completed": False}}},
+            "$or": [
+                {"final_settlement.status": "paid"},
+                {
+                    "final_settlement.status": "approved",
+                    "final_settlement.net_settlement_sle": 0,
+                },
+            ],
+        }
+        completed = await db.offboardings.update_one(
+            completed_filter,
+            {"$set": {"status": "completed", "completed_at": now}},
+        )
+        if completed.matched_count == 1:
+            await db.employees.update_one(
+                {"id": ob["employee_id"], **tenant_filter(user)},
+                {"$set": {"status": "exited"}},
+            )
+            res = await db.users.update_many(
+                {"employee_id": ob["employee_id"], **tenant_filter(user)},
+                {"$set": {"disabled": True, "deactivated_at": now}},
+            )
+            deactivated = res.modified_count > 0
+            await audit("offboarding_completed", f"offboardings/{oid}", user,
+                        {"employee": ob["employee_name"], "account_deactivated": deactivated})
+        else:
+            all_done = False
 
-    await db.offboardings.update_one({"id": oid}, {"$set": update})
     return {"ok": True, "all_complete": all_done, "account_deactivated": deactivated}
 
 
@@ -244,8 +287,18 @@ async def save_final_settlement(
     current = offboarding.get("final_settlement")
     if current and current.get("status") == "paid":
         raise HTTPException(409, "A paid final settlement is locked. Record any correction as a separate adjustment.")
-    if current and current.get("status") == "approved" and not body.revision_reason.strip():
-        raise HTTPException(422, "Enter a reason before revising an approved settlement.")
+    if current and current.get("status") == "approved":
+        if not body.revision_reason.strip():
+            raise HTTPException(422, "Enter a reason before revising an approved settlement.")
+        final_item = next(
+            (item for item in offboarding.get("items", []) if item.get("key") == "final_settlement"),
+            None,
+        )
+        if final_item and final_item.get("completed"):
+            raise HTTPException(
+                409,
+                "The final-settlement checklist is signed off. Record a separate adjustment instead of revising it.",
+            )
 
     revision = int(current.get("revision", 1)) if current else 1
     history = list(current.get("history", [])) if current else []
@@ -293,19 +346,14 @@ async def save_final_settlement(
             "final_settlement.status": current.get("status"),
             "final_settlement.prepared_at": current.get("prepared_at"),
         })
+        if current.get("status") == "approved":
+            update_filter["items"] = {
+                "$elemMatch": {"key": "final_settlement", "completed": False}
+            }
     else:
         update_filter["final_settlement"] = {"$exists": False}
-    update_fields = {"final_settlement": settlement}
-    if current and current.get("status") == "approved":
-        # Reopen the checklist item because this revision invalidates its prior sign-off.
-        update_filter["items.key"] = "final_settlement"
-        update_fields.update({
-            "items.$.completed": False,
-            "items.$.completed_by": None,
-            "items.$.completed_at": None,
-        })
     result = await db.offboardings.update_one(
-        update_filter, {"$set": update_fields},
+        update_filter, {"$set": {"final_settlement": settlement}},
     )
     if result.matched_count != 1:
         raise HTTPException(409, "Another user changed this settlement. Refresh and prepare it again.")
