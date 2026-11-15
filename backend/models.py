@@ -23,6 +23,7 @@ class TotpDisableIn(BaseModel):
 class EmployeeIn(BaseModel):
     first_name: str
     last_name: str
+    middle_name: Optional[str] = ""
     email: EmailStr
     phone: Optional[str] = ""
     job_title: str
@@ -32,6 +33,11 @@ class EmployeeIn(BaseModel):
     basic_salary_sle: float
     allowances_sle: float = 0
     nassit_no: Optional[str] = ""
+    nassit_member_name: Optional[str] = Field(default="", max_length=180)
+    nassit_member_first_name: Optional[str] = Field(default="", max_length=80)
+    nassit_member_middle_name: Optional[str] = Field(default="", max_length=80)
+    nassit_member_last_name: Optional[str] = Field(default="", max_length=80)
+    staff_number: Optional[str] = Field(default="", max_length=64)
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
     bank_account: Optional[str] = ""
@@ -39,6 +45,14 @@ class EmployeeIn(BaseModel):
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
     is_manager: bool = False
+
+
+class EmployeeNassitDetailsIn(BaseModel):
+    nassit_no: str = Field(default="", max_length=64)
+    nassit_member_name: str = Field(default="", max_length=180)
+    nassit_member_first_name: str = Field(default="", max_length=80)
+    nassit_member_middle_name: str = Field(default="", max_length=80)
+    nassit_member_last_name: str = Field(default="", max_length=80)
 
 
 # ---------- Leave ----------

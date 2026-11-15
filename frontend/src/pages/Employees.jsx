@@ -6,10 +6,10 @@ import { toast } from "sonner";
 import { DatePicker } from "../components/ui/date-picker";
 
 const empty = {
-  first_name: "", last_name: "", email: "", phone: "",
+  first_name: "", last_name: "", middle_name: "", email: "", phone: "",
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
-  nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
+  nassit_no: "", nassit_member_name: "", staff_number: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
   hire_date: "2025-01-01", status: "active",
 };
 
@@ -24,7 +24,7 @@ export default function Employees() {
   useEffect(() => { load(); }, [load]);
 
   const filtered = list.filter((e) => {
-    const s = `${e.first_name} ${e.last_name} ${e.email} ${e.department} ${e.job_title}`.toLowerCase();
+    const s = `${e.first_name} ${e.middle_name || ""} ${e.last_name} ${e.email} ${e.department} ${e.job_title}`.toLowerCase();
     return s.includes(q.toLowerCase());
   });
 
@@ -89,7 +89,7 @@ export default function Employees() {
                         {e.first_name?.[0]}{e.last_name?.[0]}
                       </div>
                       <div>
-                        <div className="font-medium text-[#1A1C1E]">{e.first_name} {e.last_name}</div>
+                        <div className="font-medium text-[#1A1C1E]">{[e.first_name, e.middle_name, e.last_name].filter(Boolean).join(" ")}</div>
                         <div className="text-xs text-[#686D76]">{e.email}</div>
                       </div>
                     </div>
@@ -129,12 +129,15 @@ export default function Employees() {
               {[
                 ["first_name", "First name", "text"],
                 ["last_name", "Last name", "text"],
+                ["middle_name", "Middle / other name", "text"],
                 ["email", "Email", "email"],
                 ["phone", "Phone", "text"],
                 ["job_title", "Job title", "text"],
                 ["department", "Department", "text"],
                 ["location", "Location", "text"],
                 ["nassit_no", "NASSIT No.", "text"],
+                ["nassit_member_name", "NASSIT member name (as on SS card)", "text"],
+                ["staff_number", "Employee staff number", "text"],
                 ["tin", "TIN", "text"],
                 ["bank_name", "Bank name", "text"],
                 ["bank_account", "Bank account", "text"],

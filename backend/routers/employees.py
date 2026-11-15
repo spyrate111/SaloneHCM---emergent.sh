@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn
+from models import EmployeeIn, EmployeeNassitDetailsIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
@@ -65,15 +65,64 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             await assert_not_cutoff_locked(
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
+    updates = body.model_dump()
+    # Older clients omit newly added optional fields; preserve saved identity data.
+    for optional_field in (
+        "middle_name", "nassit_member_name",
+        "nassit_member_first_name", "nassit_member_middle_name", "nassit_member_last_name",
+        "staff_number",
+    ):
+        if optional_field not in body.model_fields_set:
+            updates.pop(optional_field, None)
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
-        {"$set": body.model_dump()},
+        {"$set": updates},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return e
+
+
+@router.patch("/{eid}/nassit-details")
+async def update_nassit_details(
+    eid: str,
+    body: EmployeeNassitDetailsIn,
+    user: dict = Depends(require_roles("hr")),
+):
+    scope = tenant_filter(user)
+    employee = await db.employees.find_one({"id": eid, **scope}, {"_id": 0, "id": 1})
+    if not employee:
+        raise HTTPException(404, "Not found")
+    details = body.model_dump()
+    # Older profile clients send only the full SS-card name and number; preserve
+    # separately recorded card-name components when those keys are omitted.
+    for optional_field in (
+        "nassit_no", "nassit_member_name",
+        "nassit_member_first_name", "nassit_member_middle_name", "nassit_member_last_name",
+    ):
+        if optional_field not in body.model_fields_set:
+            details.pop(optional_field, None)
+    await db.employees.update_one({"id": eid, **scope}, {"$set": details})
+    await audit(
+        "employee_nassit_identity_updated",
+        f"employees/{eid}",
+        user,
+        {
+            "nassit_number_updated": bool(details.get("nassit_no")),
+            "member_name_updated": bool(details.get("nassit_member_name")),
+            "member_name_parts_updated": any(
+                key in body.model_fields_set
+                for key in (
+                    "nassit_member_first_name",
+                    "nassit_member_middle_name",
+                    "nassit_member_last_name",
+                )
+            ),
+        },
+    )
+    return await db.employees.find_one({"id": eid, **scope}, {"_id": 0})
 
 
 @router.delete("/{eid}")
