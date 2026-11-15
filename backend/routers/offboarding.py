@@ -52,6 +52,14 @@ class FinalSettlementPaymentIn(BaseModel):
     payment_reference: str = Field(..., min_length=1, max_length=120)
 
 
+def _csv_safe_text(value) -> str:
+    """Prevent spreadsheet formula execution in exported text cells."""
+    text = str(value or "")
+    if text.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")):
+        return "'" + text
+    return text
+
+
 def _may_complete(user: dict, item: dict) -> bool:
     role = item["responsible_role"]
     if role == "admin":
@@ -230,8 +238,8 @@ async def save_final_settlement(
         raise HTTPException(422, "PAYE, employee NASSIT, and other deductions cannot exceed the settlement total.")
     if net_settlement > 0 and body.payment_method == "Not applicable":
         raise HTTPException(422, "Select the payment method for a settlement with a positive net amount.")
-    if gross_settlement == 0 and not body.notes.strip():
-        raise HTTPException(422, "Add a note explaining a zero-value final settlement.")
+    if net_settlement == 0 and not body.notes.strip():
+        raise HTTPException(422, "Add a note explaining a zero-net final settlement.")
 
     current = offboarding.get("final_settlement")
     if current and current.get("status") == "paid":
@@ -287,8 +295,17 @@ async def save_final_settlement(
         })
     else:
         update_filter["final_settlement"] = {"$exists": False}
+    update_fields = {"final_settlement": settlement}
+    if current and current.get("status") == "approved":
+        # Reopen the checklist item because this revision invalidates its prior sign-off.
+        update_filter["items.key"] = "final_settlement"
+        update_fields.update({
+            "items.$.completed": False,
+            "items.$.completed_by": None,
+            "items.$.completed_at": None,
+        })
     result = await db.offboardings.update_one(
-        update_filter, {"$set": {"final_settlement": settlement}},
+        update_filter, {"$set": update_fields},
     )
     if result.matched_count != 1:
         raise HTTPException(409, "Another user changed this settlement. Refresh and prepare it again.")
@@ -414,30 +431,30 @@ async def export_final_settlement(
     writer = csv.writer(buffer)
     writer.writerow([
         "Employer", "Employee", "Payroll Period", "Currency",
-        "Taxable Final Pay (SLE)", "Termination Payment (PAYE-exempt)",
+        "Taxable Final Pay (SLE)", "Termination Payment (SLE)",
         "Termination Payment Basis", "PAYE Withheld (SLE)",
         "Employee NASSIT (SLE)", "Employer NASSIT (SLE)", "Other Deductions (SLE)",
         "Gross Settlement (SLE)", "Net Settlement (SLE)", "Payment Method",
         "Payment Reference", "Payment Date", "Revision", "Prepared By", "Approved By",
     ])
     writer.writerow([
-        company.get("name", ""), offboarding.get("employee_name", ""),
-        settlement.get("payroll_period", ""), settlement.get("currency", "SLE"),
+        _csv_safe_text(company.get("name", "")), _csv_safe_text(offboarding.get("employee_name", "")),
+        _csv_safe_text(settlement.get("payroll_period", "")), _csv_safe_text(settlement.get("currency", "SLE")),
         f'{float(settlement.get("taxable_final_pay_sle", 0)):.2f}',
         f'{float(settlement.get("termination_payment_sle", 0)):.2f}',
-        settlement.get("termination_payment_basis", ""),
+        _csv_safe_text(settlement.get("termination_payment_basis", "")),
         f'{float(settlement.get("paye_withheld_sle", 0)):.2f}',
         f'{float(settlement.get("nassit_employee_sle", 0)):.2f}',
         f'{float(settlement.get("nassit_employer_sle", 0)):.2f}',
         f'{float(settlement.get("other_deductions_sle", 0)):.2f}',
         f'{float(settlement.get("gross_settlement_sle", 0)):.2f}',
         f'{float(settlement.get("net_settlement_sle", 0)):.2f}',
-        settlement.get("payment_method", ""),
-        settlement.get("payment_reference") or "",
+        _csv_safe_text(settlement.get("payment_method", "")),
+        _csv_safe_text(settlement.get("payment_reference")),
         settlement.get("payment_date") or "",
         settlement.get("revision", 1),
-        settlement.get("prepared_by", ""),
-        settlement.get("approved_by", ""),
+        _csv_safe_text(settlement.get("prepared_by", "")),
+        _csv_safe_text(settlement.get("approved_by", "")),
     ])
     await audit(
         "offboarding_final_settlement_exported",
