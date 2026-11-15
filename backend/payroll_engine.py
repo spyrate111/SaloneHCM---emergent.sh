@@ -75,19 +75,21 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
 
 
 async def _compute_slips(emps: list, company_id: str, period: str) -> tuple[list, list]:
-    """Payslips with allowance breakdown + loan deductions; falls back to plain calc."""
+    """Calculate complete payslips; fail the run if allowances or loan deductions fail."""
     from loans_engine import compute_loan_deduction_for_period
+    from routers.civil_service import get_active_allowance_amounts
+
+    slips, applied_loan_rows = [], []
     try:
-        from routers.civil_service import get_active_allowance_amounts
-        slips, applied_loan_rows = [], []
         for e in emps:
             breakdown = await get_active_allowance_amounts(e, company_id, period)
             loan_due, loan_rows = await compute_loan_deduction_for_period(e["id"], company_id, period)
             slips.append(calc_payslip(e, allowance_breakdown=breakdown, loan_deduction=loan_due))
             applied_loan_rows.extend(loan_rows)
-        return slips, applied_loan_rows
     except Exception:
-        return [calc_payslip(e) for e in emps], []
+        logger.exception("Payroll calculation failed; refusing to create an incomplete run")
+        raise
+    return slips, applied_loan_rows
 
 
 def _run_totals(slips: list) -> dict:
