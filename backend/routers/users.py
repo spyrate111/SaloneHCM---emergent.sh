@@ -1,4 +1,5 @@
 """User management within a tenant — invite, list, reset password, delete."""
+import os
 import uuid
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,12 @@ from core import (
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+def _require_test_account_management_enabled() -> None:
+    enabled = os.environ.get("ENABLE_TEST_ACCOUNT_MANAGEMENT", "").strip().lower()
+    if enabled not in {"1", "true", "yes"}:
+        raise HTTPException(403, "Test-account management is disabled")
 
 Role = Literal["admin", "hr", "payroll", "manager", "employee", "auditor"]
 
@@ -215,7 +222,7 @@ async def set_user_flags(uid: str, body: FlagsIn, user: dict = Depends(require_a
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         raise HTTPException(422, "No flags provided")
-    await db.users.update_one({"id": uid}, {"$set": updates})
+    await db.users.update_one({"id": uid, **tenant_filter(user)}, {"$set": updates})
     await audit("user_flags_set", f"users/{uid}", user, updates)
     return {"ok": True, **updates}
 
@@ -228,10 +235,10 @@ async def list_roles(user: dict = Depends(require_admin)):
 
 @router.post("/test-accounts/seed")
 async def seed_test_accounts_endpoint(user: dict = Depends(require_superadmin)):
-    """Create/refresh the 70 standard test accounts (10 per role) in THIS
-    environment's database. Superadmin only, idempotent, audited."""
+    """Create/refresh seeded test accounts for this tenant; disabled by default."""
+    _require_test_account_management_enabled()
     from seed_test_accounts import seed_accounts
-    res = await seed_accounts()
+    res = await seed_accounts(user["company_id"])
     if not res.get("ok"):
         raise HTTPException(409, res.get("error", "Seeding failed"))
     await audit("test_accounts_seeded", "users/test-accounts", user,
@@ -241,9 +248,13 @@ async def seed_test_accounts_endpoint(user: dict = Depends(require_superadmin)):
 
 @router.delete("/test-accounts")
 async def wipe_test_accounts(user: dict = Depends(require_superadmin)):
-    """Permanently delete all seeded test accounts (flagged test_account=true
-    on a salonehcm domain). Superadmin only, audited."""
-    q = {"test_account": True, "email": {"$regex": r"@salonehcm\.(com|sl)$"}}
+    """Permanently delete only this tenant's seeded test accounts."""
+    _require_test_account_management_enabled()
+    q = {
+        **tenant_filter(user),
+        "test_account": True,
+        "email": {"$regex": r"@salonehcm\.(com|sl)$"},
+    }
     count = await db.users.count_documents(q)
     if count:
         await db.users.delete_many(q)
