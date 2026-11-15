@@ -26,6 +26,32 @@ PROVIDERS = {
     "afrimoney": "Afrimoney",
 }
 
+def _assignment_id(company_id: str, run_id: str, employee_id: str) -> str:
+    return f"payout-channel:{company_id}:{run_id}:{employee_id}"
+
+
+async def ensure_latest_payroll_run(run_id: str, period: str, user: dict) -> None:
+    latest = await db.payroll_runs.find_one(
+        {"period": period, **tenant_filter(user)},
+        {"_id": 0, "id": 1},
+        sort=[("created_at", -1)],
+    )
+    if not latest or latest.get("id") != run_id:
+        raise HTTPException(
+            409,
+            "Disbursement workpapers can only be created from the latest payroll run for this period.",
+        )
+
+
+async def _release_payout_reservations(keys: list[str], batch_id: str, user: dict) -> None:
+    if keys:
+        await db.mobile_money_assignments.delete_many({
+            "_id": {"$in": keys},
+            "batch_id": batch_id,
+            **tenant_filter(user),
+        })
+
+
 
 class MobileMoneyBatchIn(BaseModel):
     provider: Literal["orange_money", "afrimoney"]
@@ -284,6 +310,7 @@ async def create_run_mobile_money_batch(
         raise HTTPException(404, "Payroll run not found")
     if run.get("status") != "completed":
         raise HTTPException(409, "Only a completed payroll run can be disbursed.")
+    await ensure_latest_payroll_run(rid, run.get("period", ""), user)
     if str(run.get("currency") or "SLE").upper() != "SLE":
         raise HTTPException(
             409,
@@ -388,15 +415,65 @@ async def create_run_mobile_money_batch(
         "reconciled_at": None,
         "recipients": recipients,
     }
+    reservation_keys = []
+    for recipient in recipients:
+        assignment_key = _assignment_id(user["company_id"], rid, recipient["employee_id"])
+        existing_assignment = await db.mobile_money_assignments.find_one(
+            {"_id": assignment_key, **scope},
+            {"_id": 0, "provider": 1},
+        )
+        if existing_assignment:
+            await _release_payout_reservations(reservation_keys, batch_id, user)
+            if existing_assignment.get("provider") == "bank":
+                raise HTTPException(
+                    409,
+                    "This employee is already included in a bank-file export for this payroll run.",
+                )
+            raise HTTPException(
+                409,
+                "At least one employee is already reserved for another payout batch in this payroll run.",
+            )
+        assignment = {
+            "_id": assignment_key,
+            "company_id": user["company_id"],
+            "run_id": rid,
+            "employee_id": recipient["employee_id"],
+            "batch_id": batch_id,
+            "provider": body.provider,
+            "created_at": now,
+        }
+        try:
+            await db.mobile_money_assignments.insert_one(assignment)
+            reservation_keys.append(assignment_key)
+        except DuplicateKeyError:
+            await _release_payout_reservations(reservation_keys, batch_id, user)
+            current_assignment = await db.mobile_money_assignments.find_one(
+                {"_id": assignment_key, **scope},
+                {"_id": 0, "provider": 1},
+            )
+            if current_assignment and current_assignment.get("provider") == "bank":
+                raise HTTPException(
+                    409,
+                    "This employee is already included in a bank-file export for this payroll run.",
+                )
+            raise HTTPException(
+                409,
+                "At least one employee is already reserved for another payout batch in this payroll run.",
+            )
+
     try:
         await db.mobile_money_batches.insert_one(dict(batch))
     except DuplicateKeyError:
+        await _release_payout_reservations(reservation_keys, batch_id, user)
         existing = await db.mobile_money_batches.find_one(
             {"run_id": rid, "provider": body.provider, "retry_of": {"$exists": False}, **scope},
             {"_id": 0},
         )
         if existing:
             return {**existing, "already_exists": True}
+        raise
+    except Exception:
+        await _release_payout_reservations(reservation_keys, batch_id, user)
         raise
     await audit(
         "mobile_money_batch_created",
