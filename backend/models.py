@@ -1,6 +1,6 @@
 """All Pydantic request/response models."""
 from typing import Optional, Literal, List, Union, Annotated
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 # ---------- Auth ----------
@@ -42,6 +42,17 @@ class EmployeeIn(BaseModel):
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
     is_manager: bool = False
+
+    @field_validator("mobile_money_number")
+    @classmethod
+    def clean_mobile_money_number(cls, value):
+        return (value or "").strip()
+
+    @model_validator(mode="after")
+    def validate_mobile_money_destination(self):
+        if bool(self.mobile_money_provider) != bool(self.mobile_money_number):
+            raise ValueError("Choose a mobile-money provider and enter its wallet number, or clear both.")
+        return self
 
 
 class EmployeeTaxResidencyIn(BaseModel):
