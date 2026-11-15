@@ -163,7 +163,8 @@ async def create_mobile_money_batch(
         _assignment_id(company_id, rid, line["employee_id"]) for line in lines
     ]
     existing_assignments = await db.mobile_money_assignments.find(
-        {"_id": {"$in": assignment_keys}, **scope}, {"_id": 0},
+        {"_id": {"$in": assignment_keys}, **scope},
+        {"_id": 1, "employee_id": 1, "batch_id": 1, "provider": 1},
     ).to_list(len(assignment_keys))
     assignment_by_key = {item["_id"]: item for item in existing_assignments}
 
