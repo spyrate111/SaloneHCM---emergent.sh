@@ -67,6 +67,8 @@ async def disbursement_file(
         if assignment and assignment.get("provider") in PROVIDERS:
             wallet_excluded += 1
             continue
+        if assignment and assignment.get("provider") == "bank" and assignment.get("bank_format", "generic") != bank_code.lower():
+            raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
         if assignment is None:
             assignment_key = _assignment_id(user["company_id"], rid, employee_id)
             reservation = {
@@ -76,6 +78,7 @@ async def disbursement_file(
                 "employee_id": employee_id,
                 "batch_id": f"bank-file:{rid}",
                 "provider": "bank",
+                "bank_format": bank_code.lower(),
                 "created_at": iso(now_utc()),
             }
             try:
@@ -89,6 +92,8 @@ async def disbursement_file(
                 if assignment and assignment.get("provider") in PROVIDERS:
                     wallet_excluded += 1
                     continue
+                if assignment and assignment.get("provider") == "bank" and assignment.get("bank_format", "generic") != bank_code.lower():
+                    raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
         included_slips.append(slip)
 
     employees = await db.employees.find(scope, {"_id": 0}).to_list(5000)
