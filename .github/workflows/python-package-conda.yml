@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend and Frontend CI
 
 on:
   push:
@@ -45,3 +45,30 @@ jobs:
       # Collect tests here without executing requests or sending test email.
       - name: Collect backend tests
         run: python -m pytest --collect-only -q backend/tests
+
+  frontend:
+    name: Frontend production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install Yarn 1.22.22
+        run: npm install --global yarn@1.22.22
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          CI: "true"
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8001
+        run: yarn build
