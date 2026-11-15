@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { setToken } from "../lib/api";
+
 import { TIER_COLORS, TIER_DESCRIPTIONS } from "../lib/features";
 import { toast } from "sonner";
 import { Building2, Plus, X, ArrowRightLeft, Crown, Sparkles, ShieldAlert, ShieldCheck, RefreshCw } from "lucide-react";
@@ -80,7 +80,6 @@ export default function Companies() {
   const onSwitch = async (c) => {
     try {
       const r = await api.post(`/admin/companies/${c.id}/switch`);
-      setToken(r.data.token);
       toast.success(`Switched into ${c.name}`);
       // refresh user via /me
       if (refetch) await refetch();
