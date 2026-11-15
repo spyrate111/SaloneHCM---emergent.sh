@@ -202,7 +202,7 @@ export default function ProjectCosting() {
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric title="Approved project budget" value={sle(report.totals.approved_budget_sle)} />
           <Metric title="Employer payroll cost" value={sle(report.totals.actual_employer_cost_sle)} />
-          <Metric title="Variance" value={sle(report.totals.variance_sle)} />
+          <Metric title="Allocated cost variance" value={sle(report.totals.variance_sle)} />
           <Metric title="Unallocated payroll" value={report.totals.unallocated_employer_cost_sle == null
             ? "—" : `${sle(report.totals.unallocated_employer_cost_sle)} · ${report.totals.unallocated_headcount || 0} staff`} />
         </section>
