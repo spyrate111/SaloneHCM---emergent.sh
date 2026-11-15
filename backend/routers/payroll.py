@@ -67,6 +67,15 @@ async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_roles("pa
                 "message": f"Run a pre-payroll budget check for {period} before executing payroll.",
                 "period": period,
             })
+        from routers.payroll_budget import current_budget_input_fingerprint
+        current_fingerprint = await current_budget_input_fingerprint(user["company_id"], period)
+        if latest.get("input_fingerprint") != current_fingerprint:
+            raise HTTPException(412, {
+                "code": "budget_check_stale",
+                "message": f"Payroll inputs or allocations changed after the budget check for {period}. Run a new check before executing payroll.",
+                "period": period,
+                "check_id": latest["id"],
+            })
         if latest["verdict"] != "safe" and not latest.get("override"):
             raise HTTPException(412, {
                 "code": "budget_check_blocked",
