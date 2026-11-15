@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import api, { setToken } from "../lib/api";
+import api from "../lib/api";
 import { toast } from "sonner";
 import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
@@ -19,7 +19,6 @@ export default function CompanySwitcher() {
     setBusy(true);
     try {
       const r = await api.post(`/admin/companies/${cid}/switch`);
-      setToken(r.data.token);
       await refetch();
       toast.success(`Switched to ${r.data.company.name}`);
       setOpen(false);
