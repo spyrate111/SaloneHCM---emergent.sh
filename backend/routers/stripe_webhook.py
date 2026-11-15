@@ -36,13 +36,14 @@ async def stripe_webhook(request: Request):
     if evt.payment_status == "paid" and evt.session_id:
         txn = await db.payment_transactions.find_one({"session_id": evt.session_id}, {"_id": 0})
         if txn and txn.get("payment_status") != "paid":
-            await db.payment_transactions.update_one(
-                {"session_id": evt.session_id},
+            claimed = await db.payment_transactions.update_one(
+                {"session_id": evt.session_id, "payment_status": {"$ne": "paid"}},
                 {"$set": {"payment_status": "paid", "status": "complete", "paid_at": iso(now_utc())}},
             )
-            # Import lazily to avoid circular dep
-            from routers.billing import _apply_paid_subscription
-            await _apply_paid_subscription(
-                txn["company_id"], txn["plan_id"], txn["amount_sle"], "stripe"
-            )
+            if claimed.matched_count == 1:
+                # Import lazily to avoid circular dep
+                from routers.billing import _apply_paid_subscription
+                await _apply_paid_subscription(
+                    txn["company_id"], txn["plan_id"], txn["amount_sle"], "stripe"
+                )
     return {"received": True}
