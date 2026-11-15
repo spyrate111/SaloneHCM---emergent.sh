@@ -1,18 +1,18 @@
-"""Payroll variance analysis — Option B fraud-detection guardrail.
+"""Payroll variance analysis — explainable anomaly-review flags.
 
-When an MoF approver reviews a payroll run for sign-off, they need to know at
-a glance what changed vs the prior period and whether any of it looks anomalous.
-Auto-computed from stored payroll_runs data — no schema changes required.
+Payroll staff can review changes against the prior period and each employee's
+available completed-run history before approving payroll. Flags are computed
+from stored payroll_runs and employee records; they do not prove an error or
+fraud and do not block payroll.
 
-Anomaly heuristics (thresholds tuned for typical Sierra Leone civil-service
-payroll where salaries change monthly by ≤2%, headcount by ≤1%):
+Initial global review thresholds (not empirically calibrated to each company):
 
   HEADCOUNT      Δ headcount ≥ ±5%
   TOTAL_GROSS    Δ gross    ≥ +10%
   MINISTRY_JUMP  any single ministry gross change ≥ +15%
   RAISE          any single employee net change    ≥ +10%
   NEW_STARTER    employee on this run but hired > 30 days ago (should have prior slip)
-  RESURRECTED    employee on this run, missing from prior run for ≥ 2 consecutive periods
+  RESURRECTED    employee absent from the two latest completed periods and hired before both
   TERMINATED     employee marked terminated but still receiving > 0 net pay
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ from core import require_roles
 
 router = APIRouter(prefix="/payroll", tags=["payroll-variance"])
 
-# ---- Tunable thresholds ----
+# ---- Initial review thresholds (not tenant-calibrated) ----
 HEADCOUNT_PCT = 5.0
 GROSS_PCT = 10.0
 MINISTRY_PCT = 15.0
