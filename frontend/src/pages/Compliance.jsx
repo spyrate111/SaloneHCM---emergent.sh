@@ -107,7 +107,7 @@ export default function Compliance() {
         <div className="px-6 py-4 border-b border-[#E2DFD6]">
           <h3 className="font-heading text-lg font-semibold">Payroll filing workpapers</h3>
           <p className="text-xs text-[#686D76] mt-0.5 max-w-4xl">
-            The NRA export is a preparation workpaper; download the current PAYE workbook for ITAS. The NASSIT Excel schedule follows the fields in its Companion Guide and should accompany the SS4A payment advice form.
+            The NRA export is a preparation workpaper; download the current PAYE workbook for ITAS. The NASSIT schedule includes the published employer and employee fields and should accompany the SS4A payment advice form. Complete its method-of-payment field before submission; this is not an authority-approved upload template.
           </p>
           <div className="flex flex-wrap gap-4 mt-2 text-xs">
             <a href="https://mail.nra.gov.sl/document/paye-return-form" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
