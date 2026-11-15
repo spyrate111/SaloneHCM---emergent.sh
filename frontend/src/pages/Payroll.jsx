@@ -11,7 +11,7 @@ import { MoFSignaturesButton } from "../components/MoFSignatures";
 import PayslipScanPanel from "../components/PayslipScanPanel";
 import MoFConfigCard from "../components/MoFConfigCard";
 import MobileMoneyBatchActions from "../components/MobileMoneyBatchActions";
-import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Calculator, Play, Check, FileText, Download, Send } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -54,28 +54,6 @@ export default function Payroll() {
       loadRuns();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Submit failed");
-    }
-  };
-
-  const approveMoF = async (rid) => {
-    try {
-      await api.post(`/civil-service/runs/${rid}/mof-approve`, { note: "Approved" });
-      toast.success("Approved");
-      loadRuns();
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Approve failed");
-    }
-  };
-
-  const rejectMoF = async (rid) => {
-    const note = window.prompt("Reason for rejection?");
-    if (!note) return;
-    try {
-      await api.post(`/civil-service/runs/${rid}/mof-reject`, { note });
-      toast.success("Rejected");
-      loadRuns();
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Reject failed");
     }
   };
 
@@ -270,16 +248,6 @@ export default function Payroll() {
                       <button data-testid={`mof-submit-${r.id}`} onClick={() => submitMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-[#26547C] hover:bg-[#1D4363] text-white px-2.5 py-1.5 rounded">
                         <Send className="w-3.5 h-3.5" /> Submit to MoF
                       </button>
-                    )}
-                    {has("mof_approval") && r.mof_status === "submitted" && user?.mof_approver && (
-                      <>
-                        <button data-testid={`mof-approve-${r.id}`} onClick={() => approveMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-[#17A035] hover:bg-[#148231] text-white px-2.5 py-1.5 rounded">
-                          <ShieldCheck className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button data-testid={`mof-reject-${r.id}`} onClick={() => rejectMoF(r.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#3A7CB8] text-[#3A7CB8] hover:bg-[#E9F2FB] px-2.5 py-1.5 rounded">
-                          <AlertTriangle className="w-3.5 h-3.5" /> Reject
-                        </button>
-                      </>
                     )}
                     {["admin", "superadmin", "payroll"].includes(user?.role) && <MobileMoneyBatchActions run={r} />}
                     <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className={`inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded ${has("ifmis_integration") ? "hidden" : ""}`}>
