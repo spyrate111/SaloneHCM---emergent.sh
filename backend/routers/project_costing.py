@@ -32,7 +32,13 @@ def _period(value: str) -> str:
 def _money(value: float) -> float:
     if not math.isfinite(float(value)) or float(value) < 0:
         raise HTTPException(422, "amounts must be finite and non-negative")
-    return round(float(value), 2)
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _within_period(project: dict, period: str) -> bool:
+    return period >= project["start_period"] and (
+        not project.get("end_period") or period <= project["end_period"]
+    )
 
 
 async def _locked(company_id: str, period: str) -> bool:
@@ -199,7 +205,8 @@ async def save_budget_set(body: BudgetSetIn, user: dict = Depends(ACCESS)):
     ids = {row.project_id for row in body.rows}
     projects = await db.project_costing_projects.find(
         {"company_id": user["company_id"], "id": {"$in": list(ids)}, "status": "active"},
-        {"_id": 0, "id": 1, "code": 1, "name": 1, "funder": 1},
+        {"_id": 0, "id": 1, "code": 1, "name": 1, "funder": 1,
+         "start_period": 1, "end_period": 1},
     ).to_list(None)
     by_id = {row["id"]: row for row in projects}
     if ids != set(by_id):
@@ -209,6 +216,8 @@ async def save_budget_set(body: BudgetSetIn, user: dict = Depends(ACCESS)):
     for row in body.rows:
         amount = _money(row.budget_sle)
         project = by_id[row.project_id]
+        if not _within_period(project, period):
+            raise HTTPException(422, f"Project {project['code']} is not active in {period}")
         rows.append({
             "project_id": row.project_id,
             "project_code": project["code"],
@@ -243,7 +252,7 @@ async def save_budget_set(body: BudgetSetIn, user: dict = Depends(ACCESS)):
             "updated_at": now,
         }
         await db.project_budget_sets.insert_one(dict(saved))
-        saved.pop("company_id", None)
+    saved.pop("company_id", None)
     await audit("project_costing_budget_draft", f"project_budget_sets/{saved['id']}", user,
                 {"period": period, "revision": saved["revision"], "project_count": len(rows)})
     return saved
@@ -289,22 +298,29 @@ async def save_allocation_set(body: AllocationSetIn, user: dict = Depends(ACCESS
         raise HTTPException(409, "This payroll period is complete; employee allocations are locked")
     seen = set()
     by_employee = {}
+    percentage_by_pair = {}
     for row in body.allocations:
         key = (row.employee_id, row.project_id)
         if key in seen:
             raise HTTPException(422, "An employee can have only one row per project")
         seen.add(key)
-        if not math.isfinite(float(row.percentage)) or row.percentage <= 0 or row.percentage > 100:
+        percentage = Decimal(str(row.percentage))
+        if not percentage.is_finite():
+            raise HTTPException(422, "Allocation percentages must be finite")
+        percentage = percentage.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        if percentage <= 0 or percentage > 100:
             raise HTTPException(422, "Allocation percentages must be above 0 and at most 100")
-        by_employee[row.employee_id] = by_employee.get(row.employee_id, 0.0) + float(row.percentage)
-    if any(total > 100.000001 for total in by_employee.values()):
+        percentage_by_pair[key] = percentage
+        by_employee[row.employee_id] = by_employee.get(row.employee_id, Decimal("0")) + percentage
+    if any(total > Decimal("100") for total in by_employee.values()):
         raise HTTPException(422, "An employee's project allocations cannot exceed 100%")
 
     project_ids = {row.project_id for row in body.allocations}
     employee_ids = {row.employee_id for row in body.allocations}
     projects = await db.project_costing_projects.find(
         {"company_id": user["company_id"], "id": {"$in": list(project_ids)}, "status": "active"},
-        {"_id": 0, "id": 1, "code": 1, "name": 1, "funder": 1},
+        {"_id": 0, "id": 1, "code": 1, "name": 1, "funder": 1,
+         "start_period": 1, "end_period": 1},
     ).to_list(None) if project_ids else []
     employees = await db.employees.find(
         {"company_id": user["company_id"], "id": {"$in": list(employee_ids)}, "status": "active"},
@@ -314,6 +330,8 @@ async def save_allocation_set(body: AllocationSetIn, user: dict = Depends(ACCESS
     employee_by_id = {row["id"]: row for row in employees}
     if project_ids != set(project_by_id):
         raise HTTPException(422, "Every allocation must reference an active project in this company")
+    if any(not _within_period(project_by_id[project_id], period) for project_id in project_ids):
+        raise HTTPException(422, "Project allocations must fall within each project's active period")
     if employee_ids != set(employee_by_id):
         raise HTTPException(422, "Every allocation must reference an active employee in this company")
 
@@ -328,7 +346,7 @@ async def save_allocation_set(body: AllocationSetIn, user: dict = Depends(ACCESS
             "project_code": project["code"],
             "project_name": project["name"],
             "funder": project.get("funder", ""),
-            "percentage": round(float(row.percentage), 4),
+            "percentage": float(percentage_by_pair[(row.employee_id, row.project_id)]),
         })
 
     latest = await _latest(db.project_allocation_sets, user, period)
@@ -357,7 +375,7 @@ async def save_allocation_set(body: AllocationSetIn, user: dict = Depends(ACCESS
             "updated_at": now,
         }
         await db.project_allocation_sets.insert_one(dict(saved))
-        saved.pop("company_id", None)
+    saved.pop("company_id", None)
     await audit("project_costing_allocation_draft", f"project_allocation_sets/{saved['id']}", user,
                 {"period": period, "revision": saved["revision"], "row_count": len(allocations)})
     return saved
