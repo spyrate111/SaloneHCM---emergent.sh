@@ -99,7 +99,9 @@ class _AcceptInviteIn(BaseModel):
 @router.get("/invite/{token}")
 async def lookup_invite(token: str):
     """Frontend hits this with the token from the magic-link to render the accept form."""
-    invite = await db.user_invites.find_one({"token": token, "consumed_at": None}, {"_id": 0})
+    invite = await db.user_invites.find_one(
+        {"token": token, "consumed_at": None, "superseded_at": None}, {"_id": 0},
+    )
     if not invite:
         raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
     # Expiry check
@@ -118,20 +120,46 @@ async def lookup_invite(token: str):
 @router.post("/accept-invite")
 @limiter.limit("10/minute")
 async def accept_invite(request: Request, body: _AcceptInviteIn, response: Response):
-    invite = await db.user_invites.find_one({"token": body.token, "consumed_at": None})
+    invite = await db.user_invites.find_one(
+        {"token": body.token, "consumed_at": None, "superseded_at": None},
+    )
     if not invite:
         raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
     if invite.get("expires_at") and invite["expires_at"] < iso(now_utc()):
         raise HTTPException(410, detail={"code": "invite_expired", "message": "Invitation has expired"})
 
-    # Idempotent: if a user already exists for this email, update password; else create.
+    # Claim the one-time invitation before modifying users. This prevents two
+    # concurrent requests from accepting the same token or resetting passwords twice.
     existing = await db.users.find_one({"email": invite["email"]})
+    if existing and existing.get("company_id") != invite["company_id"]:
+        raise HTTPException(409, "An account with this email already belongs to another company")
+
     if existing:
-        await db.users.update_one({"id": existing["id"]}, {"$set": {"password_hash": hash_password(body.password)}})
         user_id = existing["id"]
     else:
         import uuid as _uuid
         user_id = str(_uuid.uuid4())
+
+    consumed_at = iso(now_utc())
+    claimed = await db.user_invites.update_one(
+        {
+            "token": body.token,
+            "consumed_at": None,
+            "superseded_at": None,
+        },
+        {"$set": {"consumed_at": consumed_at, "consumed_by_user_id": user_id}},
+    )
+    if claimed.matched_count != 1:
+        raise HTTPException(409, detail={"code": "invite_invalid", "message": "Invitation was already used or revoked"})
+
+    if existing:
+        updated = await db.users.update_one(
+            {"id": user_id, "company_id": invite["company_id"]},
+            {"$set": {"password_hash": hash_password(body.password)}},
+        )
+        if updated.matched_count != 1:
+            raise HTTPException(409, "The invited account changed. Ask the administrator to issue a new invitation.")
+    else:
         await db.users.insert_one({
             "id": user_id,
             "email": invite["email"],
@@ -140,15 +168,10 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
             "company_id": invite["company_id"],
             "employee_id": invite.get("employee_id"),
             "password_hash": hash_password(body.password),
-            "created_at": iso(now_utc()),
+            "created_at": consumed_at,
             "created_by": invite.get("invited_by"),
             "accepted_invite": invite["token"],
         })
-
-    await db.user_invites.update_one(
-        {"token": body.token},
-        {"$set": {"consumed_at": iso(now_utc()), "consumed_by_user_id": user_id}},
-    )
 
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
