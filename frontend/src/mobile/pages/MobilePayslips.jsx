@@ -48,12 +48,15 @@ export default function MobilePayslips() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const token = getToken();
     setRowsForAccount({ accountId, rows: [] });
     setOfflineRunsForAccount({ accountId, ids: [] });
     setSummaryForAccount({ accountId, saved: false });
     setPreview(null);
+  }, [accountId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const token = getToken();
     if (!accountId || !token) return () => { cancelled = true; };
 
     const load = async () => {
@@ -100,7 +103,7 @@ export default function MobilePayslips() {
     };
     void load();
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [accountId, online]);
 
   useEffect(() => {
     if (!preview?.url) return undefined;
