@@ -52,7 +52,7 @@ async def _latest(collection, user: dict, period: str, status: Optional[str] = N
     query = {**tenant_filter(user), "period": period}
     if status:
         query["status"] = status
-    rows = await collection.find(query, {"_id": 0}).sort(
+    rows = await collection.find(query, {"_id": 0, "company_id": 0}).sort(
         [("revision", -1), ("created_at", -1)]
     ).limit(1).to_list(1)
     return rows[0] if rows else None
@@ -97,7 +97,7 @@ class AllocationSetIn(BaseModel):
 @router.get("/projects")
 async def list_projects(user: dict = Depends(ACCESS)):
     return await db.project_costing_projects.find(
-        tenant_filter(user), {"_id": 0}
+        tenant_filter(user), {"_id": 0, "company_id": 0}
     ).sort([("status", 1), ("code", 1)]).to_list(None)
 
 
@@ -137,7 +137,7 @@ async def create_project(body: ProjectCreate, user: dict = Depends(ACCESS)):
 @router.patch("/projects/{project_id}")
 async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depends(ACCESS)):
     project = await db.project_costing_projects.find_one(
-        {"id": project_id, **tenant_filter(user)}, {"_id": 0}
+        {"id": project_id, **tenant_filter(user)}, {"_id": 0, "company_id": 0}
     )
     if not project:
         raise HTTPException(404, "Project not found")
@@ -243,7 +243,7 @@ async def save_budget_set(body: BudgetSetIn, user: dict = Depends(ACCESS)):
         )
         if not result.matched_count:
             raise HTTPException(409, "Budget draft changed; reload and try again")
-        saved = await db.project_budget_sets.find_one({"id": latest["id"]}, {"_id": 0})
+        saved = await db.project_budget_sets.find_one({"id": latest["id"], **tenant_filter(user)}, {"_id": 0, "company_id": 0})
     else:
         saved = {
             "id": str(uuid.uuid4()),
@@ -287,7 +287,7 @@ async def approve_budget_set(set_id: str, user: dict = Depends(ACCESS)):
         raise HTTPException(409, "Budget draft changed; reload and try again")
     await audit("project_costing_budget_approve", f"project_budget_sets/{set_id}", user,
                 {"period": item["period"], "revision": item["revision"]})
-    return await db.project_budget_sets.find_one({"id": set_id}, {"_id": 0})
+    return await db.project_budget_sets.find_one({"id": set_id, **tenant_filter(user)}, {"_id": 0, "company_id": 0})
 
 
 @router.get("/allocation-sets")
@@ -366,7 +366,7 @@ async def save_allocation_set(body: AllocationSetIn, user: dict = Depends(ACCESS
         )
         if not result.matched_count:
             raise HTTPException(409, "Allocation draft changed; reload and try again")
-        saved = await db.project_allocation_sets.find_one({"id": latest["id"]}, {"_id": 0})
+        saved = await db.project_allocation_sets.find_one({"id": latest["id"], **tenant_filter(user)}, {"_id": 0, "company_id": 0})
     else:
         saved = {
             "id": str(uuid.uuid4()),
@@ -410,7 +410,7 @@ async def approve_allocation_set(set_id: str, user: dict = Depends(ACCESS)):
         raise HTTPException(409, "Allocation draft changed; reload and try again")
     await audit("project_costing_allocation_approve", f"project_allocation_sets/{set_id}", user,
                 {"period": item["period"], "revision": item["revision"]})
-    return await db.project_allocation_sets.find_one({"id": set_id}, {"_id": 0})
+    return await db.project_allocation_sets.find_one({"id": set_id, **tenant_filter(user)}, {"_id": 0, "company_id": 0})
 
 
 def _split_cents(amount: float, percentages: list[float]) -> list[int]:
