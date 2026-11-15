@@ -44,6 +44,11 @@ class EmployeeIn(BaseModel):
     is_manager: bool = False
 
 
+class EmployeeNassitDetailsIn(BaseModel):
+    nassit_no: str = Field(default="", max_length=64)
+    nassit_member_name: str = Field(default="", max_length=180)
+
+
 # ---------- Leave ----------
 class LeaveIn(BaseModel):
     employee_id: Optional[str] = None  # non-admins: taken from their own account
