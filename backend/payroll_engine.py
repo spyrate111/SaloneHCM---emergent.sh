@@ -147,12 +147,29 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
     applied_claim_ids = [c["id"] for c in claims if c["employee_id"] in slip_eids]
 
     rid = str(uuid.uuid4())
+    budget_snapshot = await db.project_budget_sets.find_one(
+        {"company_id": user["company_id"], "period": period, "status": "approved"},
+        {"_id": 0},
+        sort=[("revision", -1)],
+    )
+    allocation_snapshot = await db.project_allocation_sets.find_one(
+        {"company_id": user["company_id"], "period": period, "status": "approved"},
+        {"_id": 0},
+        sort=[("revision", -1)],
+    )
+    project_costing_snapshot = {
+        "currency": "SLE",
+        "budget_set": budget_snapshot,
+        "allocation_set": allocation_snapshot,
+        "captured_at": iso(now_utc()),
+    }
     doc = {
         "id": rid,
         "company_id": user["company_id"],
         "period": period,
         "period_year": year,
         "period_month": month,
+        "project_costing_snapshot": project_costing_snapshot,
         "slips": slips,
         "totals": _run_totals(slips),
         "status": "completed",
