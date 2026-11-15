@@ -48,6 +48,11 @@ class EmployeeTaxResidencyIn(BaseModel):
     tax_residency: Literal["resident", "non_resident"]
 
 
+class EmployeeMobileMoneyProfileIn(BaseModel):
+    mobile_money_provider: Literal["", "orange_money", "afrimoney"] = ""
+    mobile_money_number: str = Field(default="", max_length=40)
+
+
 # ---------- Leave ----------
 class LeaveIn(BaseModel):
     employee_id: Optional[str] = None  # non-admins: taken from their own account
