@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn, EmployeeTaxResidencyIn
+from models import EmployeeIn, EmployeeTaxResidencyIn, EmployeeMobileMoneyProfileIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
@@ -80,6 +80,41 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
     return e
 
   
+@router.patch("/{eid}/mobile-money-profile")
+async def update_employee_mobile_money_profile(
+    eid: str,
+    body: EmployeeMobileMoneyProfileIn,
+    user: dict = Depends(require_roles("hr")),
+):
+    provider = body.mobile_money_provider
+    wallet_number = body.mobile_money_number.strip()
+    if bool(provider) != bool(wallet_number):
+        raise HTTPException(422, "Select a provider and enter its wallet number, or clear both fields.")
+    existing = await db.employees.find_one(
+        {"id": eid, **tenant_filter(user)}, {"_id": 0},
+    )
+    if not existing:
+        raise HTTPException(404, "Not found")
+    await assert_not_cutoff_locked(user, "changing an employee's mobile-money destination")
+    await db.employees.update_one(
+        {"id": eid, **tenant_filter(user)},
+        {"$set": {
+            "mobile_money_provider": provider,
+            "mobile_money_number": wallet_number,
+        }},
+    )
+    updated = await db.employees.find_one(
+        {"id": eid, **tenant_filter(user)}, {"_id": 0},
+    )
+    await audit(
+        "employee_mobile_money_profile_update",
+        f"employees/{eid}",
+        user,
+        {"provider": provider or None},
+    )
+    return updated
+
+
 @router.patch("/{eid}/tax-residency")
 async def update_employee_tax_residency(
     eid: str,
