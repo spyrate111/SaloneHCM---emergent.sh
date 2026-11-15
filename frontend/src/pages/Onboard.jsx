@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { API, setToken } from "../lib/api";
+import { API } from "../lib/api";
 import { CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -26,8 +26,7 @@ export default function Onboard() {
       .then(async (r) => {
         if (cancelled) return;
         const data = r.data || {};
-        setToken(data.token);
-        applyAuth({ ...data.user, token: data.token });
+        applyAuth(data.user);
         // Sync full profile from /me so features/roles are hydrated
         try { await refetch(); } catch { /* noop */ }
         setUser(data.user);
