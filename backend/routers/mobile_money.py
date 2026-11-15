@@ -6,7 +6,6 @@ verified employer disbursement specifications and sandbox credentials.
 import csv
 import io
 import uuid
-from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -14,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 
-from core import db, require_admin, audit, tenant_filter, with_tenant, now_utc, iso
+from core import db, require_roles, audit, tenant_filter, with_tenant, now_utc, iso
 
 
 router = APIRouter(prefix="/payroll/runs", tags=["mobile-money"])
@@ -91,7 +90,7 @@ async def _find_batch(run_id: str, batch_id: str, user: dict) -> dict:
 async def list_mobile_money_batches(
     rid: str,
     response: Response,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     response.headers["Cache-Control"] = "private, no-store"
     run = await db.payroll_runs.find_one(
@@ -109,7 +108,7 @@ async def list_mobile_money_batches(
 async def create_mobile_money_batch(
     rid: str,
     body: BatchCreateIn,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     scope = tenant_filter(user)
     run = await db.payroll_runs.find_one(
@@ -176,11 +175,19 @@ async def create_mobile_money_batch(
             reservations.append(assignment_key)
         except DuplicateKeyError:
             await db.mobile_money_assignments.delete_many({"_id": {"$in": reservations}})
+            existing_assignment = await db.mobile_money_assignments.find_one(
+                {"_id": assignment_key, **scope}, {"_id": 0},
+            )
             existing = await db.mobile_money_batches.find_one(
                 {"_id": batch_id, **scope}, {"_id": 0},
             )
             if existing:
                 return {"batch": existing, "created": False}
+            if existing_assignment and existing_assignment.get("provider") == "bank":
+                raise HTTPException(
+                    409,
+                    "This employee is already included in a bank-file export for this payroll run.",
+                )
             raise HTTPException(
                 409,
                 "At least one employee is already assigned to another wallet batch for this payroll run.",
@@ -237,7 +244,7 @@ async def create_mobile_money_batch(
 async def cancel_mobile_money_batch(
     rid: str,
     batch_id: str,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     batch = await _find_batch(rid, batch_id, user)
     if batch.get("status") != "draft":
@@ -265,7 +272,7 @@ async def cancel_mobile_money_batch(
 async def approve_mobile_money_batch(
     rid: str,
     batch_id: str,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     batch = await _find_batch(rid, batch_id, user)
     if batch.get("status") != "draft":
@@ -302,7 +309,7 @@ async def export_mobile_money_batch(
     rid: str,
     batch_id: str,
     response: Response,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     response.headers["Cache-Control"] = "private, no-store"
     batch = await _find_batch(rid, batch_id, user)
@@ -344,7 +351,7 @@ async def mark_mobile_money_batch_submitted(
     rid: str,
     batch_id: str,
     body: BatchSubmitIn,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     batch = await _find_batch(rid, batch_id, user)
     if batch.get("status") != "exported":
@@ -379,7 +386,7 @@ async def reconcile_mobile_money_line(
     batch_id: str,
     employee_id: str,
     body: BatchLineStatusIn,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     batch = await _find_batch(rid, batch_id, user)
     if batch.get("status") not in ("submitted", "reconciling", "reconciled_with_failures"):
