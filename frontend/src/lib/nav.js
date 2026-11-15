@@ -3,7 +3,7 @@ import {
   Sparkles, Settings, UserCircle, ScrollText, Heart, GraduationCap,
   BarChart3, FlaskConical, FolderArchive, Building2, UserCog, MessageSquare,
   Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video, FileCheck2, Compass,
-  Receipt, Briefcase, Megaphone,
+  Receipt, Briefcase, Megaphone, FolderKanban,
 } from "lucide-react";
 
 // Role groups — keep in sync with backend core.can_role / require_roles.
@@ -39,6 +39,7 @@ export const NAV = [
   { to: "/ministry", label: "Ministry rollup", icon: Landmark, roles: PAY, feature: "ministry_reports" },
   { to: "/civil-service", label: "Civil Service", icon: Award, roles: HR, feature: "civil_service" },
   { to: "/establishment", label: "Establishment", icon: Building2, roles: HR, feature: "establishment_control" },
+  { to: "/project-costing", label: "Project Costing", icon: FolderKanban, roles: [...HR, "payroll"], feature: "project_costing" },
   { to: "/sector-presets", label: "Sector presets", icon: Layers, roles: HR, feature: "sector_presets" },
   { to: "/promotion", label: "Promotions", icon: TrendingUp, roles: HR, feature: "civil_service" },
   { to: "/loans", label: "Loans", icon: Wallet, roles: ALL, feature: "loans_advances" },
