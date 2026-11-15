@@ -4,7 +4,7 @@ import csv
 import zipfile
 from xml.sax.saxutils import escape as xml_escape
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -86,7 +86,7 @@ async def _employees_for_payroll_run(run: dict, user: dict) -> list:
     ).to_list(len(employee_ids))
 
 
-def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
+def _build_nassit_xlsx(run: dict, employees: list, company: dict, payment_method: str) -> bytes:
     """Build a one-sheet Excel contribution schedule using NASSIT's published fields."""
     emp_map = {e["id"]: e for e in employees}
     rows = [
@@ -94,7 +94,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
         ["ER Number", company.get("nassit_employer", "")],
         ["Payment Period", run["period"]],
         ["Address of Employer", company.get("address", "")],
-        ["Method of Payment (complete before submission)", ""],
+        ["Method of Payment", payment_method],
         [],
         [
             "No.", "Member Name (as on SS card)", "SS Number",
@@ -362,7 +362,11 @@ async def nra_paye_return_csv(rid: str, user: dict = Depends(require_feature("nr
 
 
 @router.get("/nassit-schedule.xlsx/{rid}")
-async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("nra_export"))):
+async def nassit_schedule_xlsx(
+    rid: str,
+    payment_method: Literal["Cash", "Cheque", "Bank transfer"],
+    user: dict = Depends(require_feature("nra_export")),
+):
     """Excel contribution schedule using the fields published in NASSIT's Companion Guide."""
     if not can_role(user, "payroll", "auditor"):
         raise HTTPException(403, "Payroll, auditor or admin only")
@@ -397,7 +401,7 @@ async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("n
             "Complete " + " and ".join(missing_fields) + " and rerun payroll before exporting.",
         )
 
-    payload = _build_nassit_xlsx(run, employees, company)
+    payload = _build_nassit_xlsx(run, employees, company, payment_method)
     await audit(
         "nassit_schedule_xlsx_export",
         f"payroll_runs/{rid}",
