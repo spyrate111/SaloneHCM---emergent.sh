@@ -48,6 +48,12 @@ jobs:
             python -m pytest -q backend/tests/test_nassit_workpaper.py
           fi
 
+      - name: Run isolated payroll variance unit test when present
+        run: |
+          if [ -f backend/tests/test_payroll_variance_unit.py ]; then
+            python -m pytest -q backend/tests/test_payroll_variance_unit.py
+          fi
+
       - name: Run isolated mobile-money routing unit test when present
         run: |
           if [ -f backend/tests/test_mobile_money_routing.py ]; then
