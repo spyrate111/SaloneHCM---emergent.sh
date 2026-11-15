@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "../lib/auth";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
@@ -9,6 +10,7 @@ import OffboardingPanel from "../components/OffboardingPanel";
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { has } = useFeatures();
+  const { user } = useAuth();
   const [e, setE] = useState(null);
   const [slip, setSlip] = useState(null);
   // Civil-service refs
@@ -18,6 +20,9 @@ export default function EmployeeDetail() {
   const [savingCs, setSavingCs] = useState(false);
   const [qr, setQr] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
+  const [nassitIdentity, setNassitIdentity] = useState({ nassit_no: "", nassit_member_name: "" });
+  const [savingNassit, setSavingNassit] = useState(false);
+  const canEditNassit = ["hr", "admin", "superadmin"].includes(user?.role);
 
   const issueQr = async () => {
     setQrBusy(true);
@@ -33,6 +38,10 @@ export default function EmployeeDetail() {
 
   const load = useCallback(() => api.get(`/employees/${id}`).then((r) => {
     setE(r.data);
+    setNassitIdentity({
+      nassit_no: r.data.nassit_no || "",
+      nassit_member_name: r.data.nassit_member_name || "",
+    });
     setCs({
       grade_code: r.data.grade_code || "",
       step_number: r.data.step_number || "",
@@ -84,6 +93,19 @@ export default function EmployeeDetail() {
     }
   };
 
+  const saveNassitIdentity = async () => {
+    setSavingNassit(true);
+    try {
+      const res = await api.patch(`/employees/${id}/nassit-details`, nassitIdentity);
+      setE(res.data);
+      toast.success("NASSIT identity updated");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not update NASSIT identity");
+    } finally {
+      setSavingNassit(false);
+    }
+  };
+
   const selectedGrade = grades.find((g) => g.code === cs.grade_code);
 
   if (!e) return <div className="text-sm text-[#525860]">Loading…</div>;
@@ -130,6 +152,7 @@ export default function EmployeeDetail() {
               [Briefcase, "Job title", e.job_title],
               [Calendar, "Hire date", e.hire_date],
               [Hash, "NASSIT No.", e.nassit_no],
+              [Hash, "NASSIT member name (as on SS card)", e.nassit_member_name],
               [Hash, "TIN", e.tin],
             ].map(([Icon, label, val]) => (
               <div key={label} className="flex items-center gap-4 py-2 border-b border-[#F1EEE6] last:border-0">
@@ -139,6 +162,30 @@ export default function EmployeeDetail() {
               </div>
             ))}
           </div>
+
+          {canEditNassit && (
+            <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="nassit-identity-editor">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="font-heading text-lg font-semibold">NASSIT identity</h3>
+                  <p className="text-xs text-[#686D76] mt-1">Enter the member name exactly as it appears on the NASSIT Social Security card.</p>
+                </div>
+                <button data-testid="nassit-identity-save" onClick={saveNassitIdentity} disabled={savingNassit} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs px-3 py-2 rounded-md disabled:opacity-50">
+                  <Save className="w-3.5 h-3.5" /> {savingNassit ? "Saving…" : "Save"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">NASSIT No.</label>
+                  <input data-testid="nassit-identity-number" value={nassitIdentity.nassit_no} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_no: ev.target.value })} maxLength={64} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Member name on SS card</label>
+                  <input data-testid="nassit-identity-name" value={nassitIdentity.nassit_member_name} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_member_name: ev.target.value })} maxLength={180} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                </div>
+              </div>
+            </div>
+          )}
 
           {has("civil_service") && (
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="cs-profile-editor">
