@@ -3,6 +3,7 @@ superadmin API endpoint. Idempotent; re-running resets passwords/roles.
 CLI: cd /app/backend && python seed_test_accounts.py
 """
 import asyncio
+import os
 import uuid
 
 from dotenv import load_dotenv
@@ -22,16 +23,29 @@ ROLES = [
 
 
 async def seed_accounts(company_id: str | None = None) -> dict:
-    """Create/refresh all 70 test accounts on the given tenant (defaults to
-    Demo Salone Ltd., falling back to any company). employee1..10 and
-    manager1..10 get linked to real employee records so own-payslip and
-    self-service flows work."""
+    """Create/refresh test accounts only when explicitly enabled and tenant-scoped."""
+    enabled = os.environ.get("ENABLE_TEST_ACCOUNT_MANAGEMENT", "").strip().lower()
+    if enabled not in {"1", "true", "yes"}:
+        return {"ok": False, "error": "Test-account management is disabled"}
     if not company_id:
-        company = (await db.companies.find_one({"name": "Demo Salone Ltd."}, {"_id": 0, "id": 1})
-                   or await db.companies.find_one({}, {"_id": 0, "id": 1}))
-        if not company:
-            return {"ok": False, "error": "No company/tenant exists to attach accounts to"}
-        company_id = company["id"]
+        return {"ok": False, "error": "A company_id is required; no default tenant is used"}
+    # Preflight every fixed test email before changing any account. Never take over
+    # a real user or move a seeded account from another tenant.
+    existing_by_email = {}
+    for prefix, _role, _pw_prefix, _label in ROLES:
+        for n in range(1, 11):
+            email = f"{prefix}{n}@salonehcm.com"
+            existing = await db.users.find_one(
+                {"email": email},
+                {"_id": 0, "id": 1, "test_account": 1, "company_id": 1},
+            )
+            if existing and (
+                existing.get("test_account") is not True
+                or existing.get("company_id") != company_id
+            ):
+                return {"ok": False, "error": f"Refusing to overwrite non-test or cross-tenant account: {email}"}
+            existing_by_email[email] = existing
+
     emp_pool = [e["id"] for e in await db.employees.find(
         {"company_id": company_id, "status": "active"}, {"_id": 0, "id": 1}).to_list(50)]
     created = updated = 0
@@ -54,9 +68,18 @@ async def seed_accounts(company_id: str | None = None) -> dict:
             }
             if prefix == "auditor":
                 doc["auditor"] = True
-            existing = await db.users.find_one({"email": email}, {"_id": 0, "id": 1})
+            existing = existing_by_email[email]
             if existing:
-                await db.users.update_one({"email": email}, {"$set": doc})
+                result = await db.users.update_one(
+                    {
+                        "id": existing["id"],
+                        "company_id": company_id,
+                        "test_account": True,
+                    },
+                    {"$set": doc},
+                )
+                if not result.matched_count:
+                    return {"ok": False, "error": f"Test account changed during seeding: {email}"}
                 updated += 1
             else:
                 await db.users.insert_one({"id": str(uuid.uuid4()),
@@ -66,4 +89,8 @@ async def seed_accounts(company_id: str | None = None) -> dict:
 
 
 if __name__ == "__main__":
-    print(asyncio.run(seed_accounts()))
+    import sys
+
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python seed_test_accounts.py <company_id>")
+    print(asyncio.run(seed_accounts(sys.argv[1])))
