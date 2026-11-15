@@ -64,9 +64,8 @@ def _xml_safe_text(value) -> str:
 
 def _payroll_identity_value(slip: dict, snapshot_key: str, employee: dict, current_key: str):
     """Use run-time identity when present; only older runs fall back to current profiles."""
-    if snapshot_key in slip:
-        return slip.get(snapshot_key) or ""
-    return employee.get(current_key, "")
+    value = slip.get(snapshot_key) if snapshot_key in slip else employee.get(current_key, "")
+    return str(value or "").strip()
 
 
 def _require_completed_run(run: dict) -> None:
@@ -373,10 +372,10 @@ async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("n
     _require_completed_run(run)
     employees = await _employees_for_payroll_run(run, user)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
-    if not company.get("name") or not company.get("nassit_employer"):
+    if not company.get("name") or not company.get("nassit_employer") or not company.get("address"):
         raise HTTPException(
             422,
-            "Complete the employer name and NASSIT registration number in the company profile before exporting.",
+            "Complete the employer name, address, and NASSIT registration number in the company profile before exporting.",
         )
     emp_map = {employee["id"]: employee for employee in employees}
     missing_nassit_ids = []
