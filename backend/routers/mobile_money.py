@@ -17,9 +17,49 @@ from core import db, require_roles, audit, tenant_filter, with_tenant, now_utc, 
 
 
 router = APIRouter(prefix="/payroll/runs", tags=["mobile-money"])
+class ManualWorkpaperAdapter:
+    """Provider-specific extension point; this base only exports an internal CSV."""
+
+    provider_key = ""
+    label = ""
+    api_enabled = False
+
+    def build_workpaper(self, batch: dict) -> bytes:
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow([
+            "employee_name", "wallet_mobile_number", "amount_sle",
+            "currency", "payroll_period", "payment_reference",
+        ])
+        for line in batch.get("lines", []):
+            writer.writerow([
+                _text_cell(line.get("employee_name")),
+                _text_cell(line.get("mobile_money_number")),
+                f'{float(line.get("amount_sle", 0)):.2f}',
+                "SLE",
+                _text_cell(batch.get("period")),
+                _text_cell(line.get("payment_reference")),
+            ])
+        return buffer.getvalue().encode("utf-8")
+
+
+class OrangeMoneyAdapter(ManualWorkpaperAdapter):
+    provider_key = "orange_money"
+    label = "Orange Money"
+
+
+class AfrimoneyAdapter(ManualWorkpaperAdapter):
+    provider_key = "afrimoney"
+    label = "Afrimoney"
+
+
+PROVIDER_ADAPTERS = {
+    adapter.provider_key: adapter()
+    for adapter in (OrangeMoneyAdapter, AfrimoneyAdapter)
+}
 PROVIDERS = {
-    "orange_money": {"label": "Orange Money", "api_enabled": False},
-    "afrimoney": {"label": "Afrimoney", "api_enabled": False},
+    key: {"label": adapter.label, "api_enabled": adapter.api_enabled}
+    for key, adapter in PROVIDER_ADAPTERS.items()
 }
 
 
@@ -58,22 +98,10 @@ def _batch_id(company_id: str, run_id: str, provider: str) -> str:
 
 def _build_batch_csv(batch: dict) -> bytes:
     """Build SaloneHCM's internal workpaper, not a provider upload template."""
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow([
-        "employee_name", "wallet_mobile_number", "amount_sle",
-        "currency", "payroll_period", "payment_reference",
-    ])
-    for line in batch.get("lines", []):
-        writer.writerow([
-            _text_cell(line.get("employee_name")),
-            _text_cell(line.get("mobile_money_number")),
-            f'{float(line.get("amount_sle", 0)):.2f}',
-            "SLE",
-            _text_cell(batch.get("period")),
-            _text_cell(line.get("payment_reference")),
-        ])
-    return buffer.getvalue().encode("utf-8")
+    adapter = PROVIDER_ADAPTERS.get(batch.get("provider"))
+    if not adapter:
+        raise HTTPException(422, "Unknown mobile-money provider.")
+    return adapter.build_workpaper(batch)
 
 
 async def _find_batch(run_id: str, batch_id: str, user: dict) -> dict:
