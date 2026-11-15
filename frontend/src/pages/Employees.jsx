@@ -9,7 +9,7 @@ const empty = {
   first_name: "", last_name: "", middle_name: "", email: "", phone: "",
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
-  nassit_no: "", staff_number: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
+  nassit_no: "", nassit_member_name: "", staff_number: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
   hire_date: "2025-01-01", status: "active",
 };
 
@@ -136,6 +136,7 @@ export default function Employees() {
                 ["department", "Department", "text"],
                 ["location", "Location", "text"],
                 ["nassit_no", "NASSIT No.", "text"],
+                ["nassit_member_name", "NASSIT member name (as on SS card)", "text"],
                 ["staff_number", "Employee staff number", "text"],
                 ["tin", "TIN", "text"],
                 ["bank_name", "Bank name", "text"],
