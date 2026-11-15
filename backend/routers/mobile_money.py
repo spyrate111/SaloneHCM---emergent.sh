@@ -159,8 +159,30 @@ async def create_mobile_money_batch(
             "history": [],
         })
 
+    assignment_keys = [
+        _assignment_id(company_id, rid, line["employee_id"]) for line in lines
+    ]
+    existing_assignments = await db.mobile_money_assignments.find(
+        {"_id": {"$in": assignment_keys}, **scope}, {"_id": 0},
+    ).to_list(len(assignment_keys))
+    assignment_by_key = {item["_id"]: item for item in existing_assignments}
+
     for line in lines:
         assignment_key = _assignment_id(company_id, rid, line["employee_id"])
+        previous = assignment_by_key.get(assignment_key)
+        if previous:
+            if previous.get("batch_id") == batch_id:
+                continue
+            await db.mobile_money_assignments.delete_many({"_id": {"$in": reservations}})
+            if previous.get("provider") == "bank":
+                raise HTTPException(
+                    409,
+                    "This employee is already included in a bank-file export for this payroll run.",
+                )
+            raise HTTPException(
+                409,
+                "At least one employee is already assigned to another wallet batch for this payroll run.",
+            )
         assignment = {
             "_id": assignment_key,
             "company_id": company_id,
@@ -174,10 +196,12 @@ async def create_mobile_money_batch(
             await db.mobile_money_assignments.insert_one(assignment)
             reservations.append(assignment_key)
         except DuplicateKeyError:
-            await db.mobile_money_assignments.delete_many({"_id": {"$in": reservations}})
             existing_assignment = await db.mobile_money_assignments.find_one(
                 {"_id": assignment_key, **scope}, {"_id": 0},
             )
+            if existing_assignment and existing_assignment.get("batch_id") == batch_id:
+                continue
+            await db.mobile_money_assignments.delete_many({"_id": {"$in": reservations}})
             existing = await db.mobile_money_batches.find_one(
                 {"_id": batch_id, **scope}, {"_id": 0},
             )
