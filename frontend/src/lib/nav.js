@@ -3,7 +3,7 @@ import {
   Sparkles, Settings, UserCircle, ScrollText, Heart, GraduationCap,
   BarChart3, FlaskConical, FolderArchive, Building2, UserCog, MessageSquare,
   Repeat, Landmark, Award, Wallet, CreditCard, Layers, TrendingUp, Video, FileCheck2, Compass,
-  Receipt, Briefcase, Megaphone,
+  Receipt, Briefcase, Megaphone, DollarSign,
 } from "lucide-react";
 
 // Role groups — keep in sync with backend core.can_role / require_roles.
@@ -36,6 +36,7 @@ export const NAV = [
   { to: "/performance", label: "Performance", icon: Sparkles, roles: ALL, feature: "talent" },
   { to: "/documents", label: "Document Vault", icon: FolderArchive, roles: ALL, feature: "documents" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, roles: INSIGHT, feature: "analytics" },
+  { to: "/fx-rates", label: "FX Reference Rates", icon: DollarSign, roles: INSIGHT, feature: "analytics", financeOfficer: true },
   { to: "/ministry", label: "Ministry rollup", icon: Landmark, roles: PAY, feature: "ministry_reports" },
   { to: "/civil-service", label: "Civil Service", icon: Award, roles: HR, feature: "civil_service" },
   { to: "/establishment", label: "Establishment", icon: Building2, roles: HR, feature: "establishment_control" },
@@ -59,5 +60,8 @@ export const NAV = [
 // `has` is the `useFeatures().has(featureName) => boolean` helper.
 export function filterNavForUser(user, has) {
   if (!user) return [];
-  return NAV.filter((n) => n.roles.includes(user.role) && (!n.feature || has(n.feature)));
+  return NAV.filter((n) =>
+    (n.roles.includes(user.role) || (n.financeOfficer && user.finance_officer))
+    && (!n.feature || has(n.feature))
+  );
 }
