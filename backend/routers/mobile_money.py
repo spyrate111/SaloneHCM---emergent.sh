@@ -416,50 +416,52 @@ async def create_run_mobile_money_batch(
         "recipients": recipients,
     }
     reservation_keys = []
-    for recipient in recipients:
-        assignment_key = _assignment_id(user["company_id"], rid, recipient["employee_id"])
-        existing_assignment = await db.mobile_money_assignments.find_one(
-            {"_id": assignment_key, **scope},
-            {"_id": 0, "provider": 1},
-        )
-        if existing_assignment:
-            await _release_payout_reservations(reservation_keys, batch_id, user)
-            if existing_assignment.get("provider") == "bank":
-                raise HTTPException(
-                    409,
-                    "This employee is already included in a bank-file export for this payroll run.",
-                )
-            raise HTTPException(
-                409,
-                "At least one employee is already reserved for another payout batch in this payroll run.",
-            )
-        assignment = {
-            "_id": assignment_key,
-            "company_id": user["company_id"],
-            "run_id": rid,
-            "employee_id": recipient["employee_id"],
-            "batch_id": batch_id,
-            "provider": body.provider,
-            "created_at": now,
-        }
-        try:
-            await db.mobile_money_assignments.insert_one(assignment)
-            reservation_keys.append(assignment_key)
-        except DuplicateKeyError:
-            await _release_payout_reservations(reservation_keys, batch_id, user)
-            current_assignment = await db.mobile_money_assignments.find_one(
+    try:
+        for recipient in recipients:
+            assignment_key = _assignment_id(user["company_id"], rid, recipient["employee_id"])
+            existing_assignment = await db.mobile_money_assignments.find_one(
                 {"_id": assignment_key, **scope},
                 {"_id": 0, "provider": 1},
             )
-            if current_assignment and current_assignment.get("provider") == "bank":
+            if existing_assignment:
+                if existing_assignment.get("provider") == "bank":
+                    raise HTTPException(
+                        409,
+                        "This employee is already included in a bank-file export for this payroll run.",
+                    )
                 raise HTTPException(
                     409,
-                    "This employee is already included in a bank-file export for this payroll run.",
+                    "At least one employee is already reserved for another payout batch in this payroll run.",
                 )
-            raise HTTPException(
-                409,
-                "At least one employee is already reserved for another payout batch in this payroll run.",
-            )
+            assignment = {
+                "_id": assignment_key,
+                "company_id": user["company_id"],
+                "run_id": rid,
+                "employee_id": recipient["employee_id"],
+                "batch_id": batch_id,
+                "provider": body.provider,
+                "created_at": now,
+            }
+            try:
+                await db.mobile_money_assignments.insert_one(assignment)
+                reservation_keys.append(assignment_key)
+            except DuplicateKeyError:
+                current_assignment = await db.mobile_money_assignments.find_one(
+                    {"_id": assignment_key, **scope},
+                    {"_id": 0, "provider": 1},
+                )
+                if current_assignment and current_assignment.get("provider") == "bank":
+                    raise HTTPException(
+                        409,
+                        "This employee is already included in a bank-file export for this payroll run.",
+                    )
+                raise HTTPException(
+                    409,
+                    "At least one employee is already reserved for another payout batch in this payroll run.",
+                )
+    except Exception:
+        await _release_payout_reservations(reservation_keys, batch_id, user)
+        raise
 
     try:
         await db.mobile_money_batches.insert_one(dict(batch))
@@ -488,6 +490,43 @@ async def create_run_mobile_money_batch(
         },
     )
     return batch
+
+
+@router.delete("/mobile-money/batches/{bid}")
+async def cancel_pending_mobile_money_batch(
+    bid: str,
+    user: dict = Depends(require_roles("payroll")),
+):
+    scope = tenant_filter(user)
+    batch = await db.mobile_money_batches.find_one(
+        {"id": bid, **scope}, {"_id": 0},
+    )
+    if not batch:
+        raise HTTPException(404, "Mobile-money batch not found")
+    if batch.get("status") != "pending_approval":
+        raise HTTPException(409, "Only a batch awaiting approval can be cancelled.")
+    if batch.get("created_by") != user.get("email"):
+        raise HTTPException(403, "Only the person who prepared this batch can cancel it.")
+
+    deleted = await db.mobile_money_batches.delete_one({
+        "id": bid,
+        **scope,
+        "status": "pending_approval",
+        "created_by": user.get("email"),
+    })
+    if deleted.deleted_count != 1:
+        raise HTTPException(409, "The batch changed. Refresh before cancelling it.")
+    await db.mobile_money_assignments.delete_many({
+        "batch_id": bid,
+        **scope,
+    })
+    await audit(
+        "mobile_money_batch_cancelled",
+        f"payroll_runs/{batch['run_id']}",
+        user,
+        {"batch_id": bid, "provider": batch["provider"], "recipient_count": batch["recipient_count"]},
+    )
+    return {"ok": True}
 
 
 @router.post("/mobile-money/batches/{bid}/retry-failed")
