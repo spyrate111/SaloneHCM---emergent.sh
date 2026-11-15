@@ -71,13 +71,13 @@ export default function Schedules() {
             Recurring schedules <Repeat className="w-6 h-6 text-[#D1603D]" />
           </h1>
           <p className="text-[#525860] text-sm mt-1.5 max-w-2xl">
-            Auto-run payroll on a cadence. Each schedule fires at <span className="font-data">06:00 UTC</span> on its due date and creates a normal payroll run — the same one you'd get from the manual wizard.
+            Auto-run payroll on a cadence. Each schedule fires at <span className="font-data">06:00 UTC</span> on its due date and creates a normal payroll run &mdash; the same one you&rsquo;d get from the manual wizard.
           </p>
         </div>
         <button
           data-testid="schedule-create-open"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+          className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
         >
           <Plus className="w-4 h-4" strokeWidth={1.5} /> New schedule
         </button>
@@ -105,13 +105,13 @@ export default function Schedules() {
                 <td className="py-3 px-4 font-data text-xs text-[#686D76]">
                   {s.last_run_at ? new Date(s.last_run_at).toLocaleDateString() : "—"}
                   {s.last_run_status && s.last_run_status !== "success" && s.last_run_status !== "manual" && (
-                    <div className="text-[10px] text-[#B83A3A] mt-0.5">{s.last_run_status}</div>
+                    <div className="text-[10px] text-[#3A7CB8] mt-0.5">{s.last_run_status}</div>
                   )}
                 </td>
                 <td className="py-3 px-4 font-data text-[#525860]">{s.runs_completed || 0}</td>
                 <td className="py-3 px-4">
                   {s.active
-                    ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#E6F4EC] text-[#2D7A5D]"><PlayCircle className="w-3 h-3" /> Active</span>
+                    ? <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]"><PlayCircle className="w-3 h-3" /> Active</span>
                     : <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#EBE8E0] text-[#525860]"><Pause className="w-3 h-3" /> Paused</span>}
                 </td>
                 <td className="py-3 px-4 text-right">
@@ -120,7 +120,7 @@ export default function Schedules() {
                     <button data-testid={`toggle-${s.id}`} onClick={() => toggle(s)} title={s.active ? "Pause" : "Activate"} className="p-1.5 rounded text-[#26547C] hover:bg-[#E5EEF6]">
                       {s.active ? <Pause className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
                     </button>
-                    <button data-testid={`delete-${s.id}`} onClick={() => remove(s)} title="Delete" className="p-1.5 rounded text-[#B83A3A] hover:bg-[#FBEAEA]"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button data-testid={`delete-${s.id}`} onClick={() => remove(s)} title="Delete" className="p-1.5 rounded text-[#3A7CB8] hover:bg-[#E9F2FB]"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </td>
               </tr>
@@ -154,14 +154,14 @@ export default function Schedules() {
             </Field>
             <Field label="Day of month (used for Monthly only)">
               <input data-testid="new-schedule-day" name="day_of_month" type="number" min={1} max={31} defaultValue={28} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
-              <div className="text-[11px] text-[#686D76] mt-1">If the chosen day doesn't exist (e.g. Feb 30), it falls back to the last day of the month.</div>
+              <div className="text-[11px] text-[#686D76] mt-1">If the chosen day doesn&rsquo;t exist (e.g. Feb 30), it falls back to the last day of the month.</div>
             </Field>
             <Field label="Description (optional)">
               <input name="description" placeholder="Notes for your team" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
             </Field>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button type="submit" data-testid="new-schedule-submit" className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md inline-flex items-center gap-2">
+              <button type="submit" data-testid="new-schedule-submit" className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md inline-flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Create
               </button>
             </div>

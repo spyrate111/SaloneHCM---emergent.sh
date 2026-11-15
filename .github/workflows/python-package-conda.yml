@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend and Frontend CI
 
 on:
   push:
@@ -41,7 +41,53 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q backend
 
-      # The current pytest suite includes deployment and provider integration tests.
-      # Collect tests here without executing requests or sending test email.
+      - name: Run isolated mobile-money routing unit test when present
+        run: |
+          if [ -f backend/tests/test_mobile_money_routing.py ]; then
+            python -m pytest -q backend/tests/test_mobile_money_routing.py
+          fi
+
+      # This focused workpaper test is offline and safe to execute when a PR adds it.
+      - name: Run isolated NASSIT workpaper unit test when present
+        run: |
+          if [ -f backend/tests/test_nassit_workpaper.py ]; then
+            python -m pytest -q backend/tests/test_nassit_workpaper.py
+          fi
+
+      - name: Run isolated payroll variance unit test when present
+        run: |
+          if [ -f backend/tests/test_payroll_variance_unit.py ]; then
+            python -m pytest -q backend/tests/test_payroll_variance_unit.py
+          fi
+
+      # The remaining suite includes deployment and provider integration tests.
+      # Collect those tests without executing requests or sending test email.
       - name: Collect backend tests
         run: python -m pytest --collect-only -q backend/tests
+
+  frontend:
+    name: Frontend production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install Yarn 1.22.22
+        run: npm install --global yarn@1.22.22
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          CI: "true"
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8001
+        run: yarn build

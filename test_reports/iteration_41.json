@@ -1,0 +1,39 @@
+{
+  "summary": "iter53 features tested end-to-end on the preview URL. Interview scheduling UI (schedule, chip, reschedule prefill, past-date 422 toast, still correct after reload), the interview email/reminder pipeline (interview_scheduled log, reminder sent once, 2nd run sent=0, HR gets 403), the announcement reminder badge and panel summary line (79 nudges, employee1 who had read it was skipped, 2nd run sent=0, HR/employee get 403), the Leavers report (month filter, row data, empty state, CSV download leavers-2025-03.csv with the leaver's name) and the leavers role gate (payroll section hidden, 403 for payroll and employee on report and report.csv) all PASS. Smoke check as admin1 on /recruitment, /announcements and /analytics: no page errors and no failed requests.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/announcements/{aid}", "issue": "Deletes announcement_reads but not announcement_reminders. Reminder records are left orphaned."},
+      {"endpoint": "POST /api/announcements/run-reminders, POST /api/recruitment/run-interview-reminders", "issue": "A tenant admin can trigger the sweep, but it runs across ALL tenants because reminders.py has no company filter. Delivery is still correct per tenant, but the trigger is not tenant-scoped. Consider limiting manual triggers to superadmin or passing company_id."},
+      {"endpoint": "reminders.run_announcement_reminders", "issue": "Nudges every enabled user in the company, including superadmin. It ignores any audience targeting and does not exclude the poster (the poster is only skipped if they already read it)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Layout polling for the HR role", "issue": "GET /api/payroll/cutoff/status returns 403 repeatedly for hradmin1 and spams the console with 'Failed to load resource 403'. Already there before this work, not part of the new features.", "affected_selectors": []}
+    ],
+    "design_issues": [
+      {"screen": "Recruitment InterviewModal", "issues": ["The 'fixed inset-0' backdrop dims only the main content container. The sidebar and top header stay undimmed, probably because a transformed or animated ancestor creates a containing block. Render the modal through a portal to fix it."]},
+      {"screen": "Analytics payroll chart (not part of this work)", "issues": ["X-axis month labels are out of order (2026-02, 2026-07, ..., 2026-01)."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/iter41_setup.py", "/app/tests/iter41_verify.py", "/app/tests/iter41_cleanup.py", "/app/tests/iter41_setup_common.py"],
+  "action_items": [
+    "Optional: also delete announcement_reminders in delete_announcement",
+    "Optional: scope the manual reminder triggers to the caller's tenant, or restrict them to superadmin",
+    "Optional: render InterviewModal through a portal so the backdrop covers the whole viewport",
+    "Optional: stop calling /api/payroll/cutoff/status for roles that get 403"
+  ],
+  "critical_code_review_comments": [
+    "The interview time is treated as UTC. That is correct for Sierra Leone (GMT), but document it in case the app is used in other timezones.",
+    "Rescheduling resets reminder_sent=False, so a rescheduled interview inside 24h gets a fresh reminder. This looks intended.",
+    "The Leavers CSV export button is not disabled when the month has no leavers. It downloads a file with only the header row. Acceptable."
+  ],
+  "updated_files": ["/app/tests/iter41_setup.py", "/app/tests/iter41_verify.py", "/app/tests/iter41_cleanup.py", "/app/tests/iter41_setup_common.py"],
+  "success_rate": {"backend": "100% (API/DB verifications)", "frontend": "100%"},
+  "seed_data_creation": "Created a TEST_ vacancy and application, a TEST_ urgent announcement (with reads and 79 reminders) and a TEST_Leaver employee plus a completed offboarding. All of it was deleted by id afterwards (iter41_cleanup.py).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "To re-run: python /app/tests/iter41_setup.py (writes /tmp/iter41.json), then iter41_verify.py interview|announce|leavers, then iter41_cleanup.py. The server clock is Nov 2026. admin1 and hradmin1 share the Demo Salone tenant."
+}

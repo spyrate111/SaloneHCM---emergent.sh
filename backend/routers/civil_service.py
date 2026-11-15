@@ -4,15 +4,16 @@ acting allowances, Ministry-of-Finance approval workflow, ghost-worker controls.
 Gov tier-only. Feature flag: `civil_service`.
 """
 import uuid
-from datetime import datetime
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from core import (
-    db, get_current_user, require_admin, require_feature, audit,
+    db, get_current_user, require_admin, audit,
     now_utc, iso, tenant_filter, with_tenant,
 )
+
+from core import require_roles
 
 router = APIRouter(prefix="/civil-service", tags=["civil-service"])
 
@@ -44,7 +45,7 @@ async def list_grades(user: dict = Depends(get_current_user)):
 
 
 @router.post("/grades")
-async def create_grade(body: GradeIn, user: dict = Depends(require_admin)):
+async def create_grade(body: GradeIn, user: dict = Depends(require_roles("hr"))):
     existing = await db.civil_service_grades.find_one(
         {"code": body.code, **tenant_filter(user)}, {"_id": 0, "code": 1}
     )
@@ -58,7 +59,7 @@ async def create_grade(body: GradeIn, user: dict = Depends(require_admin)):
 
 
 @router.delete("/grades/{code}")
-async def delete_grade(code: str, user: dict = Depends(require_admin)):
+async def delete_grade(code: str, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     # Block delete if any employees still assigned
     using = await db.employees.count_documents({"grade_code": code, **tf})
@@ -71,7 +72,7 @@ async def delete_grade(code: str, user: dict = Depends(require_admin)):
 
 
 @router.put("/grades/{code}/steps")
-async def set_grade_steps(code: str, steps: list[StepIn], user: dict = Depends(require_admin)):
+async def set_grade_steps(code: str, steps: list[StepIn], user: dict = Depends(require_roles("hr"))):
     """Replace the entire step schedule for a grade (atomic)."""
     tf = tenant_filter(user)
     grade = await db.civil_service_grades.find_one({"code": code, **tf}, {"_id": 0})
@@ -118,7 +119,7 @@ async def list_allowance_rules(user: dict = Depends(get_current_user)):
 
 
 @router.post("/allowance-rules")
-async def create_allowance_rule(body: AllowanceRuleIn, user: dict = Depends(require_admin)):
+async def create_allowance_rule(body: AllowanceRuleIn, user: dict = Depends(require_roles("hr"))):
     if (body.flat_sle is None) == (body.pct_of_basic is None):
         raise HTTPException(400, "Provide exactly one of `flat_sle` or `pct_of_basic`")
     doc = with_tenant({
@@ -133,7 +134,7 @@ async def create_allowance_rule(body: AllowanceRuleIn, user: dict = Depends(requ
 
 
 @router.delete("/allowance-rules/{rid}")
-async def delete_allowance_rule(rid: str, user: dict = Depends(require_admin)):
+async def delete_allowance_rule(rid: str, user: dict = Depends(require_roles("hr"))):
     await db.civil_service_allowance_rules.delete_one({"id": rid, **tenant_filter(user)})
     await audit("allowance_rule_delete", f"civil_service_allowance_rules/{rid}", user)
     return {"ok": True}
@@ -157,7 +158,7 @@ async def list_budget_codes(user: dict = Depends(get_current_user)):
 
 
 @router.post("/budget-codes")
-async def create_budget_code(body: BudgetCodeIn, user: dict = Depends(require_admin)):
+async def create_budget_code(body: BudgetCodeIn, user: dict = Depends(require_roles("hr"))):
     if await db.civil_service_budget_codes.find_one({"code": body.code, **tenant_filter(user)}, {"_id": 0, "code": 1}):
         raise HTTPException(409, f"Budget code {body.code} already exists")
     doc = with_tenant({**body.model_dump(), "id": str(uuid.uuid4()), "created_at": iso(now_utc())}, user)
@@ -168,7 +169,7 @@ async def create_budget_code(body: BudgetCodeIn, user: dict = Depends(require_ad
 
 
 @router.delete("/budget-codes/{code}")
-async def delete_budget_code(code: str, user: dict = Depends(require_admin)):
+async def delete_budget_code(code: str, user: dict = Depends(require_roles("hr"))):
     using = await db.employees.count_documents({"budget_code": code, **tenant_filter(user)})
     if using:
         raise HTTPException(409, f"Cannot delete — {using} employees mapped to {code}")
@@ -191,7 +192,7 @@ class EmployeeCivilServicePatch(BaseModel):
 
 
 @router.patch("/employees/{eid}/profile")
-async def patch_employee_cs(eid: str, body: EmployeeCivilServicePatch, user: dict = Depends(require_admin)):
+async def patch_employee_cs(eid: str, body: EmployeeCivilServicePatch, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     payload = {k: v for k, v in body.model_dump().items() if v is not None}
     if not payload:
@@ -252,7 +253,7 @@ async def list_actings(active_only: bool = False, user: dict = Depends(get_curre
 
 
 @router.post("/actings")
-async def create_acting(body: ActingIn, user: dict = Depends(require_admin)):
+async def create_acting(body: ActingIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     emp = await db.employees.find_one({"id": body.employee_id, **tf}, {"_id": 0, "id": 1})
     if not emp:
@@ -265,7 +266,7 @@ async def create_acting(body: ActingIn, user: dict = Depends(require_admin)):
 
 
 @router.delete("/actings/{aid}")
-async def delete_acting(aid: str, user: dict = Depends(require_admin)):
+async def delete_acting(aid: str, user: dict = Depends(require_roles("hr"))):
     await db.civil_service_actings.delete_one({"id": aid, **tenant_filter(user)})
     await audit("acting_delete", f"civil_service_actings/{aid}", user)
     return {"ok": True}
@@ -307,38 +308,19 @@ async def get_active_allowance_amounts(emp: dict, company_id: str, period: str) 
     for a in active_actings:
         label = f"Acting: {a['acting_role_title']}"
         out[label] = round(out.get(label, 0) + float(a["monthly_allowance_sle"]), 2)
+
+    # Sector preset allowances (private-sector industry templates).
+    # These are additive to civil-service allowances. Stored directly on the employee.
+    for sa in emp.get("sector_allowances") or []:
+        lbl = sa.get("label")
+        amt = float(sa.get("amount_sle", 0) or 0)
+        if lbl and amt:
+            out[lbl] = round(out.get(lbl, 0) + amt, 2)
+
     return out
 
 
 # ============ Reports ============
-
-@router.get("/reports/by-budget-code/{run_id}")
-async def spend_by_budget_code(run_id: str, user: dict = Depends(require_admin)):
-    tf = tenant_filter(user)
-    run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
-    if not run:
-        raise HTTPException(404, "Run not found")
-    emps = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(5000)}
-    by_code: dict = {}
-    for s in run.get("slips", []):
-        emp = emps.get(s["employee_id"], {})
-        code = emp.get("budget_code", "UNCODED")
-        ministry = emp.get("mda_ministry", "—")
-        bucket = by_code.setdefault(code, {
-            "budget_code": code, "ministry": ministry, "employee_count": 0,
-            "gross": 0.0, "paye": 0.0, "nassit_employer": 0.0, "net": 0.0,
-        })
-        bucket["employee_count"] += 1
-        bucket["gross"] += s["gross"]
-        bucket["paye"] += s["paye"]
-        bucket["nassit_employer"] += s["nassit_employer"]
-        bucket["net"] += s["net"]
-    rows = sorted(by_code.values(), key=lambda r: -r["gross"])
-    for r in rows:
-        for k in ("gross", "paye", "nassit_employer", "net"):
-            r[k] = round(r[k], 2)
-    return {"period": run["period"], "rows": rows, "total_rows": len(rows)}
-
 
 async def _budget_rows(run_id: str, tf: dict) -> tuple[dict, list]:
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
@@ -367,7 +349,7 @@ async def _budget_rows(run_id: str, tf: dict) -> tuple[dict, list]:
 
 
 @router.get("/reports/by-budget-code/{run_id}.csv")
-async def spend_by_budget_code_csv(run_id: str, user: dict = Depends(require_admin)):
+async def spend_by_budget_code_csv(run_id: str, user: dict = Depends(require_roles("hr"))):
     import io
     import csv
     from fastapi.responses import StreamingResponse
@@ -395,7 +377,7 @@ async def spend_by_budget_code_csv(run_id: str, user: dict = Depends(require_adm
 
 
 @router.get("/reports/by-budget-code/{run_id}.pdf")
-async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_admin)):
+async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_roles("hr"))):
     import io
     from fastapi.responses import StreamingResponse
     from reportlab.lib.pagesizes import A4, landscape
@@ -410,7 +392,7 @@ async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_adm
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
     styles = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#133326"), alignment=0, spaceAfter=6)
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#0A4A1E"), alignment=0, spaceAfter=6)
     small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
 
     story = [
@@ -456,6 +438,12 @@ async def spend_by_budget_code_pdf(run_id: str, user: dict = Depends(require_adm
     )
 
 
+@router.get("/reports/by-budget-code/{run_id}")
+async def spend_by_budget_code(run_id: str, user: dict = Depends(require_roles("hr"))):
+    run, rows = await _budget_rows(run_id, tenant_filter(user))
+    return {"period": run["period"], "rows": rows, "total_rows": len(rows)}
+
+
 async def _ghost_data(run_id: str, tf: dict) -> dict:
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
@@ -490,7 +478,7 @@ async def _ghost_data(run_id: str, tf: dict) -> dict:
 
 
 @router.get("/ghost-workers/{run_id}.csv")
-async def ghost_workers_csv(run_id: str, user: dict = Depends(require_admin)):
+async def ghost_workers_csv(run_id: str, user: dict = Depends(require_roles("hr"))):
     import io
     import csv
     from fastapi.responses import StreamingResponse
@@ -517,14 +505,64 @@ async def ghost_workers_csv(run_id: str, user: dict = Depends(require_admin)):
     )
 
 
+def _ghost_pdf_story(data: dict, company: dict, styles, small, h1) -> list:
+    """Build the ghost-worker PDF story header (excluding the table)."""
+    from reportlab.platypus import Paragraph, Spacer
+    from reportlab.lib.units import cm
+    return [
+        Paragraph(f"Ghost-Worker Audit · {data['period']}", h1),
+        Paragraph(
+            f"<b>{company.get('name','—')}</b> &nbsp;|&nbsp; "
+            f"Total slips: <b>{data['total_slips']}</b> &nbsp;|&nbsp; "
+            f"Acknowledged: <b>{data['acknowledged']}</b> &nbsp;|&nbsp; "
+            f"Unacknowledged: <b style='color:#3A7CB8'>{data['ghost_suspects']}</b> "
+            f"({data['ghost_rate']:.0%})",
+            small,
+        ),
+        Spacer(1, 0.4 * cm),
+    ]
+
+
+def _ghost_pdf_suspects_table(suspects: list):
+    """Build the Table+TableStyle for ghost-worker suspects. Returns a Table."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle
+    rows = [["Employee", "Department", "Ministry", "Grade", "Budget code", "Net SLE", "Hire date"]]
+    total = 0.0
+    for s in suspects:
+        rows.append([
+            s["employee_name"], s["department"] or "—", s["ministry"] or "—",
+            s["grade_code"] or "—", s["budget_code"] or "—",
+            f"{s['net_unacknowledged_sle']:,.2f}", s["hire_date"] or "—",
+        ])
+        total += s["net_unacknowledged_sle"]
+    rows.append(["TOTAL", "", "", "", "", f"{total:,.2f}", ""])
+    t = Table(rows, colWidths=[5 * cm, 3.4 * cm, 4 * cm, 1.6 * cm, 3 * cm, 3 * cm, 2.4 * cm])
+    t.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
+        ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E9F2FB")),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#3A7CB8")),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
+        ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
+        ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
+        ("ALIGN", (5, 1), (5, -1), "RIGHT"),
+        ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#3A7CB8")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    return t
+
+
 @router.get("/ghost-workers/{run_id}.pdf")
-async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
+async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_roles("hr"))):
     import io
     from fastapi.responses import StreamingResponse
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
     data = await _ghost_data(run_id, tenant_filter(user))
@@ -533,50 +571,15 @@ async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.6 * cm, rightMargin=1.6 * cm, topMargin=1.6 * cm, bottomMargin=1.6 * cm)
     styles = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#B83A3A"), alignment=0, spaceAfter=6)
+    h1 = ParagraphStyle("h1", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, textColor=colors.HexColor("#3A7CB8"), alignment=0, spaceAfter=6)
     small = ParagraphStyle("small", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#525860"))
 
-    story = [
-        Paragraph(f"Ghost-Worker Audit · {data['period']}", h1),
-        Paragraph(
-            f"<b>{company.get('name','—')}</b> &nbsp;|&nbsp; "
-            f"Total slips: <b>{data['total_slips']}</b> &nbsp;|&nbsp; "
-            f"Acknowledged: <b>{data['acknowledged']}</b> &nbsp;|&nbsp; "
-            f"Unacknowledged: <b style='color:#B83A3A'>{data['ghost_suspects']}</b> "
-            f"({data['ghost_rate']:.0%})",
-            small,
-        ),
-        Spacer(1, 0.4 * cm),
-    ]
+    story = _ghost_pdf_story(data, company, styles, small, h1)
     if data["suspects"]:
-        rows = [["Employee", "Department", "Ministry", "Grade", "Budget code", "Net SLE", "Hire date"]]
-        total = 0.0
-        for s in data["suspects"]:
-            rows.append([
-                s["employee_name"], s["department"] or "—", s["ministry"] or "—",
-                s["grade_code"] or "—", s["budget_code"] or "—",
-                f"{s['net_unacknowledged_sle']:,.2f}", s["hire_date"] or "—",
-            ])
-            total += s["net_unacknowledged_sle"]
-        rows.append(["TOTAL", "", "", "", "", f"{total:,.2f}", ""])
-        t = Table(rows, colWidths=[5 * cm, 3.4 * cm, 4 * cm, 1.6 * cm, 3 * cm, 3 * cm, 2.4 * cm])
-        t.setStyle(TableStyle([
-            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
-            ("FONT", (0, 1), (-1, -1), "Helvetica", 8),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FBEAEA")),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.6, colors.HexColor("#B83A3A")),
-            ("LINEBELOW", (0, 1), (-1, -2), 0.2, colors.HexColor("#E2DFD6")),
-            ("LINEABOVE", (0, -1), (-1, -1), 0.6, colors.HexColor("#1A1C1E")),
-            ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 9),
-            ("ALIGN", (5, 1), (5, -1), "RIGHT"),
-            ("TEXTCOLOR", (5, 1), (5, -2), colors.HexColor("#B83A3A")),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ]))
-        story.append(t)
+        story.append(_ghost_pdf_suspects_table(data["suspects"]))
     else:
         story.append(Paragraph(
-            "<font color='#2D7A5D'><b>No ghost workers detected — all payslips acknowledged.</b></font>",
+            "<font color='#17A035'><b>No ghost workers detected — all payslips acknowledged.</b></font>",
             styles["BodyText"],
         ))
     doc.build(story)
@@ -589,7 +592,14 @@ async def ghost_workers_pdf(run_id: str, user: dict = Depends(require_admin)):
     )
 
 
-# ============ Ghost-worker detection / Payslip acknowledgement ============
+@router.get("/ghost-workers/{run_id}")
+async def ghost_workers_report(run_id: str, user: dict = Depends(require_roles("hr"))):
+    """List employees whose payslip was issued but never acknowledged → potential ghost workers."""
+    data = await _ghost_data(run_id, tenant_filter(user))
+    # Strip the raw run object from the JSON response
+    data.pop("run", None)
+    return data
+
 
 class AcknowledgeIn(BaseModel):
     note: Optional[str] = None
@@ -623,13 +633,62 @@ async def acknowledge_my_payslip(run_id: str, body: AcknowledgeIn, user: dict = 
     return {"ok": True, "acknowledged_at": iso(now_utc())}
 
 
-@router.get("/ghost-workers/{run_id}")
-async def ghost_workers_report(run_id: str, user: dict = Depends(require_admin)):
-    """List employees whose payslip was issued but never acknowledged → potential ghost workers."""
-    data = await _ghost_data(run_id, tenant_filter(user))
-    # Strip the raw run object from the JSON response
-    data.pop("run", None)
-    return data
+# ============ Step Increments (admin) ============
+
+class StepIncrementRunIn(BaseModel):
+    dry_run: bool = True
+    target_date: Optional[str] = None  # YYYY-MM-DD to simulate a specific day
+
+
+@router.post("/step-increments/run")
+async def run_step_increments(body: StepIncrementRunIn, user: dict = Depends(require_roles("hr"))):
+    """Manually trigger the step-increment job for this tenant. `dry_run=True` previews without writing."""
+    from step_increments import _eligible_today_for_tenant, apply_increments
+    from datetime import datetime as _dt
+    target = None
+    if body.target_date:
+        try:
+            target = _dt.fromisoformat(body.target_date).replace(tzinfo=None)
+            from datetime import timezone as _tz
+            target = target.replace(tzinfo=_tz.utc)
+        except Exception:
+            raise HTTPException(400, "target_date must be YYYY-MM-DD")
+    eligible = await _eligible_today_for_tenant(user["company_id"], target_date=target)
+    res = await apply_increments(user["company_id"], eligible, user_email=user["email"], dry_run=body.dry_run)
+    await audit("step_increments_run", "civil_service/step-increments", user, {
+        "dry_run": body.dry_run, "count": res["count"], "target_date": body.target_date,
+    })
+    return res
+
+
+@router.get("/step-increments/history")
+async def step_increment_history(user: dict = Depends(require_roles("hr"))):
+    return await db.step_increments.find(
+        tenant_filter(user), {"_id": 0}
+    ).sort("applied_at", -1).to_list(500)
+
+
+# ============ Acting Allowance edit ============
+
+class ActingPatch(BaseModel):
+    acting_role_title: Optional[str] = None
+    monthly_allowance_sle: Optional[float] = Field(default=None, ge=0)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+@router.patch("/actings/{aid}")
+async def patch_acting(aid: str, body: ActingPatch, user: dict = Depends(require_roles("hr"))):
+    patch = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not patch:
+        return {"ok": True, "updated": 0}
+    r = await db.civil_service_actings.update_one(
+        {"id": aid, **tenant_filter(user)}, {"$set": patch}
+    )
+    if not r.matched_count:
+        raise HTTPException(404, "Acting not found")
+    await audit("acting_update", f"civil_service_actings/{aid}", user, patch)
+    return {"ok": True, "updated": patch}
 
 
 # ============ Ministry-of-Finance approval workflow ============
@@ -639,7 +698,7 @@ class MoFActionIn(BaseModel):
 
 
 @router.post("/runs/{run_id}/submit-for-approval")
-async def submit_for_mof_approval(run_id: str, body: MoFActionIn, user: dict = Depends(require_admin)):
+async def submit_for_mof_approval(run_id: str, body: MoFActionIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
@@ -659,11 +718,21 @@ async def submit_for_mof_approval(run_id: str, body: MoFActionIn, user: dict = D
     return {"ok": True, "mof_status": "submitted"}
 
 
+async def _require_multi_signature_mof_flow(user: dict) -> None:
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "features": 1})
+    if "mof_approval" in (company or {}).get("features", []):
+        raise HTTPException(
+            409,
+            "This company requires the multi-signature MoF workflow; use the MoF signatures panel.",
+        )
+
+
 @router.post("/runs/{run_id}/mof-approve")
-async def mof_approve_run(run_id: str, body: MoFActionIn, user: dict = Depends(require_admin)):
+async def mof_approve_run(run_id: str, body: MoFActionIn, user: dict = Depends(require_roles("hr"))):
     """Only users tagged with role-flag `mof_approver` (or superadmin) can approve."""
     if user["role"] != "superadmin" and not user.get("mof_approver"):
         raise HTTPException(403, "Only MoF approvers can approve runs")
+    await _require_multi_signature_mof_flow(user)
     tf = tenant_filter(user)
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
@@ -684,9 +753,10 @@ async def mof_approve_run(run_id: str, body: MoFActionIn, user: dict = Depends(r
 
 
 @router.post("/runs/{run_id}/mof-reject")
-async def mof_reject_run(run_id: str, body: MoFActionIn, user: dict = Depends(require_admin)):
+async def mof_reject_run(run_id: str, body: MoFActionIn, user: dict = Depends(require_roles("hr"))):
     if user["role"] != "superadmin" and not user.get("mof_approver"):
         raise HTTPException(403, "Only MoF approvers can reject runs")
+    await _require_multi_signature_mof_flow(user)
     tf = tenant_filter(user)
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:

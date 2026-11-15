@@ -28,7 +28,7 @@ module.exports = {
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         // SaloneHCM palette
-        forest: { DEFAULT: "#133326", hover: "#0F281E", light: "#1F4A38" },
+        forest: { DEFAULT: "#0A4A1E", hover: "#063514", light: "#0F6428" },
         ocean: { DEFAULT: "#26547C", hover: "#1D4363" },
         sunset: { DEFAULT: "#D1603D", hover: "#B84F2F" },
         sand: { DEFAULT: "#F7F6F2", paper: "#FFFFFF" },

@@ -1,0 +1,65 @@
+{
+  "summary": "Frontend-only wiring verification for iter31 — RetroPayPanel + MoFSignaturesButton wiring and PostJobModal extraction. All three integrations work end-to-end. Existing Civil-Service tabs and Payroll actions regress cleanly. 0 real console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MoFSignatures modal empty-state message 'No signatures yet. This run is awaiting the first MoF approver.' is shown even when mof_status is 'approved' via the legacy single-sig flow (mof-approve endpoint that doesn't populate signatures[]). Not a regression from this iteration (the component was not modified now) but the wording is misleading for legacy approved runs. Consider showing a different message when data.mof_status === 'approved' but data.signatures.length === 0 (e.g., 'This run was approved via the legacy single-signature flow.').",
+    "Gov tenant currently has 22 draft + 3 approved payroll runs; no submitted/partially_signed/rejected exist. Multi-signature button visibility for 'submitted'/'partially_signed'/'rejected' statuses was verified via component logic ({submitted/partially_signed/approved/rejected}.includes(mofStatus)) but not exercised with a live-status row. E1 may want to seed one of each status for richer UI coverage.",
+    "React devtool overlay injects <span data-ve-dynamic=true> inside <option> elements (visible in DOM in the RetroPayPanel employee dropdown), causing a hydration console warning. This is from the emergent tooling, NOT the app code — flagging for awareness only."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per E1 request)", "frontend": "100%"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (gov tenant admin, mof_approver=true, no 2FA) — worked as expected",
+  "seed_data_creation": "Created 1 retro-pay adjustment (SDET employee, +250 SLE, current period 2026-07, source=manual) and 1 job posting titled 'SDET Test Job 1374512' via UI. Both appeared successfully in their respective lists.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter31 wiring is verified working. RetroPayPanel: 7 filter chips + form modal + all 6 testids (retro-emp/monthly/from/to/source/reason) work; POST /civil-service/retro-pay creates row; MoFSignaturesButton auto-hides for mof_status='draft' and shows for approved (only status available in gov tenant seed); modal has progress bar, list/empty state, close; sign actions correctly hidden when status != submitted/partially_signed. PostJobModal: all testids present (post-job/post-job-modal/title/department/location/salary-min/salary-max/description/cancel/submit/close); creates posting and closes cleanly on submit/cancel/X. All 7 civil-service tabs and 25 payroll rows render fine. If richer MoF multi-sig UI testing is needed, first submit a draft run via Submit-to-MoF button to get a 'submitted' status, then the Sign approval / Sign reject buttons will render.",
+  "detailed_verifications": {
+    "retro_pay_tab": {
+      "civil_service_page_visible": true,
+      "all_7_tabs_visible": ["grades", "allowances", "budgets", "actings", "increments", "retro", "ghosts"],
+      "retro_panel_testid": "retro-pay-panel (visible)",
+      "filter_chips_all_visible": ["retro-filter-all", "retro-filter-pending", "retro-filter-pending_approval", "retro-filter-settled", "retro-filter-rejected"],
+      "add_button_visible": true,
+      "existing_rows_before_test": 0,
+      "form_modal_visible": true,
+      "employee_dropdown_options": 7,
+      "form_submit_creates_row": true,
+      "rows_after_test": 1
+    },
+    "mof_signatures_button": {
+      "payroll_history_row_count": 25,
+      "runs_by_status": {"draft": 22, "approved": 3},
+      "mof_sig_button_on_approved_run": true,
+      "mof_sig_button_hidden_on_draft": true,
+      "modal_opens": true,
+      "progress_bar_visible": true,
+      "empty_state_shown": true,
+      "modal_close_works": true,
+      "sign_actions_correctly_hidden_for_approved_status": true
+    },
+    "post_job_modal": {
+      "talent_page_visible": true,
+      "tab_recruitment_visible": true,
+      "tab_learning_visible": true,
+      "post_job_button_visible_for_admin": true,
+      "all_testids_present": ["post-job", "post-job-modal", "post-job-title", "post-job-department", "post-job-location", "post-job-salary-min", "post-job-salary-max", "post-job-description", "post-job-cancel", "post-job-submit", "post-job-close"],
+      "submit_creates_posting": true,
+      "cancel_closes_modal": true,
+      "x_close_closes_modal": true,
+      "applicant_kanban_still_renders": true
+    },
+    "regression": {
+      "civil_service_tabs_all_render_correct_heading": true,
+      "payroll_variance_button_count": 25,
+      "payroll_bank_button_count": 25,
+      "console_errors": 0
+    }
+  }
+}

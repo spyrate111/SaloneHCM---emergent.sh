@@ -1,15 +1,23 @@
 """Payroll endpoints: preview, run, history, payslip PDF, bank file CSV, my-payslips."""
 import io
 import csv
+import os
+import uuid
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature
+from core import db, get_current_user, require_admin, audit, tenant_filter, require_feature, now_utc, iso
 from models import PayrollRunIn
 from payroll_engine import calc_payslip, run_payroll as _run, build_payslip_pdf
 from sms import send_payslip_batch, is_configured as sms_is_configured
+
+from core import require_roles
+
+from core import can_role
+from pymongo.errors import DuplicateKeyError
+from routers.mobile_money import PROVIDERS, _assignment_id, ensure_latest_payroll_run
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -19,7 +27,7 @@ class SendSmsIn(BaseModel):
 
 
 @router.post("/preview")
-async def preview_payroll(user: dict = Depends(require_admin)):
+async def preview_payroll(user: dict = Depends(require_roles("payroll"))):
     emps = await db.employees.find(
         {"status": "active", **tenant_filter(user)},
         {"_id": 0},
@@ -37,17 +45,71 @@ async def preview_payroll(user: dict = Depends(require_admin)):
 
 
 @router.post("/run")
-async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_admin)):
+async def run_payroll(body: PayrollRunIn, user: dict = Depends(require_roles("payroll"))):
+    """Run payroll for the given period.
+
+    Guardrail (Gov tier only): re-runs the pre-payroll budget check against
+    IFMIS allocations. Blocks unsafe verdicts unless an existing check has an
+    active override signed by an mof_approver or superadmin.
+    """
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "features": 1, "tier": 1}) or {}
+    features = company.get("features") or []
+    if "gov_payroll" in features:
+        period = f"{body.period_year}-{body.period_month:02d}"
+        # Look up the most recent budget check for this period.
+        latest = await db.payroll_budget_checks.find_one(
+            {"company_id": user["company_id"], "period": period},
+            {"_id": 0}, sort=[("ran_at", -1)],
+        )
+        if not latest:
+            raise HTTPException(412, {
+                "code": "budget_check_missing",
+                "message": f"Run a pre-payroll budget check for {period} before executing payroll.",
+                "period": period,
+            })
+        from routers.payroll_budget import current_budget_input_fingerprint
+        current_fingerprint = await current_budget_input_fingerprint(user["company_id"], period)
+        if latest.get("input_fingerprint") != current_fingerprint:
+            raise HTTPException(412, {
+                "code": "budget_check_stale",
+                "message": f"Payroll inputs or allocations changed after the budget check for {period}. Run a new check before executing payroll.",
+                "period": period,
+                "check_id": latest["id"],
+            })
+        if latest["verdict"] != "safe" and not latest.get("override"):
+            raise HTTPException(412, {
+                "code": "budget_check_blocked",
+                "message": f"Budget check for {period} returned '{latest['verdict']}'. An MoF approver must apply an override before running.",
+                "verdict": latest["verdict"],
+                "check_id": latest["id"],
+                "codes_over": latest["totals"]["codes_over"],
+                "unallocated_headcount": latest["totals"]["unallocated_headcount"],
+            })
+        # Passed — carry the check_id into the run for provenance.
+        result = await _run(body.period_year, body.period_month, user)
+        override_used = bool(latest.get("override"))
+        await db.payroll_runs.update_one(
+            {"id": result["id"]},
+            {"$set": {"budget_check_id": latest["id"], "budget_override_used": override_used}},
+        )
+        await db.payroll_budget_checks.update_one(
+            {"id": latest["id"]}, {"$set": {"run_id": result["id"]}},
+        )
+        result["budget_check_id"] = latest["id"]
+        result["budget_override_used"] = override_used
+        return result
+
     return await _run(body.period_year, body.period_month, user)
 
 
 @router.get("/runs")
-async def list_runs(user: dict = Depends(get_current_user)):
-    return await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(500)
+async def list_runs(user: dict = Depends(require_roles("hr", "payroll"))):
+    return await db.payroll_runs.find(
+        tenant_filter(user), {"_id": 0, "slips": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.get("/runs/{rid}")
-async def get_run(rid: str, user: dict = Depends(get_current_user)):
+async def get_run(rid: str, user: dict = Depends(require_roles("hr", "payroll"))):
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Not found")
@@ -72,16 +134,20 @@ async def my_payslips(user: dict = Depends(get_current_user)):
         return []
     runs = await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", -1).to_list(50)
     out = []
+    seen_periods = set()
     for r in runs:
+        if r["period"] in seen_periods:
+            continue  # keep only the latest run per period
         slip = next((s for s in r["slips"] if s["employee_id"] == eid), None)
         if slip:
             out.append({"run_id": r["id"], "period": r["period"], "slip": slip})
+            seen_periods.add(r["period"])
     return out
 
 
 @router.get("/runs/{rid}/payslip/{eid}.pdf")
 async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "superadmin") and user.get("employee_id") != eid:
+    if not can_role(user, "payroll") and user.get("employee_id") != eid:
         raise HTTPException(403, "Forbidden")
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
@@ -90,7 +156,24 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
     if not slip:
         raise HTTPException(404, "Payslip not found")
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
-    pdf = build_payslip_pdf(slip, r["period"], company=company.get("name") if company else "Demo Salone Ltd.")
+
+    # Upsert a verification record + QR so banks can confirm authenticity.
+    ver = await db.payslip_verifications.find_one({"run_id": rid, "employee_id": eid}, {"_id": 0})
+    if not ver:
+        ver = {
+            "id": str(uuid.uuid4()), "run_id": rid, "employee_id": eid,
+            "company_id": user["company_id"], "period": r["period"],
+            "employee_name": slip["employee_name"],
+            "net": slip["net"], "gross": slip["gross"],
+            "created_at": iso(now_utc()),
+        }
+        await db.payslip_verifications.insert_one(dict(ver))
+    frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    verify_url = f"{frontend_url}/verify-payslip/{ver['id']}"
+
+    pdf = build_payslip_pdf(slip, r["period"],
+                            company=company.get("name") if company else "Demo Salone Ltd.",
+                            verification_id=ver["id"], verify_url=verify_url)
     fname = f"payslip-{slip['employee_name'].replace(' ', '_')}-{r['period']}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf), media_type="application/pdf",
@@ -99,35 +182,100 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
 
 
 @router.get("/runs/{rid}/bank-file")
-async def bank_file(rid: str, user: dict = Depends(require_admin)):
-    """NRC clearing CSV — bank_name, account_no, beneficiary, amount, reference."""
-    r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
-    if not r:
+async def bank_file(rid: str, user: dict = Depends(require_roles("payroll"))):
+    """Download a generic bank workpaper and reserve the bank payout channel."""
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
         raise HTTPException(404, "Run not found")
-    emps = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
-    emp_map = {e["id"]: e for e in emps}
+    await ensure_latest_payroll_run(rid, run.get("period", ""), user)
+
+    scope = tenant_filter(user)
+    employees = await db.employees.find(scope, {"_id": 0}).to_list(2000)
+    employee_map = {employee["id"]: employee for employee in employees}
+    assignments = await db.mobile_money_assignments.find(
+        {"run_id": rid, **scope}, {"_id": 0},
+    ).to_list(2000)
+    assignment_by_employee = {item["employee_id"]: item for item in assignments}
+
     buf = io.StringIO()
     writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
     writer.writerow(["bank_name", "account_no", "beneficiary", "amount_sle", "reference"])
-    for s in r["slips"]:
-        e = emp_map.get(s["employee_id"], {})
+    bank_rows = 0
+    wallet_excluded = 0
+    for slip in run.get("slips", []):
+        amount = float(slip.get("net", 0) or 0)
+        if amount <= 0:
+            continue
+        employee_id = slip["employee_id"]
+        assignment = assignment_by_employee.get(employee_id)
+        if assignment and assignment.get("provider") in PROVIDERS:
+            wallet_excluded += 1
+            continue
+        if (
+            assignment
+            and assignment.get("provider") == "bank"
+            and assignment.get("bank_format", "generic") != "generic"
+        ):
+            raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
+        if assignment is None:
+            assignment_key = _assignment_id(user["company_id"], rid, employee_id)
+            reservation = {
+                "_id": assignment_key,
+                "company_id": user["company_id"],
+                "run_id": rid,
+                "employee_id": employee_id,
+                "batch_id": f"bank-file:{rid}",
+                "provider": "bank",
+                "bank_format": "generic",
+                "created_at": iso(now_utc()),
+            }
+            try:
+                await db.mobile_money_assignments.insert_one(reservation)
+                assignment_by_employee[employee_id] = reservation
+            except DuplicateKeyError:
+                assignment = await db.mobile_money_assignments.find_one(
+                    {"_id": assignment_key, **scope}, {"_id": 0},
+                )
+                if assignment is None:
+                    raise HTTPException(409, "The payout assignment changed. Refresh and export again.")
+                assignment_by_employee[employee_id] = assignment
+                if assignment.get("provider") in PROVIDERS:
+                    wallet_excluded += 1
+                    continue
+                if (
+                    assignment.get("provider") == "bank"
+                    and assignment.get("bank_format", "generic") != "generic"
+                ):
+                    raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
+        employee = employee_map.get(employee_id, {})
         writer.writerow([
-            e.get("bank_name", "Sierra Leone Commercial Bank"),
-            e.get("bank_account", "0000000000"),
-            s["employee_name"],
-            f"{s['net']:.2f}",
-            f"PAYROLL-{r['period']}",
+            employee.get("bank_name", "Sierra Leone Commercial Bank"),
+            employee.get("bank_account", "0000000000"),
+            slip.get("employee_name", ""),
+            f"{amount:.2f}",
+            f"PAYROLL-{run['period']}",
         ])
-    await audit("export_bank_file", f"payroll_runs/{rid}", user,
-                {"period": r["period"], "rows": len(r["slips"])})
+        bank_rows += 1
+
+    await audit(
+        "export_bank_file",
+        f"payroll_runs/{rid}",
+        user,
+        {"period": run["period"], "rows": bank_rows, "wallet_excluded": wallet_excluded},
+    )
     return StreamingResponse(
-        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="bank-file-{r["period"]}.csv"'},
+        io.BytesIO(buf.getvalue().encode()),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="bank-file-{run["period"]}.csv"',
+            "Cache-Control": "private, no-store",
+            "X-Mobile-Money-Excluded": str(wallet_excluded),
+        },
     )
 
 
 @router.get("/sms/status")
-async def sms_status(_: dict = Depends(require_admin)):
+async def sms_status(_: dict = Depends(require_roles("payroll"))):
     """Tell the frontend whether Twilio creds are wired so it can warn the admin."""
     return {"twilio_configured": sms_is_configured()}
 
@@ -138,8 +286,8 @@ async def send_payslip_sms(
     body: SendSmsIn,
     user: dict = Depends(require_feature("bulk_sms_payslips")),
 ):
-    if user.get("role") not in ("admin", "superadmin"):
-        raise HTTPException(403, "Admin only")
+    if not can_role(user, "payroll"):
+        raise HTTPException(403, "Admin or payroll officer only")
     run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not run:
         raise HTTPException(404, "Payroll run not found")
@@ -166,7 +314,7 @@ async def list_sms_logs(
     period: Optional[str] = None,
     status: Optional[str] = None,
     batch_id: Optional[str] = None,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     q: dict = {**tenant_filter(user)}
     if period:
@@ -180,7 +328,7 @@ async def list_sms_logs(
 
 
 @router.get("/sms/batches")
-async def list_sms_batches(user: dict = Depends(require_admin)):
+async def list_sms_batches(user: dict = Depends(require_roles("payroll"))):
     """Distinct SMS batches with aggregate counts per status — for the audit page header view."""
     pipeline = [
         {"$match": tenant_filter(user)},
@@ -219,7 +367,7 @@ async def list_sms_batches(user: dict = Depends(require_admin)):
 
 
 @router.get("/sms/summary")
-async def sms_summary(user: dict = Depends(require_admin)):
+async def sms_summary(user: dict = Depends(require_roles("payroll"))):
     """High-level KPIs for the audit page header."""
     tf = tenant_filter(user)
     pipeline = [
@@ -242,7 +390,7 @@ async def export_sms_logs_csv(
     period: Optional[str] = None,
     status: Optional[str] = None,
     batch_id: Optional[str] = None,
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_roles("payroll")),
 ):
     """Forensic CSV export of SMS deliveries — for Auditor General submissions."""
     q: dict = {**tenant_filter(user)}
@@ -309,7 +457,7 @@ class EmailExportIn(BaseModel):
 
 
 @router.post("/sms/logs.csv/email")
-async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_admin)):
+async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_roles("payroll"))):
     """Email the audit CSV to the requester (or another email)."""
     from email_service import send_csv_attachment, is_configured as _ec
     if not _ec():
@@ -341,3 +489,46 @@ async def email_sms_logs_csv(body: EmailExportIn, user: dict = Depends(require_a
     )
     await audit("sms_log_email", "payroll/sms/logs.csv/email", user, {"to": to, "rows": len(rows), "ok": res.get("ok")})
     return {**res, "rows": len(rows), "to": to}
+
+
+# ---------------------------------------------------------------------------
+# Payslip QR scan log — anti-fraud analytics over public verification scans.
+# ---------------------------------------------------------------------------
+def _flag_scans(times: list[str]) -> bool:
+    """Flag when 5+ scans fall within ANY 24-hour window."""
+    from scan_alerts import flag_scans
+    return flag_scans(times)
+
+
+@router.get("/verification-scans")
+async def verification_scans(user: dict = Depends(require_roles("payroll", "auditor"))):
+    vers = await db.payslip_verifications.find(
+        tenant_filter(user), {"_id": 0}).to_list(2000)
+    out = []
+    for v in vers:
+        scans = await db.payslip_scans.find(
+            {"verification_id": v["id"]},
+            {"_id": 0, "scanned_at": 1}).sort("scanned_at", 1).to_list(5000)
+        times = [s["scanned_at"] for s in scans]
+        out.append({
+            "verification_id": v["id"], "run_id": v.get("run_id"),
+            "employee_name": v.get("employee_name"), "period": v.get("period"),
+            "scan_count": len(times),
+            "first_scanned_at": times[0] if times else None,
+            "last_scanned_at": times[-1] if times else None,
+            "flagged": _flag_scans(times),
+        })
+    out.sort(key=lambda r: (not r["flagged"], -r["scan_count"]))
+    return out
+
+
+@router.get("/verification-scans/{vid}")
+async def verification_scan_history(vid: str, user: dict = Depends(require_roles("payroll", "auditor"))):
+    ver = await db.payslip_verifications.find_one(
+        {"id": vid, **tenant_filter(user)}, {"_id": 0})
+    if not ver:
+        raise HTTPException(404, "Verification not found")
+    scans = await db.payslip_scans.find(
+        {"verification_id": vid}, {"_id": 0}).sort("scanned_at", -1).to_list(1000)
+    return {"verification": ver, "scans": scans, "flagged": _flag_scans(
+        sorted(s["scanned_at"] for s in scans))}

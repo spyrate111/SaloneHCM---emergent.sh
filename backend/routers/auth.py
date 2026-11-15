@@ -1,7 +1,11 @@
 """Auth endpoints: login, logout, me, 2FA management."""
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
-from core import db, get_current_user, verify_password, hash_password, make_access, limiter, audit, now_utc, iso
+from core import (
+    db, get_current_user, verify_password, hash_password, make_access,
+    limiter, audit, now_utc, iso,
+    new_csrf_token, CSRF_COOKIE,
+)
 from models import LoginIn, TotpVerifyIn, TotpDisableIn
 import twofa
 
@@ -11,11 +15,21 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 TWOFA_REQUIRED_ROLES = {"superadmin"}
 
 
-def _set_cookie(resp: Response, token: str):
+def _set_auth_cookies(resp: Response, token: str) -> str:
+    """Set the httpOnly session cookie + a fresh non-httpOnly CSRF cookie.
+
+    Returns the CSRF token so the JSON body can echo it for SPA bootstrapping.
+    """
     resp.set_cookie(
         key="access_token", value=token, httponly=True, secure=True,
         samesite="none", max_age=43200, path="/",
     )
+    csrf = new_csrf_token()
+    resp.set_cookie(
+        key=CSRF_COOKIE, value=csrf, httponly=False, secure=True,
+        samesite="none", max_age=43200, path="/",
+    )
+    return csrf
 
 
 def _public_company(c: dict | None) -> dict | None:
@@ -28,12 +42,14 @@ def _public_company(c: dict | None) -> dict | None:
 
 
 @router.post("/login")
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 async def login(request: Request, body: LoginIn, response: Response):
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(401, "Invalid email or password")
+    if user.get("disabled"):
+        raise HTTPException(401, "Account deactivated")
     if not user.get("company_id"):
         raise HTTPException(401, "User has no company assigned — contact your admin")
 
@@ -47,20 +63,23 @@ async def login(request: Request, body: LoginIn, response: Response):
 
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     token = make_access(user["id"], user["email"], user["role"])
-    _set_cookie(response, token)
+    csrf = _set_auth_cookies(response, token)
     return {
         "id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"],
         "employee_id": user.get("employee_id"),
         "company_id": user["company_id"], "company": _public_company(company),
         "twofa_enabled": bool(user.get("twofa_enabled")),
         "mof_approver": bool(user.get("mof_approver")),
+        "finance_officer": bool(user.get("finance_officer")),
         "token": token,
+        "csrf_token": csrf,
     }
 
 
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token", path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
     return {"ok": True}
 
 
@@ -71,7 +90,7 @@ class AcceptInviteIn(LoginIn.__bases__[0]):
     pass
 
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 class _AcceptInviteIn(BaseModel):
     token: str = Field(..., min_length=10, max_length=200)
     password: str = Field(..., min_length=8, max_length=128)
@@ -80,7 +99,9 @@ class _AcceptInviteIn(BaseModel):
 @router.get("/invite/{token}")
 async def lookup_invite(token: str):
     """Frontend hits this with the token from the magic-link to render the accept form."""
-    invite = await db.user_invites.find_one({"token": token, "consumed_at": None}, {"_id": 0})
+    invite = await db.user_invites.find_one(
+        {"token": token, "consumed_at": None, "superseded_at": None}, {"_id": 0},
+    )
     if not invite:
         raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
     # Expiry check
@@ -99,20 +120,46 @@ async def lookup_invite(token: str):
 @router.post("/accept-invite")
 @limiter.limit("10/minute")
 async def accept_invite(request: Request, body: _AcceptInviteIn, response: Response):
-    invite = await db.user_invites.find_one({"token": body.token, "consumed_at": None})
+    invite = await db.user_invites.find_one(
+        {"token": body.token, "consumed_at": None, "superseded_at": None},
+    )
     if not invite:
         raise HTTPException(404, detail={"code": "invite_invalid", "message": "Invitation invalid or already used"})
     if invite.get("expires_at") and invite["expires_at"] < iso(now_utc()):
         raise HTTPException(410, detail={"code": "invite_expired", "message": "Invitation has expired"})
 
-    # Idempotent: if a user already exists for this email, update password; else create.
+    # Claim the one-time invitation before modifying users. This prevents two
+    # concurrent requests from accepting the same token or resetting passwords twice.
     existing = await db.users.find_one({"email": invite["email"]})
+    if existing and existing.get("company_id") != invite["company_id"]:
+        raise HTTPException(409, "An account with this email already belongs to another company")
+
     if existing:
-        await db.users.update_one({"id": existing["id"]}, {"$set": {"password_hash": hash_password(body.password)}})
         user_id = existing["id"]
     else:
         import uuid as _uuid
         user_id = str(_uuid.uuid4())
+
+    consumed_at = iso(now_utc())
+    claimed = await db.user_invites.update_one(
+        {
+            "token": body.token,
+            "consumed_at": None,
+            "superseded_at": None,
+        },
+        {"$set": {"consumed_at": consumed_at, "consumed_by_user_id": user_id}},
+    )
+    if claimed.matched_count != 1:
+        raise HTTPException(409, detail={"code": "invite_invalid", "message": "Invitation was already used or revoked"})
+
+    if existing:
+        updated = await db.users.update_one(
+            {"id": user_id, "company_id": invite["company_id"]},
+            {"$set": {"password_hash": hash_password(body.password)}},
+        )
+        if updated.matched_count != 1:
+            raise HTTPException(409, "The invited account changed. Ask the administrator to issue a new invitation.")
+    else:
         await db.users.insert_one({
             "id": user_id,
             "email": invite["email"],
@@ -121,20 +168,15 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
             "company_id": invite["company_id"],
             "employee_id": invite.get("employee_id"),
             "password_hash": hash_password(body.password),
-            "created_at": iso(now_utc()),
+            "created_at": consumed_at,
             "created_by": invite.get("invited_by"),
             "accepted_invite": invite["token"],
         })
 
-    await db.user_invites.update_one(
-        {"token": body.token},
-        {"$set": {"consumed_at": iso(now_utc()), "consumed_by_user_id": user_id}},
-    )
-
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     token = make_access(user["id"], user["email"], user["role"])
-    _set_cookie(response, token)
+    csrf = _set_auth_cookies(response, token)
     await audit("invite_accept", f"users/{user_id}", user, {"email": user["email"]})
     return {
         "id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"],
@@ -142,7 +184,9 @@ async def accept_invite(request: Request, body: _AcceptInviteIn, response: Respo
         "company_id": user["company_id"], "company": _public_company(company),
         "twofa_enabled": bool(user.get("twofa_enabled")),
         "mof_approver": bool(user.get("mof_approver")),
+        "finance_officer": bool(user.get("finance_officer")),
         "token": token,
+        "csrf_token": csrf,
     }
 
 

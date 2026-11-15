@@ -7,7 +7,7 @@ Designed to be:
   - Re-targetable: admin can call `POST /civil-service/step-increments/run` to dry-run or apply now.
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Optional
 
 from apscheduler.triggers.cron import CronTrigger
@@ -50,9 +50,10 @@ async def _eligible_today_for_tenant(company_id: str, target_date: Optional[date
             continue
         # Idempotency: skip if we already recorded an increment for (employee, year)
         existing = await db.step_increments.find_one(
-            {"company_id": company_id, "employee_id": e["id"], "year": year}, {"_id": 0, "id": 1}
+            {"company_id": company_id, "employee_id": e["id"], "year": year},
+            {"_id": 1},
         )
-        if existing:
+        if existing is not None:
             continue
         # Skip if already on max step
         max_step = await db.civil_service_steps.find_one(

@@ -84,7 +84,13 @@ export default function Assistant() {
     setMessages((m) => m.map((mm) => (mm.id === msgId ? { ...mm, plan: null, cancelled: true } : mm)));
   };
 
-  const suggestions = isAdmin && actionMode ? ACTION_SUGGESTIONS : isAdmin && useContext ? CONTEXT_SUGGESTIONS : GENERAL_SUGGESTIONS;
+  // One place decides copy/data per assistant mode: action > context > general
+  const byMode = (action, context, general) => {
+    if (isAdmin && actionMode) return action;
+    if (isAdmin && useContext) return context;
+    return general;
+  };
+  const suggestions = byMode(ACTION_SUGGESTIONS, CONTEXT_SUGGESTIONS, GENERAL_SUGGESTIONS);
   // Strip the json fence from displayed text when a plan is parsed (or was cancelled — fence still in raw reply)
   const cleanContent = (m) => ((m.plan || m.cancelled) ? m.content.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/g, "").trim() : m.content);
 
@@ -103,7 +109,7 @@ export default function Assistant() {
               type="button"
               onClick={() => setUseContext((v) => !v)}
               className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-medium transition ${
-                useContext ? "bg-[#133326] border-[#133326] text-white" : "bg-white border-[#E2DFD6] text-[#525860] hover:border-[#133326]"
+                useContext ? "bg-[#0A4A1E] border-[#0A4A1E] text-white" : "bg-white border-[#E2DFD6] text-[#525860] hover:border-[#0A4A1E]"
               }`}
             >
               <Database className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -146,13 +152,14 @@ export default function Assistant() {
               </div>
               <h3 className="font-heading text-lg font-semibold">How can I help?</h3>
               <p className="text-sm text-[#686D76] mt-1">
-                {isAdmin && actionMode ? "Tell me what to do — I'll draft a plan for you to confirm."
-                : isAdmin && useContext ? "I can see your live HR data — ask about anomalies, top performers, or trends."
-                : "Trained on Sierra Leone HR rules, NRA bands, and NASSIT."}
+                {byMode(
+                  "Tell me what to do — I'll draft a plan for you to confirm.",
+                  "I can see your live HR data — ask about anomalies, top performers, or trends.",
+                  "Trained on Sierra Leone HR rules, NRA bands, and NASSIT.")}
               </p>
               <div className="grid grid-cols-1 gap-2 mt-5 text-left">
                 {suggestions.map((s) => (
-                  <button key={s} onClick={() => send(s)} className="text-sm border border-[#E2DFD6] hover:border-[#133326] hover:bg-[#F7F6F2] rounded-md px-3 py-2 transition text-[#1A1C1E]">{s}</button>
+                  <button key={s} onClick={() => send(s)} className="text-sm border border-[#E2DFD6] hover:border-[#0A4A1E] hover:bg-[#F7F6F2] rounded-md px-3 py-2 transition text-[#1A1C1E]">{s}</button>
                 ))}
               </div>
             </div>
@@ -179,7 +186,7 @@ export default function Assistant() {
                     {m.cancelled && <div className="text-xs text-[#686D76] mt-1 italic">Plan cancelled.</div>}
                   </>
                 ) : (
-                  <div className="bg-[#133326] text-white rounded-lg px-4 py-3 text-sm whitespace-pre-wrap">
+                  <div className="bg-[#0A4A1E] text-white rounded-lg px-4 py-3 text-sm whitespace-pre-wrap">
                     {m.withAction && <div className="text-[10px] uppercase tracking-wider text-[#D1603D] mb-1 inline-flex items-center gap-1"><Wand2 className="w-2.5 h-2.5" /> action request</div>}
                     {m.withCtx && !m.withAction && <div className="text-[10px] uppercase tracking-wider text-[#D1603D]/80 mb-1 inline-flex items-center gap-1"><Database className="w-2.5 h-2.5" /> with company data</div>}
                     {m.content}
@@ -198,7 +205,7 @@ export default function Assistant() {
           <input
             data-testid="assistant-input"
             value={input} onChange={(e) => setInput(e.target.value)}
-            placeholder={isAdmin && actionMode ? "Tell me what to do…" : isAdmin && useContext ? "Ask about your team's data…" : "Ask about PAYE, NASSIT, leave, payroll…"}
+            placeholder={byMode("Tell me what to do…", "Ask about your team's data…", "Ask about PAYE, NASSIT, leave, payroll…")}
             className="flex-1 bg-white border border-[#E2DFD6] rounded-md px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]"
           />
           <button data-testid="assistant-send" disabled={busy} className="inline-flex items-center gap-1.5 bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2.5 rounded-md text-sm font-medium disabled:opacity-60">

@@ -1,5 +1,164 @@
 ## CHANGELOG
 
+### v1.19 (Feb 2026) — Super-Admin Videos CRUD UI
+
+**New `/admin/videos` page (super-admin only)**
+- Full library management from the browser: table view of every video (published + drafts), inline **paste-a-URL** form with **live preview** using the same public `VideoPlayer`.
+- **HTML5 drag-to-reorder** — grab any row's grip handle, drop it into position; `sort` auto-renumbers to `(i+1)*10` across affected rows to leave room for later inserts. Bulk PATCH persists the new order.
+- **Publish / draft toggle** via eye icon (no navigation needed).
+- **Delete with confirmation modal** that shows the video title before hard-delete.
+- **Chapters editor** inline in the form (add/remove/edit seconds + label).
+- **Search** field filters the table client-side across title/summary/category/persona.
+- **Marketing Videos** nav item added to the super-admin sidebar (`Layout.jsx`, `roles: ["superadmin"]`) — gov-admin correctly does NOT see it.
+
+**Testing (verified by testing_agent iter24)**
+- Backend: iter26 videos suite still 10/10 (unchanged API contract).
+- Frontend: **100% (12/12 flows verified)** — auth guard, page structure, table render, create+live-preview, edit, publish toggle, delete confirm, drag-reorder, chapters, search, mobile 390x844, public-site regression.
+- Zero defects. Testing agent's review flagged only minor observations (all favorable).
+
+---
+
+
+### v1.18 (Feb 2026) — Training Video Library
+
+**Public marketing videos**
+- New universal `VideoPlayer` (auto-detects YouTube / Vimeo / MP4) with poster, big play button, hover controls (play, mute, fullscreen, progress bar), and clickable chapter markers.
+- New `VideoLibrary` section on the landing page between Products and Industries — featured player + side playlist of 9-12 videos.
+- New `/videos` route: full library with category chips (All / Getting started / By industry / Deep dive), client-side search, and persona labels.
+- "Videos" link added to desktop nav + mobile drawer.
+
+**Backend**
+- `GET /api/marketing/videos` (public, filterable by `category` and `persona`) and `GET /api/marketing/videos/{id}`.
+- `POST/PATCH/DELETE /api/marketing/admin/videos` (super-admin only) for CRUD; `GET /api/marketing/admin/videos` lists all including unpublished drafts.
+- Seeder ships 9 placeholder videos across 3 categories × 3+ personas. Idempotent by title; also refreshes `poster` URLs in-place when the seed source changes. Source MP4s = Google's public test bucket (placeholder); replace via the admin endpoint when real screen recordings are ready.
+
+**Testing (verified by testing_agent iter23)**
+- **Backend: 35/35 PASS (100%)** — 10 new iter26 video tests + 25 regression.
+- **Frontend e2e: 100% functional** — landing section, /videos page, all player testids, category filter, search, mobile drawer, navigation. Switched poster CDN from Unsplash (403'd in env) to picsum.photos seeded URLs after iter23 review.
+
+---
+
+
+### v1.17 (Feb 2026) — Public Demo Wizard (ADP page-2 equivalent)
+
+**New public `/demo` route**
+- 3-step multi-step wizard (You → Your team → Your goals) with progress bar, validation gating on Continue/Submit, Back/Next navigation, and success state with 3 next-step CTAs.
+- Right rail with "Why SaloneHCM" card (phone + email), Trust & Security badges (4 static slugs: nra, wca, nassit, iso27001), and 2 testimonials.
+- Hydrates from sessionStorage `salonehcm_lead` written by the landing hero — employees → size bucket, interest → topic (filtered to known topic IDs to avoid invisible pre-selections).
+- Landing hero CTA now routes to `/demo` instead of `/pricing`; "Get a demo" link added to desktop nav + mobile drawer; "Get pricing" button still routes to `/pricing` for users who want price directly.
+
+**Backend**
+- `POST /api/marketing/demo-requests` — public, no auth, no CSRF. Validates `industry`, `size`, `topics` against allowed sets; `topics` must be non-empty. Persists to `marketing_demo_requests` collection with `source='demo_wizard'`.
+
+**Testing (verified by testing_agent iter22)**
+- Backend: **23/23 PASS (100%)** — 7 new iter25 demo-request tests + iter21/22/23/24 regression.
+- Frontend e2e: full wizard flow validated end-to-end (3 steps + success state, validation gating matrix, real submission, hero handoff hydration, mobile drawer nav). 100% functional.
+- Two minor follow-ups from review applied: static slugs on trust-badge testids + hydration filter for unknown topic IDs.
+
+---
+
+
+### v1.16 (Feb 2026) — Twilio Live Integration Verified
+
+**Twilio wired with real credentials**
+- Updated `/app/backend/.env` with the user's production Twilio Account SID, Auth Token, and sender number `+18555259887`.
+- Added `POST /api/integrations/sms/test` endpoint (mirrors `/email/test`): admin-only, validates E.164, defaults sensible test body, 502 on Twilio errors, audits to `audit_logs`.
+- End-to-end verified with live sends:
+  - Single test → SID `SM214d081dd14aa7a47004f3cb3b6018dc` → **delivered** to +18777804236.
+  - Bulk payslip send → 1/6 delivered (the test-virtual-number employee). The other 5 +232 numbers returned Twilio's expected trial-account "unverified destination" error — code is correct, account just needs upgrade + Geo Permissions.
+
+**Testing (verified by testing_agent iter21)**
+- Backend: **17/17 PASS** — 8 new SMS-test endpoint tests + 9 iter12 Twilio regression tests + dry-run payroll bulk-SMS smoke.
+
+**Outstanding for production +232 sends**
+- Upgrade Twilio account from Trial to paid.
+- Enable Geo Permissions for Sierra Leone in Twilio console.
+- Resend domain verification still pending DNS update.
+
+**SECURITY REMINDER**
+- The Auth Token shared in chat is now in conversation logs. **Rotate it in Twilio Console → Account → API Keys & Tokens → Rotate Auth Token** as soon as practical, then update `/app/backend/.env`.
+
+---
+
+
+### v1.15 (Feb 2026) — Tier Drift Monitor
+
+**New super-admin widget on `/companies`**
+- Visible drift indicator (green ShieldCheck / red ShieldAlert) at the top of the Tenants page, with a badge showing "All in sync" or "N drifted".
+- Expandable per-tenant detail showing the exact missing / extra feature flags.
+- One-click "Resync now" button that re-derives features from tier for every drifted tenant, with per-tenant audit-log entry.
+- Auto-refreshes after any tier change.
+
+**Backend**
+- `GET /api/admin/companies/drift-check` — read-only scan; returns `{ok, total_companies, drifted_count, drifted: [{id, name, tier, missing, extra}]}`. Set comparison so feature order doesn't trigger false positives.
+- `POST /api/admin/companies/drift-resync` — idempotent in-process fix; audit-logged. Returns `{ok, fixed_count, fixed: [...]}`.
+- Both endpoints require super-admin (router-level dep). Gov-tenant admin gets 403.
+
+**Testing (verified by testing_agent iter20)**
+- Backend: **38/38 PASS (100%)** — 4 new drift-monitor tests + full regression iter18→iter23.
+- Frontend e2e: super-admin login → drift injection → red-badge render → expand detail → click Resync → toast → green-badge restoration. All 5 data-testids verified.
+
+---
+
+
+### v1.14 (Feb 2026) — Tier/Features Drift Hardening
+
+**Closed the gap between restarts** (follow-up to iter18's boot-time fix)
+- Audited all 5 `companies.update_one` callsites that write `tier`. All 3 production paths (`billing.py:263`, `billing.py:391`, `admin.py:94`) were already correct — they bundle `tier`, `label`, and `features=features_for(tier)` in a single atomic `$set`.
+- The leak was a test fixture: `tests/test_iter19_billing.py::_isolate_billing` reset only `tier`, leaving features stale and contaminating later test modules. Now uses `gov_reset = {$set: {tier, label, features}}` atomically.
+- Belt-and-braces guard: `tests/conftest.py::_restore_superadmin_tenant()` now iterates `db.companies` on every module load and resyncs `features` for any tenant whose array doesn't match its tier — silently no-ops on clean state.
+
+**Empirically verified**
+- Ran `test_iter19_billing.py` (the historical drift source) → 9/9 PASS → direct DB check: gov tenant retains all 30 features → ran `test_iter20_presets_and_promotion.py` immediately after → 11/11 PASS with zero 402s.
+- Full regression: iter18+iter19+iter20+iter21+iter22 = 34/34 (100%).
+- Boot logs show `Seed complete` with no `Re-synced features for N` line on clean restarts — confirming zero production drift.
+
+---
+
+
+### v1.13 (Feb 2026) — Code Quality Pass + Latent Drift Bug Fix
+
+**Code quality (per external review)**
+- Replaced 6 hardcoded `SUPER_SECRET = "KRSXG5..."` literals in test files with `os.environ.get("SUPERADMIN_TOTP_SECRET", "<dev-default>")` — matches conftest.py pattern; CI can inject a real secret without code changes.
+- Removed 3 unused local variables: `sub` in `routers/billing.py::_apply_paid_subscription`, `prev_due` + `completion` in `tests/test_iter14_batch.py`.
+- Fixed multi-statements-per-line in `tests/test_iter13_batch.py` and `tests/test_iter20_presets_and_promotion.py`.
+- Frontend: added stable React key in `marketing/sections/Testimonials.jsx` (`${t.name}-star-${i}`), replaced empty catch in `marketing/sections/Hero.jsx` with `console.debug`, added `useMemo` for header array in `pages/Loans.jsx::LoansTable`, fixed 10 unescaped-entity lint errors across Dashboard / CivilService / Schedules / Establishment / Team / TwoFactorCard / TransparencyCard / ApprovalBanner / ShareLinkModal / marketing-Hero / marketing-Testimonials / marketing-Personas / marketing-Contact.
+
+**Bug fix: company-features drift causing 402 errors**
+- Root cause: some admin paths write `company.tier` without re-deriving `company.features`; the discrepancy then breaks tier-gated routes (`require_feature("civil_service")` returns 402 even though `tier == "gov"`). This had silently bit us twice — once in the prior session (Session 4/5 testing), once in iter17 when iter19 billing tests caused live drift.
+- Fix: `seeders/__init__.py::_resync_all_company_features()` — boot-time async helper that scans every company, compares `set(company.features)` to `set(features_for(company.tier))`, and updates any drift. Logs `"Re-synced features for N company tier mismatch(es)"` only when work was done (no log spam on clean boots).
+- Verified: testing agent iter18 ran the iter19 billing suite (which DOES cause drift), then called the resync function — features array went 23 → 30 and `GET /api/promotion/eligible` flipped 402 → 200. Empirical demonstration that the fix eliminates the user-visible bug.
+- New tests: `tests/test_iter22_feature_resync.py` — boot-state invariant + simulated drift correction.
+
+**Testing**
+- Backend: 34/34 across iter18/iter19/iter20/iter21/iter22 (100%).
+- Frontend: 9/9 regression items pass (per iter17 testing agent).
+
+---
+
+
+
+### v1.12 (Feb 2026) — Public Marketing Site (ADP-inspired)
+
+**New public landing experience at `/`**
+- `/` now renders a public marketing `LandingPage` (no auth required). Wildcard `*` route changed to redirect to `/` (was `/dashboard`).
+- 12 distinct sections matching ADP's layout pattern, localized for Sierra Leone: promo-banner (live countdown), sticky marketing-nav (4 dropdowns + Pricing + Sign-in + Get-pricing CTAs), hero with "Solution Wizard" lead form, personas (Small/Midsize/Enterprise/Government), 9-product feature grid, 6 industry tiles, dark-green stats panel, 3-card resources, 3-quote testimonials, 4-tile awards, contact form, 4-column footer.
+- New `/pricing` public route with 4-tier comparison (Lite / Professional / Enterprise / Gov), featured plan with "Most popular" badge, SLE pricing, Stripe + bank-transfer note.
+
+**New backend endpoint**
+- `POST /api/marketing/leads` — public (no auth, no CSRF) — captures `{name, email, company, employees, message}` into `marketing_leads` collection. EmailStr validation, employees ≥1 required.
+
+**Architecture**
+- New folder `/app/frontend/src/marketing/` housing `LandingPage.jsx`, `PricingPage.jsx`, `MarketingLayout.jsx`, `MarketingNav.jsx`, `MarketingFooter.jsx`, `PromoBanner.jsx` + `sections/` with `Hero`, `Personas`, `ProductsGrid`, `Industries`, `StatsRow`, `Resources`, `Testimonials`, `Contact`.
+- `MarketingLayout` handles `#anchor` smooth-scroll on hash-link navigation.
+- All interactive elements carry kebab-case `data-testid` attributes for QA.
+
+**Tests added**
+- `tests/test_iter21_marketing_leads.py` — 4 backend tests for the public lead capture endpoint (all passing).
+- Frontend testing agent iteration_16: 16/16 checks pass (100%) — landing + pricing + mobile drawer + auth regression all green.
+
+---
+
 ### v1.6 (May 2026) — NRA Filing Automation + PWA polish
 
 **NRA filing export automation** (Gov-tier exclusive)

@@ -7,10 +7,10 @@ const TYPE_ICON = { health: Heart, dental: Smile, pension: Wallet, life: Shield,
 const TYPE_COLOR = {
   health: "bg-[#FBE9DF] text-[#B84F2F]",
   dental: "bg-[#E5EEF6] text-[#26547C]",
-  pension: "bg-[#E6F4EC] text-[#2D7A5D]",
+  pension: "bg-[#E4F7E7] text-[#17A035]",
   life: "bg-[#EBE8E0] text-[#525860]",
   transport: "bg-[#FBF1DE] text-[#8B6A14]",
-  housing: "bg-[#F7E5EC] text-[#9A2A52]",
+  housing: "bg-[#E5EDF7] text-[#2A5C9C]",
 };
 
 const empty = { name: "", type: "health", monthly_cost_sle: 0, employer_share_pct: 50, description: "" };
@@ -56,7 +56,7 @@ export default function Benefits() {
           <p className="text-[#525860] text-sm mt-1">Health, pension, life, transport, housing — plan catalog and enrollments.</p>
         </div>
         {isAdmin && (
-          <button data-testid="benefits-add-plan" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm font-medium px-4 py-2.5 rounded-md">
+          <button data-testid="benefits-add-plan" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm font-medium px-4 py-2.5 rounded-md">
             <Plus className="w-4 h-4" /> New plan
           </button>
         )}
@@ -82,12 +82,12 @@ export default function Benefits() {
               </div>
               <div className="mt-3 flex gap-2">
                 {enrolled ? (
-                  <span className="flex-1 inline-flex items-center justify-center text-xs bg-[#E6F4EC] text-[#2D7A5D] rounded px-3 py-2 font-medium">✓ Enrolled</span>
+                  <span className="flex-1 inline-flex items-center justify-center text-xs bg-[#E4F7E7] text-[#17A035] rounded px-3 py-2 font-medium">✓ Enrolled</span>
                 ) : (
                   <button data-testid={`enroll-${p.id}`} onClick={() => enroll(p.id)} className="flex-1 inline-flex items-center justify-center text-xs bg-[#26547C] hover:bg-[#1D4363] text-white rounded px-3 py-2 font-medium">Enroll</button>
                 )}
                 {isAdmin && (
-                  <button onClick={() => removePlan(p.id)} className="p-2 text-[#B83A3A] hover:bg-[#FBEAEA] rounded">
+                  <button onClick={() => removePlan(p.id)} className="p-2 text-[#3A7CB8] hover:bg-[#E9F2FB] rounded">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -113,9 +113,9 @@ export default function Benefits() {
                 <td className="py-3 px-4 font-medium">{e.plan_name}</td>
                 <td className="py-3 px-4 capitalize">{e.plan_type}</td>
                 <td className="py-3 px-4 font-data">{fmtSLE(e.monthly_cost_sle)}</td>
-                <td className="py-3 px-4"><span className="text-[11px] uppercase tracking-wider px-2 py-0.5 bg-[#E6F4EC] text-[#2D7A5D] rounded-full">{e.status}</span></td>
+                <td className="py-3 px-4"><span className="text-[11px] uppercase tracking-wider px-2 py-0.5 bg-[#E4F7E7] text-[#17A035] rounded-full">{e.status}</span></td>
                 <td className="py-3 px-4 text-right">
-                  <button onClick={() => unenroll(e.id)} className="text-xs text-[#B83A3A] hover:underline">Remove</button>
+                  <button onClick={() => unenroll(e.id)} className="text-xs text-[#3A7CB8] hover:underline">Remove</button>
                 </td>
               </tr>
             ))}
@@ -159,7 +159,7 @@ export default function Benefits() {
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button data-testid="benefits-submit" type="submit" className="px-4 py-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white rounded-md">Save plan</button>
+              <button data-testid="benefits-submit" type="submit" className="px-4 py-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md">Save plan</button>
             </div>
           </form>
         </div>

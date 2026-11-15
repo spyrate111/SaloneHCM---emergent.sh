@@ -1,0 +1,73 @@
+WEBVTT
+
+1
+00:00:00.250 --> 00:00:03.530
+Kusheh en welkom to di SaloneHCM administrator guide.
+
+2
+00:00:03.530 --> 00:00:10.275
+As administrator, na yu de control who able enter di system, wetin den able do, en aw yu organisation set up.
+
+3
+00:00:10.275 --> 00:00:18.010
+Insai di next few minutes wi go cover user management, role flags, organisation settings, branch office dem, en di audit log.
+
+4
+00:00:19.250 --> 00:00:21.330
+Mek wi start with users en access.
+
+5
+00:00:21.330 --> 00:00:27.754
+From ya yu de invite new user dem by email, reset password, en remove account wey nobody no de use again.
+
+6
+00:00:27.754 --> 00:00:32.954
+Look di role pill dem near every name — admin, employee, en special capability flags.
+
+7
+00:00:34.250 --> 00:00:36.831
+Two flags important bad for money matter.
+
+8
+00:00:36.831 --> 00:00:41.615
+Di Finance Officer flag mek one user able review en approve payroll voucher.
+
+9
+00:00:41.615 --> 00:00:46.777
+Di M o F approver flag mek den able sign payroll run en authorize voucher payment.
+
+10
+00:00:46.777 --> 00:00:56.786
+Yu de grant den with one click na di banknote icon — en memba: di system enforce separation of duties by itself, so no one person no able push money out alone.
+
+11
+00:00:58.250 --> 00:01:11.882
+Under settings yu de manage yu organisation profile, yu subscription tier, integration dem like S M S en email, security policy dem like two-factor authentication, en di public transparency portal for government tenant dem.
+
+12
+00:01:13.250 --> 00:01:20.647
+If yu organisation de submit payroll voucher from plenty branch, district, or ministry, na ya yu de define den office.
+
+13
+00:01:20.647 --> 00:01:30.363
+Every branch get in own unique code, optional ministry link, en one branch supervisor wey in approval need before dat branch in voucher reach headquarters.
+
+14
+00:01:30.363 --> 00:01:34.250
+Yu able assign workman den to den branch from dis same screen.
+
+15
+00:01:45.250 --> 00:01:54.608
+Last one, di audit log. Every sensitive action insai SaloneHCM — every approval, every change, every payment authorization — de record ya with who do am en when.
+
+16
+00:01:54.608 --> 00:01:58.618
+If regulator or di Auditor General ask, di answer na one search away.
+
+17
+00:02:00.250 --> 00:02:09.979
+Dat na di administrator essentials: control access tight, grant money power careful, keep yu settings current, en mek di audit log memba everything for yu.
+
+18
+00:02:09.979 --> 00:02:15.754
+Go take di administrator certification quiz na di Training Center for confirm wetin yu sabi.

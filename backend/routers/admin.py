@@ -1,10 +1,10 @@
 """Super-admin endpoints — manage companies and switch active tenant."""
 import uuid
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from core import db, require_superadmin, hash_password, audit, now_utc, iso, make_access
+from core import db, require_superadmin, hash_password, audit, now_utc, iso, make_access, new_csrf_token, CSRF_COOKIE
 from tiers import TIERS, features_for, tier_label
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_superadmin)])
@@ -17,7 +17,7 @@ class CompanyCreateIn(BaseModel):
     tin: str = Field("", max_length=40)
     nassit_employer: str = Field("", max_length=40)
     country: str = "Sierra Leone"
-    currency: str = "SLE"
+    currency: Literal["SLE"] = "SLE"
     tier: Tier = "professional"
     # Seed an initial admin user for this company
     admin_email: EmailStr
@@ -105,7 +105,7 @@ async def update_tier(cid: str, body: TierUpdateIn, user: dict = Depends(require
 
 
 @router.post("/companies/{cid}/switch")
-async def switch_company(cid: str, user: dict = Depends(require_superadmin)):
+async def switch_company(cid: str, response: Response, user: dict = Depends(require_superadmin)):
     """Issue a new JWT scoped to the target company. Super-admin only."""
     company = await db.companies.find_one({"id": cid}, {"_id": 0})
     if not company:
@@ -113,10 +113,21 @@ async def switch_company(cid: str, user: dict = Depends(require_superadmin)):
     # Move the super-admin's user record to the target company (so all tenant_filter queries hit the new tenant)
     await db.users.update_one({"id": user["id"]}, {"$set": {"company_id": cid}})
     token = make_access(user["id"], user["email"], user["role"])
+    # Refresh both cookies so subsequent cookie-authenticated requests use the new JWT.
+    response.set_cookie(
+        key="access_token", value=token, httponly=True, secure=True,
+        samesite="none", max_age=43200, path="/",
+    )
+    csrf = new_csrf_token()
+    response.set_cookie(
+        key=CSRF_COOKIE, value=csrf, httponly=False, secure=True,
+        samesite="none", max_age=43200, path="/",
+    )
     await audit("company_switch", f"companies/{cid}", user,
                 {"to_company": company["name"]})
     return {
         "token": token,
+        "csrf_token": csrf,
         "company": {
             "id": company["id"],
             "name": company["name"],
@@ -133,3 +144,49 @@ async def list_tiers(_: dict = Depends(require_superadmin)):
         {"id": t, "label": tier_label(t), "features": features_for(t), "rank": i}
         for i, t in enumerate(TIERS)
     ]
+
+
+# ---------- Tier-features drift monitor ----------
+
+@router.get("/companies/drift-check")
+async def drift_check(_: dict = Depends(require_superadmin)):
+    """Scan every company and report any whose `features` array doesn't match its tier."""
+    drifted = []
+    total = 0
+    async for c in db.companies.find({}, {"_id": 0, "id": 1, "name": 1, "tier": 1, "features": 1}):
+        total += 1
+        expected = set(features_for(c.get("tier", "lite")))
+        have = set(c.get("features") or [])
+        if have != expected:
+            drifted.append({
+                "id": c["id"],
+                "name": c.get("name", ""),
+                "tier": c.get("tier", "lite"),
+                "missing": sorted(expected - have),
+                "extra": sorted(have - expected),
+            })
+    return {
+        "ok": len(drifted) == 0,
+        "total_companies": total,
+        "drifted_count": len(drifted),
+        "drifted": drifted,
+    }
+
+
+@router.post("/companies/drift-resync")
+async def drift_resync(user: dict = Depends(require_superadmin)):
+    """One-click resync — re-derive `features` from `tier` for every drifted company.
+    Logs an audit entry per fixed company."""
+    fixed = []
+    async for c in db.companies.find({}, {"_id": 0, "id": 1, "name": 1, "tier": 1, "features": 1}):
+        expected = features_for(c.get("tier", "lite"))
+        if set(c.get("features") or []) != set(expected):
+            await db.companies.update_one(
+                {"id": c["id"]},
+                {"$set": {"features": expected, "label": tier_label(c.get("tier", "lite"))}},
+            )
+            await audit("company_features_resync", f"companies/{c['id']}", user, {
+                "tier": c.get("tier"), "feature_count": len(expected),
+            })
+            fixed.append({"id": c["id"], "name": c.get("name", ""), "tier": c.get("tier")})
+    return {"ok": True, "fixed_count": len(fixed), "fixed": fixed}

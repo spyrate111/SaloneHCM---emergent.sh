@@ -1,17 +1,37 @@
 """User management within a tenant — invite, list, reset password, delete."""
+import os
 import uuid
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from core import (
-    db, get_current_user, require_admin, hash_password,
+    db, get_current_user, require_admin, require_superadmin, hash_password,
     audit, now_utc, iso, tenant_filter, with_tenant,
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-Role = Literal["admin", "employee"]
+
+def _require_test_account_management_enabled() -> None:
+    enabled = os.environ.get("ENABLE_TEST_ACCOUNT_MANAGEMENT", "").strip().lower()
+    if enabled not in {"1", "true", "yes"}:
+        raise HTTPException(403, "Test-account management is disabled")
+
+Role = Literal["admin", "hr", "payroll", "manager", "employee", "auditor"]
+
+ROLE_DESCRIPTIONS = {
+    "admin": "Full control of everything in the company",
+    "hr": "Employees, leave, training, performance & benefits — no payroll money or user management",
+    "payroll": "Payroll runs, vouchers, payslips & compliance filings — read-only employees",
+    "manager": "Self-service plus their own team: approve reports' leave, see team attendance",
+    "employee": "Self-service only — own payslips, leave, attendance and training",
+    "auditor": "Read-only oversight — audit logs, compliance reports, scan logs, punch maps and leave records. Cannot change anything",
+}
+
+
+class RoleChangeIn(BaseModel):
+    role: Role
 
 
 class InviteIn(BaseModel):
@@ -24,6 +44,11 @@ class InviteIn(BaseModel):
 
 class ResetPasswordIn(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
+
+
+class FlagsIn(BaseModel):
+    finance_officer: Optional[bool] = None
+    mof_approver: Optional[bool] = None
 
 
 def _public(u: dict) -> dict:
@@ -156,6 +181,27 @@ async def list_invites(user: dict = Depends(require_admin)):
     ).sort("created_at", -1).to_list(200)
 
 
+def _stale_invite_query(user: dict) -> dict:
+    from datetime import timedelta
+    cutoff = iso(now_utc() - timedelta(days=7))
+    return {**tenant_filter(user), "consumed_at": None, "superseded_at": None,
+            "created_at": {"$lt": cutoff}}
+
+
+@router.get("/invites/stale-count")
+async def stale_invite_count(user: dict = Depends(require_superadmin)):
+    """Pending invitations older than 7 days (super-admin only)."""
+    return {"count": await db.user_invites.count_documents(_stale_invite_query(user))}
+
+
+@router.delete("/invites/stale")
+async def clear_stale_invites(user: dict = Depends(require_superadmin)):
+    """Hard-delete all pending invitations older than 7 days (super-admin only)."""
+    r = await db.user_invites.delete_many(_stale_invite_query(user))
+    await audit("invites_stale_cleared", "user_invites", user, {"deleted": r.deleted_count})
+    return {"ok": True, "deleted": r.deleted_count}
+
+
 @router.delete("/invites/{iid}")
 async def revoke_invite(iid: str, user: dict = Depends(require_admin)):
     r = await db.user_invites.update_one(
@@ -166,6 +212,71 @@ async def revoke_invite(iid: str, user: dict = Depends(require_admin)):
         raise HTTPException(404, "Invite not found, already consumed, or already revoked")
     await audit("invite_revoke", f"user_invites/{iid}", user, {})
     return {"ok": True}
+
+
+@router.patch("/{uid}/flags")
+async def set_user_flags(uid: str, body: FlagsIn, user: dict = Depends(require_admin)):
+    target = await db.users.find_one({"id": uid, **tenant_filter(user)}, {"_id": 0, "id": 1})
+    if not target:
+        raise HTTPException(404, "User not found")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(422, "No flags provided")
+    await db.users.update_one({"id": uid, **tenant_filter(user)}, {"$set": updates})
+    await audit("user_flags_set", f"users/{uid}", user, updates)
+    return {"ok": True, **updates}
+
+
+@router.get("/roles")
+async def list_roles(user: dict = Depends(require_admin)):
+    """Assignable roles with plain-language permission summaries."""
+    return [{"role": r, "description": d} for r, d in ROLE_DESCRIPTIONS.items()]
+
+
+@router.post("/test-accounts/seed")
+async def seed_test_accounts_endpoint(user: dict = Depends(require_superadmin)):
+    """Create/refresh seeded test accounts for this tenant; disabled by default."""
+    _require_test_account_management_enabled()
+    from seed_test_accounts import seed_accounts
+    res = await seed_accounts(user["company_id"])
+    if not res.get("ok"):
+        raise HTTPException(409, res.get("error", "Seeding failed"))
+    await audit("test_accounts_seeded", "users/test-accounts", user,
+                {"created": res["created"], "updated": res["updated"]})
+    return res
+
+
+@router.delete("/test-accounts")
+async def wipe_test_accounts(user: dict = Depends(require_superadmin)):
+    """Permanently delete only this tenant's seeded test accounts."""
+    _require_test_account_management_enabled()
+    q = {
+        **tenant_filter(user),
+        "test_account": True,
+        "email": {"$regex": r"@salonehcm\.(com|sl)$"},
+    }
+    count = await db.users.count_documents(q)
+    if count:
+        await db.users.delete_many(q)
+    await audit("test_accounts_wiped", "users/test-accounts", user, {"deleted": count})
+    return {"ok": True, "deleted": count}
+
+
+@router.patch("/{uid}/role")
+async def change_user_role(uid: str, body: RoleChangeIn, user: dict = Depends(require_admin)):
+    target = await db.users.find_one({"id": uid, **tenant_filter(user)}, {"_id": 0})
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target.get("role") == "superadmin":
+        raise HTTPException(403, "Cannot change a super-admin's role")
+    if target["id"] == user["id"]:
+        raise HTTPException(400, "You cannot change your own role")
+    old = target.get("role")
+    await db.users.update_one({"id": uid, **tenant_filter(user)},
+                              {"$set": {"role": body.role}})
+    await audit("user_role_changed", f"users/{uid}", user,
+                {"email": target["email"], "from": old, "to": body.role})
+    return {"ok": True, "role": body.role}
 
 
 @router.post("/{uid}/reset-password")
@@ -219,6 +330,22 @@ async def set_digest_prefs(body: DigestPrefsIn, user: dict = Depends(get_current
     )
     await audit("digest_prefs_update", f"users/{user['id']}", user, body.model_dump())
     return {"ok": True, **body.model_dump()}
+
+
+@router.post("/me/role-tour-seen")
+async def dismiss_role_tour(user: dict = Depends(get_current_user)):
+    """One-time role welcome card dismissed — never show again for this user."""
+    await db.users.update_one({"id": user["id"]}, {"$set": {"role_tour_seen": True}})
+    return {"ok": True}
+
+
+@router.get("/me/digest-preview")
+async def digest_preview(user: dict = Depends(get_current_user)):
+    """Snapshot of what today's digest would contain (admin only)."""
+    if user["role"] not in ("admin", "superadmin"):
+        raise HTTPException(403, "Digest is admin-only")
+    from digest import _aggregate_for_tenant
+    return await _aggregate_for_tenant(user["company_id"])
 
 
 @router.get("/unlinked-employees")

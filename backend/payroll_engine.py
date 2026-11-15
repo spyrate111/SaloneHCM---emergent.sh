@@ -8,7 +8,8 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-from core import db, audit, now_utc, iso
+from core import db, audit, now_utc, iso, logger
+from fastapi import HTTPException
 
 # NRA PAYE bands (monthly SLE, post-2022 redenomination)
 PAYE_BANDS = [
@@ -38,7 +39,8 @@ def calc_paye(taxable: float) -> float:
     return round(tax, 2)
 
 
-def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
+def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None,
+                 loan_deduction: float = 0.0) -> dict:
     basic = float(emp.get("basic_salary_sle", 0))
     legacy_allow = float(emp.get("allowances_sle", 0))
     breakdown = dict(allowance_breakdown or {})
@@ -50,7 +52,9 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
     nassit_er = round(basic * NASSIT_EMPLOYER, 2)
     taxable = max(0.0, gross - nassit_emp)
     paye = calc_paye(taxable)
-    net = round(gross - nassit_emp - paye, 2)
+    # Loan deductions are post-tax — they reduce take-home pay but don't change tax liability.
+    loan = round(max(0.0, float(loan_deduction or 0.0)), 2)
+    net = round(gross - nassit_emp - paye - loan, 2)
     return {
         "employee_id": emp["id"],
         "employee_name": f'{emp["first_name"]} {emp["last_name"]}',
@@ -61,12 +65,60 @@ def calc_payslip(emp: dict, allowance_breakdown: Optional[dict] = None) -> dict:
         "nassit_employee": nassit_emp,
         "nassit_employer": nassit_er,
         "paye": paye,
+        "loan_deduction": loan,
         "net": net,
         "grade_code": emp.get("grade_code"),
         "step_number": emp.get("step_number"),
         "budget_code": emp.get("budget_code"),
         "mda_ministry": emp.get("mda_ministry"),
     }
+
+
+async def _compute_slips(emps: list, company_id: str, period: str) -> tuple[list, list]:
+    """Calculate complete payslips; fail the run if allowances or loan deductions fail."""
+    from loans_engine import compute_loan_deduction_for_period
+    from routers.civil_service import get_active_allowance_amounts
+
+    slips, applied_loan_rows = [], []
+    try:
+        for e in emps:
+            breakdown = await get_active_allowance_amounts(e, company_id, period)
+            loan_due, loan_rows = await compute_loan_deduction_for_period(e["id"], company_id, period)
+            slips.append(calc_payslip(e, allowance_breakdown=breakdown, loan_deduction=loan_due))
+            applied_loan_rows.extend(loan_rows)
+    except Exception:
+        logger.exception("Payroll calculation failed; refusing to create an incomplete run")
+        raise
+    return slips, applied_loan_rows
+
+
+def _run_totals(slips: list) -> dict:
+    return {
+        "employee_count": len(slips),
+        "gross": round(sum(s["gross"] for s in slips), 2),
+        "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
+        "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
+        "paye": round(sum(s["paye"] for s in slips), 2),
+        "loan_deductions": round(sum(s.get("loan_deduction", 0) for s in slips), 2),
+        "reimbursements": round(sum(s.get("reimbursement", 0) for s in slips), 2),
+        "net": round(sum(s["net"] for s in slips), 2),
+    }
+
+
+async def _settle_retros(rid: str, period: str, company_id: str, doc: dict) -> None:
+    """Apply pending retro-pay adjustments falling within this period (best-effort)."""
+    try:
+        from routers.payroll_rails import settle_pending_retros_for_run
+        settled = await settle_pending_retros_for_run(rid, period, company_id)
+        if settled["settled"]:
+            updates = {
+                "retro_settled_count": settled["settled"],
+                "retro_settled_total_sle": settled["total_sle"],
+            }
+            await db.payroll_runs.update_one({"id": rid}, {"$set": updates})
+            doc.update(updates)
+    except Exception as e:
+        logger.warning("retro settlement failed for run %s: %s", rid, e)
 
 
 async def run_payroll(year: int, month: int, user: dict, audit_action: str = "payroll_run") -> dict:
@@ -76,16 +128,43 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         {"_id": 0},
     ).to_list(2000)
     period = f"{year}-{month:02d}"
+    prior_runs = await db.payroll_runs.find(
+        {"company_id": user["company_id"], "period": period},
+        {"_id": 0, "id": 1},
+    ).to_list(5000)
+    prior_run_ids = [run["id"] for run in prior_runs]
+    if prior_run_ids:
+        reserved = await db.mobile_money_assignments.find_one(
+            {
+                "company_id": user["company_id"],
+                "run_id": {"$in": prior_run_ids},
+            },
+            {"_id": 0, "provider": 1},
+        )
+        if reserved:
+            raise HTTPException(
+                status_code=409,
+                detail="A payout workpaper already reserves this payroll period. Resolve that bank or wallet batch before rerunning payroll.",
+            )
 
-    # Pull allowance breakdown per employee using the civil-service module
-    try:
-        from routers.civil_service import get_active_allowance_amounts
-        slips = []
-        for e in emps:
-            breakdown = await get_active_allowance_amounts(e, user["company_id"], period)
-            slips.append(calc_payslip(e, allowance_breakdown=breakdown))
-    except Exception:
-        slips = [calc_payslip(e) for e in emps]
+    slips, applied_loan_rows = await _compute_slips(emps, user["company_id"], period)
+
+    # Approved, un-reimbursed expense claims become a reimbursement line.
+    claims = await db.expense_claims.find(
+        {"company_id": user["company_id"], "status": "approved", "payroll_run_id": None},
+        {"_id": 0, "id": 1, "employee_id": 1, "amount_sle": 1}).to_list(2000)
+    reimb_by_emp: dict = {}
+    for c in claims:
+        reimb_by_emp[c["employee_id"]] = round(
+            reimb_by_emp.get(c["employee_id"], 0) + c["amount_sle"], 2)
+    slip_eids = set()
+    for s in slips:
+        amt = reimb_by_emp.get(s["employee_id"], 0)
+        if amt:
+            s["reimbursement"] = amt
+            s["net"] = round(s["net"] + amt, 2)
+        slip_eids.add(s["employee_id"])
+    applied_claim_ids = [c["id"] for c in claims if c["employee_id"] in slip_eids]
 
     rid = str(uuid.uuid4())
     doc = {
@@ -95,30 +174,35 @@ async def run_payroll(year: int, month: int, user: dict, audit_action: str = "pa
         "period_year": year,
         "period_month": month,
         "slips": slips,
-        "totals": {
-            "employee_count": len(slips),
-            "gross": round(sum(s["gross"] for s in slips), 2),
-            "nassit_employee": round(sum(s["nassit_employee"] for s in slips), 2),
-            "nassit_employer": round(sum(s["nassit_employer"] for s in slips), 2),
-            "paye": round(sum(s["paye"] for s in slips), 2),
-            "net": round(sum(s["net"] for s in slips), 2),
-        },
+        "totals": _run_totals(slips),
         "status": "completed",
         "mof_status": "draft",
         "created_at": iso(now_utc()),
     }
     await db.payroll_runs.insert_one(doc)
+    if applied_claim_ids:
+        await db.expense_claims.update_many(
+            {"id": {"$in": applied_claim_ids}},
+            {"$set": {"status": "reimbursed", "payroll_run_id": rid,
+                      "reimbursed_period": period}})
+    # Persist loan deductions against each affected loan, idempotent by (loan_id, period).
+    if applied_loan_rows:
+        from loans_engine import apply_loan_deductions_for_run
+        await apply_loan_deductions_for_run(rid, period, applied_loan_rows)
     doc.pop("_id", None)
     await audit(audit_action, f"payroll_runs/{rid}", user,
                 {"period": period, "net": doc["totals"]["net"]})
+    await _settle_retros(rid, period, user["company_id"], doc)
     return doc
 
 
-def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd.") -> bytes:
+def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd.",
+                      verification_id: Optional[str] = None,
+                      verify_url: Optional[str] = None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
-    h = ParagraphStyle("h", parent=styles["Heading1"], fontSize=20, textColor=colors.HexColor("#133326"), spaceAfter=4)
+    h = ParagraphStyle("h", parent=styles["Heading1"], fontSize=20, textColor=colors.HexColor("#0A4A1E"), spaceAfter=4)
     sub = ParagraphStyle("s", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#525860"))
     label = ParagraphStyle("l", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#525860"))
     story = [
@@ -135,17 +219,21 @@ def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd."
         ["Gross", f"{slip['gross']:,.2f}"],
         ["NASSIT (employee 5%)", f"-{slip['nassit_employee']:,.2f}"],
         ["PAYE (NRA)", f"-{slip['paye']:,.2f}"],
-        ["Net pay", f"{slip['net']:,.2f}"],
     ]
+    if slip.get("loan_deduction"):
+        rows.append(["Loan repayment", f"-{slip['loan_deduction']:,.2f}"])
+    if slip.get("reimbursement"):
+        rows.append(["Expense reimbursement", f"+{slip['reimbursement']:,.2f}"])
+    rows.append(["Net pay", f"{slip['net']:,.2f}"])
     t = Table(rows, colWidths=[300, 200])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#133326")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A4A1E")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("ALIGN", (1, 0), (1, -1), "RIGHT"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.HexColor("#F7F6F2"), colors.white]),
-        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E6F4EC")),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E4F7E7")),
         ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2DFD6")),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
@@ -159,5 +247,37 @@ def build_payslip_pdf(slip: dict, period: str, company: str = "Demo Salone Ltd."
         "<i>Calculated per Sierra Leone NRA PAYE bands and NASSIT (5% employee, 10% employer) on basic salary.</i>",
         label,
     ))
+    if verify_url and verification_id:
+        try:
+            import qrcode as _qr
+            from reportlab.platypus import Image as _RLImage
+            q = _qr.QRCode(border=1, box_size=4)
+            q.add_data(verify_url)
+            q.make(fit=True)
+            img = q.make_image(fill_color="#0A4A1E", back_color="#FFFFFF").convert("RGB")
+            qb = io.BytesIO()
+            img.save(qb, format="PNG")
+            qb.seek(0)
+            note = Paragraph(
+                f"<b>Bank verification</b><br/>"
+                f"Scan the QR code (or visit the link below) to confirm this payslip is genuine.<br/>"
+                f"<font size=7 color='#525860'>{verify_url}</font><br/>"
+                f"<font size=7 color='#525860'>Verification ID: {verification_id}</font>",
+                ParagraphStyle("v", parent=label, fontSize=8, leading=11),
+            )
+            vt = Table([[_RLImage(qb, width=68, height=68), note]], colWidths=[84, 416])
+            vt.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7F6F2")),
+                ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2DFD6")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            story.append(Spacer(1, 14))
+            story.append(vt)
+        except Exception:
+            logger.exception("payslip QR block failed — PDF built without it")
     doc.build(story)
     return buf.getvalue()

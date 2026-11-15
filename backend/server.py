@@ -1,6 +1,8 @@
 """SaloneHCM API entry point — wires routers and middleware."""
 import logging
-from fastapi import FastAPI, APIRouter
+import os
+from pathlib import Path
+from fastapi import FastAPI, APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
@@ -8,7 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from core import client, limiter
+from core import client, db, limiter, csrf_protect
 from seeders import seed
 from storage import init_storage
 import scheduler as payroll_scheduler
@@ -16,7 +18,10 @@ from routers import (
     auth, employees, payroll, compliance, leave, attendance,
     dashboard, audit, assistant, benefits, talent, analytics, simulator, team,
     documents, company, admin, users, schedules, ministry, public, integrations,
-    push, performance, civil_service,
+    push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
+    sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
+    expenses, fx_rates, recruitment, announcements, offboarding, mobile_money,
+    vouchers, training, mobile, webauthn, onboarding, training_progress,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +31,15 @@ logger = logging.getLogger("salonehcm")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await seed()
+    await db.mobile_money_batches.create_index(
+        [("company_id", 1), ("run_id", 1), ("provider", 1)],
+        unique=True,
+        partialFilterExpression={"batch_type": "initial"},
+        name="unique_initial_mobile_money_batch",
+    )
+    await db.mobile_money_batches.create_index(
+        "retry_of", unique=True, sparse=True, name="unique_mobile_money_retry",
+    )
     try:
         init_storage()
     except Exception as e:
@@ -44,10 +58,11 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-api = APIRouter(prefix="/api")
+api = APIRouter(prefix="/api", dependencies=[Depends(csrf_protect)])
 api.include_router(auth.router)
 api.include_router(employees.router)
 api.include_router(payroll.router)
+api.include_router(mobile_money.router)
 api.include_router(compliance.router)
 api.include_router(leave.router)
 api.include_router(attendance.router)
@@ -70,6 +85,32 @@ api.include_router(integrations.router)
 api.include_router(push.router)
 api.include_router(performance.router)
 api.include_router(civil_service.router)
+api.include_router(ifmis.router)
+api.include_router(establishment.router)
+api.include_router(loans.router)
+api.include_router(billing.router)
+api.include_router(stripe_webhook.router)
+api.include_router(sector_presets.router)
+api.include_router(promotion.router)
+api.include_router(marketing.router)
+api.include_router(payroll_budget.router)
+api.include_router(fx_rates.router)
+api.include_router(payroll_variance.router)
+api.include_router(expenses.router)
+api.include_router(recruitment.router)
+api.include_router(recruitment.public_router)
+api.include_router(announcements.router)
+api.include_router(offboarding.router)
+api.include_router(payroll_rails.retro_router, prefix="/civil-service")
+api.include_router(payroll_rails.signatures_router, prefix="/civil-service")
+api.include_router(payroll_rails.cutoff_router, prefix="/payroll")
+api.include_router(vouchers.branches_router)
+api.include_router(vouchers.vouchers_router)
+api.include_router(training.router)
+api.include_router(mobile.router)
+api.include_router(webauthn.router)
+api.include_router(onboarding.router)
+api.include_router(training_progress.router)
 
 
 @api.get("/")
@@ -78,10 +119,44 @@ async def root():
 
 
 app.include_router(api)
+
+# Static training media (videos, posters, document pack) — /api prefix for ingress routing
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+_static_dir = Path(__file__).parent / "static"
+_static_dir.mkdir(exist_ok=True)
+app.mount("/api/static", StaticFiles(directory=str(_static_dir)), name="static")
+
+# CORS — when cookies are used, browsers reject Access-Control-Allow-Origin='*'.
+#
+# Production cutover: set `CORS_ALLOWED_ORIGINS` to a comma-separated allowlist
+# of explicit https origins (e.g. https://app.salonehcm.gov.sl,https://hcm.mof.gov.sl).
+# Preview origins are disabled by default whenever an explicit origin is configured;
+# set `CORS_ALLOW_PREVIEW=1` only in environments that intentionally need preview access.
+#
+# When no explicit origin is configured we retain the preview-host regex for
+# development convenience. Do not use that default in production.
+_explicit = [o.strip().rstrip("/") for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_legacy_frontend_url = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
+if _legacy_frontend_url and _legacy_frontend_url not in _explicit:
+    _explicit.append(_legacy_frontend_url)
+_preview_default = "0" if _explicit else "1"
+_allow_preview = os.environ.get("CORS_ALLOW_PREVIEW", _preview_default).strip().lower() not in ("0", "false", "")
+_preview_regex = r"https://[^/]+\.preview\.emergentagent\.com" if _allow_preview else None
+
+# When neither an explicit allowlist nor the preview regex is configured, fall
+# back to localhost-only so the server still boots in CI/dev.
+_allow_origins = _explicit or ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origin_regex=_preview_regex,
+    allow_origins=_allow_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-CSRF-Token"],
+)
+logging.getLogger("salonehcm").info(
+    "CORS configured: explicit=%s preview_regex=%s",
+    _allow_origins, bool(_preview_regex),
 )

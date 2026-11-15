@@ -68,7 +68,8 @@ class Test2FAEnforcement:
         assert r.json().get("twofa_enabled") is True
 
     def test_super_login_with_invalid_code_fails(self):
-        import urllib.request, json
+        import urllib.request
+        import json
         req = urllib.request.Request(
             f"{API}/auth/login",
             data=json.dumps({"email": "admin@salonehcm.sl", "password": "Admin@2026", "totp_code": "000000"}).encode(),
@@ -247,7 +248,8 @@ class TestPerformance:
         for c in candidates:
             email_to_name = c.split("@")[0].replace(".", " ").title()
             if email_to_name != target_emp_name:
-                other = c; break
+                other = c
+                break
         if not other:
             pytest.skip("could not pick a non-matching employee")
         try:

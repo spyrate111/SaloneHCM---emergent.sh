@@ -1,7 +1,7 @@
 """Daily admin digest — runs once per day, pushes a summary to each tenant admin."""
 import logging
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from apscheduler.triggers.cron import CronTrigger
@@ -38,12 +38,37 @@ async def _aggregate_for_tenant(company_id: str) -> dict:
     pending_perf = await db.performance_reviews_v2.count_documents({
         "company_id": company_id, "status": "pending_manager",
     })
+
+    # Payslip QR fraud alerts flagged since the last digest went out
+    last = await db.digest_runs.find_one({}, {"_id": 0, "ran_at": 1},
+                                         sort=[("ran_at", -1)])
+    since = last["ran_at"] if last else iso(now - timedelta(hours=24))
+    scan_alerts = await db.payslip_scan_alerts.find(
+        {"company_id": company_id, "created_at": {"$gt": since}},
+        {"_id": 0, "verification_id": 1, "employee_name": 1, "period": 1,
+         "scan_count": 1, "created_at": 1},
+    ).sort("created_at", -1).to_list(20)
+
+    # Out-of-zone punches since the last digest
+    ooz_punches = await db.ooz_alerts.find(
+        {"company_id": company_id, "created_at": {"$gt": since}},
+        {"_id": 0, "employee_name": 1, "branch_name": 1, "kind": 1,
+         "distance_from_branch_m": 1, "clocked_at": 1},
+    ).sort("created_at", -1).to_list(20)
+
+    # Training reminder nudges pushed since the last digest
+    training_nudges_sent = await db.training_reminders.count_documents(
+        {"company_id": company_id, "created_at": {"$gt": since}})
     return {
         "pending_leaves": pending_leaves,
         "employee_count": employee_count,
         "upcoming_runs": next_runs,
         "outstanding_filings": outstanding,
         "pending_manager_reviews": pending_perf,
+        "scan_alerts": scan_alerts,
+        "ooz_punches": ooz_punches,
+        "training_nudges_sent": training_nudges_sent,
+        "since": since,
         "generated_at": iso(now),
     }
 
@@ -59,6 +84,15 @@ def _summarize(snap: dict) -> str:
         parts.append(f"{len(snap['outstanding_filings'])} NRA filing{'s' if len(snap['outstanding_filings']) != 1 else ''} outstanding")
     if snap["pending_manager_reviews"]:
         parts.append(f"{snap['pending_manager_reviews']} review{'s' if snap['pending_manager_reviews'] != 1 else ''} awaiting manager")
+    if snap.get("scan_alerts"):
+        n = len(snap["scan_alerts"])
+        parts.append(f"{n} flagged payslip scan{'s' if n != 1 else ''}")
+    if snap.get("ooz_punches"):
+        n = len(snap["ooz_punches"])
+        parts.append(f"{n} out-of-zone punch{'es' if n != 1 else ''}")
+    if snap.get("training_nudges_sent"):
+        n = snap["training_nudges_sent"]
+        parts.append(f"{n} training nudge{'s' if n != 1 else ''} sent")
     return " · ".join(parts) or "All clear — no pending actions."
 
 
@@ -90,13 +124,83 @@ def _email_items(snap: dict) -> list[dict]:
             "url": f"{frontend}/performance",
             "cta": "Score reviews",
         })
+    for al in snap.get("scan_alerts", []):
+        flagged_at = al["created_at"][:16].replace("T", " ")
+        items.append({
+            "label": (f'<strong style="color:#B03A2E;">Flagged payslip</strong> — '
+                      f'{al["employee_name"]} · {al["period"]} · {al["scan_count"]} scans · '
+                      f'flagged {flagged_at} UTC'),
+            "url": f"{frontend}/payroll?flag={al['verification_id']}",
+            "cta": "View scan log",
+        })
+    if snap.get("ooz_punches"):
+        n = len(snap["ooz_punches"])
+        items.append({
+            "label": f"<strong>{n}</strong> out-of-zone punch{'es' if n != 1 else ''} since the last digest",
+            "url": f"{frontend}/attendance",
+            "cta": "View punch map",
+        })
+    if snap.get("training_nudges_sent"):
+        n = snap["training_nudges_sent"]
+        items.append({
+            "label": f"<strong>{n}</strong> training reminder{'s' if n != 1 else ''} nudged to staff",
+            "url": f"{frontend}/dashboard",
+            "cta": "Open dashboard",
+        })
     return items
+
+
+def _build_email_body_html(admin_name: str, items: list[dict]) -> str:
+    """Compose the inner HTML body for a digest email."""
+    greeting = f"<p>Good morning {admin_name},</p>"
+    if not items:
+        return greeting + '<p style="color:#17A035;font-weight:600;">All clear — no pending actions today. 🎉</p>'
+    rows = "".join(
+        f'<tr><td style="padding:10px 0;border-bottom:1px solid #E2DFD6;">'
+        f'<div style="font-size:13px;">{it["label"]}</div>'
+        f'<a href="{it["url"]}" style="color:#26547C;font-size:12px;text-decoration:none;">{it["cta"]} →</a>'
+        f'</td></tr>'
+        for it in items
+    )
+    return (
+        greeting
+        + "<p>Here's your SaloneHCM digest for today:</p>"
+        + f'<table style="width:100%;border-collapse:collapse;">{rows}</table>'
+    )
+
+
+async def _push_digest(admin: dict, body: str) -> None:
+    import push_service
+    try:
+        await push_service.fanout_to_user(admin["id"], {
+            "title": "SaloneHCM · Daily digest",
+            "body": body,
+            "url": "/dashboard",
+            "kind": "daily_digest",
+            "tag": "daily-digest",
+        })
+    except Exception:
+        logger.warning("daily digest push failed for %s", admin["email"])
+
+
+async def _email_digest(admin: dict, snap: dict) -> None:
+    from email_service import _wrap_html, _send as _email_send
+    try:
+        body_html = _build_email_body_html(admin.get("name", ""), _email_items(snap))
+        html = _wrap_html(
+            title="Daily digest",
+            body_html=body_html,
+            cta_label="Open dashboard",
+            cta_url=(os.environ.get("FRONTEND_URL", "") + "/dashboard"),
+        )
+        await _email_send(admin["email"], "SaloneHCM · Daily digest", html)
+    except Exception:
+        logger.warning("daily digest email failed for %s", admin["email"])
 
 
 async def _send_daily_digest() -> None:
     """For each admin user, compute their tenant snapshot and fire their preferred channels."""
-    import push_service
-    from email_service import _wrap_html, _send as _email_send, is_configured as _email_ok
+    from email_service import is_configured as _email_ok
     admins = await db.users.find(
         {"role": {"$in": ["admin", "superadmin"]}},
         {"_id": 0, "id": 1, "email": 1, "company_id": 1, "name": 1, "digest_prefs": 1},
@@ -110,49 +214,11 @@ async def _send_daily_digest() -> None:
         if cid not in by_tenant:
             by_tenant[cid] = await _aggregate_for_tenant(cid)
         snap = by_tenant[cid]
-        body = _summarize(snap)
         prefs = a.get("digest_prefs") or {"push": True, "email": False}
         if prefs.get("push"):
-            try:
-                await push_service.fanout_to_user(a["id"], {
-                    "title": "SaloneHCM · Daily digest",
-                    "body": body,
-                    "url": "/dashboard",
-                    "kind": "daily_digest",
-                    "tag": "daily-digest",
-                })
-            except Exception:
-                logger.warning("daily digest push failed for %s", a["email"])
+            await _push_digest(a, _summarize(snap))
         if prefs.get("email") and _email_ok():
-            try:
-                items = _email_items(snap)
-                if items:
-                    rows = "".join([
-                        f'''<tr><td style="padding:10px 0;border-bottom:1px solid #E2DFD6;">
-                              <div style="font-size:13px;">{it["label"]}</div>
-                              <a href="{it["url"]}" style="color:#26547C;font-size:12px;text-decoration:none;">{it["cta"]} →</a>
-                            </td></tr>'''
-                        for it in items
-                    ])
-                    body_html = f"""
-                      <p>Good morning {a.get('name','')},</p>
-                      <p>Here's your SaloneHCM digest for today:</p>
-                      <table style="width:100%;border-collapse:collapse;">{rows}</table>
-                    """
-                else:
-                    body_html = f"""
-                      <p>Good morning {a.get('name','')},</p>
-                      <p style="color:#2D7A5D;font-weight:600;">All clear — no pending actions today. 🎉</p>
-                    """
-                html = _wrap_html(
-                    title="Daily digest",
-                    body_html=body_html,
-                    cta_label="Open dashboard",
-                    cta_url=(os.environ.get("FRONTEND_URL", "") + "/dashboard"),
-                )
-                await _email_send(a["email"], "SaloneHCM · Daily digest", html)
-            except Exception:
-                logger.warning("daily digest email failed for %s", a["email"])
+            await _email_digest(a, snap)
 
     # Persist a log so admins can inspect
     try:

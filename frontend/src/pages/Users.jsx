@@ -2,13 +2,18 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
+import { InviteUserModal } from "../components/InviteUserModal";
 import {
-  Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search, Mail, Clock,
+  Users as UsersIcon, UserPlus, Trash2, KeyRound, X, ShieldCheck, User as UserIcon, Crown, Search, Clock, Banknote,
+  Briefcase, Calculator, UserCheck,
 } from "lucide-react";
 
 const ROLE_PILL = {
   superadmin: { label: "Super-admin", icon: Crown, color: "bg-[#FBE9DF] text-[#B84F2F]" },
   admin: { label: "Admin", icon: ShieldCheck, color: "bg-[#E5EEF6] text-[#26547C]" },
+  hr: { label: "HR Manager", icon: Briefcase, color: "bg-[#E4F7E7] text-[#0A4A1E]" },
+  payroll: { label: "Payroll Officer", icon: Calculator, color: "bg-[#FBF3D9] text-[#8B6A14]" },
+  manager: { label: "Manager", icon: UserCheck, color: "bg-[#EFE9F7] text-[#6B4FA1]" },
   employee: { label: "Employee", icon: UserIcon, color: "bg-[#EBE8E0] text-[#525860]" },
 };
 
@@ -91,6 +96,47 @@ export default function Users() {
     }
   };
 
+  const toggleFinance = async (u) => {
+    try {
+      await api.patch(`/users/${u.id}/flags`, { finance_officer: !u.finance_officer });
+      toast.success(u.finance_officer ? "Finance officer revoked" : "Finance officer granted");
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Update failed");
+    }
+  };
+
+  const [staleCount, setStaleCount] = useState(null); // null = dialog closed
+  const askClearStale = async () => {
+    try {
+      const { data } = await api.get("/users/invites/stale-count");
+      setStaleCount(data.count);
+    } catch {
+      toast.error("Could not check stale invitations");
+    }
+  };
+  const clearStale = async () => {
+    try {
+      const { data } = await api.delete("/users/invites/stale");
+      toast.success(`Deleted ${data.deleted} stale invitation${data.deleted === 1 ? "" : "s"}`);
+      setStaleCount(null);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Cleanup failed");
+    }
+  };
+
+  const changeRole = async (u, role) => {
+    if (role === u.role) return;
+    try {
+      await api.patch(`/users/${u.id}/role`, { role });
+      toast.success(`${u.name} is now ${ROLE_PILL[role]?.label || role}`);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Role change failed");
+    }
+  };
+
   const filtered = users.filter((u) => {
     if (!q) return true;
     const t = q.toLowerCase();
@@ -110,7 +156,8 @@ export default function Users() {
         <button
           data-testid="users-invite-open"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm px-4 py-2.5 rounded-md transition"
+          data-testid="users-invite-button"
+          className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm px-4 py-2.5 rounded-md transition"
         >
           <UserPlus className="w-4 h-4" strokeWidth={1.5} /> Invite user
         </button>
@@ -121,6 +168,15 @@ export default function Users() {
           <div className="px-5 py-3 border-b border-[#E2DFD6] flex items-center gap-2">
             <Clock className="w-4 h-4 text-[#8B6A14]" strokeWidth={1.5} />
             <h3 className="font-heading text-sm font-semibold">Pending invitations · {invites.length}</h3>
+            {me?.role === "superadmin" && (
+              <button
+                onClick={askClearStale}
+                className="ml-auto text-xs font-medium border border-[#B03A2E]/40 text-[#B03A2E] px-3 py-1.5 rounded-md hover:bg-[#FBE9E9]"
+                data-testid="clear-stale-invites-button"
+              >
+                Clear stale invitations
+              </button>
+            )}
           </div>
           <table className="w-full text-sm">
             <tbody>
@@ -133,7 +189,7 @@ export default function Users() {
                   <td className="py-2.5 px-5 text-xs text-[#525860] capitalize">{iv.role}</td>
                   <td className="py-2.5 px-5 text-xs text-[#525860] font-data">expires {new Date(iv.expires_at).toLocaleDateString()}</td>
                   <td className="py-2.5 px-5 text-right">
-                    <button data-testid={`invite-revoke-${iv.id}`} onClick={() => revokeInvite(iv.id)} className="text-xs text-[#B83A3A] hover:underline">Revoke</button>
+                    <button data-testid={`invite-revoke-${iv.id}`} onClick={() => revokeInvite(iv.id)} className="text-xs text-[#3A7CB8] hover:underline">Revoke</button>
                   </td>
                 </tr>
               ))}
@@ -172,7 +228,7 @@ export default function Users() {
                 <tr key={u.id} className="border-t border-[#E2DFD6] hover:bg-[#FDFCFB]" data-testid={`user-row-${u.id}`}>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#F1EEE6] grid place-items-center text-xs font-medium text-[#133326]">
+                      <div className="w-8 h-8 rounded-full bg-[#F1EEE6] grid place-items-center text-xs font-medium text-[#0A4A1E]">
                         {u.name?.[0] || "?"}
                       </div>
                       <div>
@@ -182,9 +238,32 @@ export default function Users() {
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full ${rolePill.color}`}>
-                      <RoleIcon className="w-3 h-3" strokeWidth={1.7} /> {rolePill.label}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full ${rolePill.color}`}>
+                        <RoleIcon className="w-3 h-3" strokeWidth={1.7} /> {rolePill.label}
+                      </span>
+                      {u.finance_officer && (
+                        <span data-testid={`user-finance-pill-${u.id}`} className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E4F7E7] text-[#17A035]">Finance</span>
+                      )}
+                      {u.mof_approver && (
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FBF3D9] text-[#8B6A14]">MoF</span>
+                      )}
+                      {u.role !== "superadmin" && u.id !== me?.id && (
+                        <select
+                          value={u.role}
+                          onChange={(e) => changeRole(u, e.target.value)}
+                          className="text-[11px] border border-[#E2DFD6] rounded-md px-1.5 py-1 bg-white text-[#525860] cursor-pointer"
+                          data-testid={`user-role-select-${u.id}`}
+                          title="Change role"
+                        >
+                          <option value="employee">Employee</option>
+                          <option value="manager">Manager</option>
+                          <option value="hr">HR Manager</option>
+                          <option value="payroll">Payroll Officer</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-[#525860] text-xs font-data">{u.employee_id ? u.employee_id.slice(0, 8) + "…" : "—"}</td>
                   <td className="py-3 px-4 text-[#686D76] text-xs font-data">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
@@ -192,6 +271,14 @@ export default function Users() {
                     <div className="inline-flex items-center gap-1">
                       {u.role !== "superadmin" && (
                         <>
+                          <button
+                            data-testid={`user-finance-toggle-${u.id}`}
+                            onClick={() => toggleFinance(u)}
+                            className={`p-1.5 rounded hover:bg-[#F1EEE6] ${u.finance_officer ? "text-[#17A035]" : "text-[#A1A5AB]"}`}
+                            title={u.finance_officer ? "Revoke finance officer" : "Grant finance officer (voucher review & approval)"}
+                          >
+                            <Banknote className="w-4 h-4" strokeWidth={1.5} />
+                          </button>
                           <button
                             data-testid={`user-reset-${u.id}`}
                             onClick={() => setResetting(u)}
@@ -204,7 +291,7 @@ export default function Users() {
                             <button
                               data-testid={`user-delete-${u.id}`}
                               onClick={() => onDelete(u)}
-                              className="p-1.5 rounded hover:bg-[#FBEAEA] text-[#B83A3A]"
+                              className="p-1.5 rounded hover:bg-[#E9F2FB] text-[#3A7CB8]"
                               title="Delete"
                             >
                               <Trash2 className="w-4 h-4" strokeWidth={1.5} />
@@ -228,66 +315,13 @@ export default function Users() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/40 grid place-items-center p-4" data-testid="invite-modal">
-          <form onSubmit={onInvite} className="bg-white rounded-lg border border-[#E2DFD6] w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading text-lg font-semibold">Invite user</h3>
-              <button type="button" onClick={() => setOpen(false)} className="text-[#525860] hover:text-[#1A1C1E]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex gap-2 p-1 bg-[#F7F6F2] border border-[#E2DFD6] rounded-md" data-testid="invite-mode-toggle">
-              <button type="button" onClick={() => setInviteMode("magic")} data-testid="invite-mode-magic" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "magic" ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
-                <Mail className="w-3.5 h-3.5" /> Magic link
-              </button>
-              <button type="button" onClick={() => setInviteMode("password")} data-testid="invite-mode-password" className={`flex-1 text-xs font-medium px-3 py-2 rounded inline-flex items-center justify-center gap-1.5 transition ${inviteMode === "password" ? "bg-white text-[#133326] shadow-sm" : "text-[#686D76]"}`}>
-                <KeyRound className="w-3.5 h-3.5" /> Set password
-              </button>
-            </div>
-            <div className="text-[11px] text-[#525860] -mt-2">
-              {inviteMode === "magic"
-                ? "Sends an email with a one-time link — the user sets their own password on first click."
-                : "Creates the account immediately with the password you choose."}
-            </div>
-            <Field label="Full name"><input data-testid="invite-name" required name="name" placeholder="Jane Doe" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
-            <Field label="Email"><input data-testid="invite-email" required type="email" name="email" placeholder="jane@company.sl" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" /></Field>
-            <Field label="Role">
-              <select data-testid="invite-role" required name="role" defaultValue="employee" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-                <option value="employee">Employee</option>
-                <option value="admin">Admin</option>
-              </select>
-            </Field>
-            <Field label="Initial password (share securely)">
-              <input
-                data-testid="invite-password"
-                required={inviteMode === "password"}
-                disabled={inviteMode === "magic"}
-                name="password"
-                type="password"
-                minLength={8}
-                placeholder={inviteMode === "magic" ? "(set on first click)" : "At least 8 chars"}
-                className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data disabled:bg-[#F7F6F2] disabled:text-[#A1A5AB]"
-              />
-            </Field>
-            {unlinked.length > 0 && (
-              <Field label="Link to existing employee (optional)">
-                <select data-testid="invite-employee" name="employee_id" defaultValue="" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
-                  <option value="">— None —</option>
-                  {unlinked.map((e) => (
-                    <option key={e.id} value={e.id}>{e.first_name} {e.last_name} · {e.department}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6] hover:bg-[#F7F6F2]">Cancel</button>
-              <button type="submit" data-testid="invite-submit" className="inline-flex items-center gap-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white px-4 py-2 rounded-md">
-                {inviteMode === "magic" ? <Mail className="w-4 h-4" strokeWidth={1.5} /> : <UserPlus className="w-4 h-4" strokeWidth={1.5} />}
-                {inviteMode === "magic" ? "Send magic link" : "Create account"}
-              </button>
-            </div>
-          </form>
-        </div>
+        <InviteUserModal
+          inviteMode={inviteMode}
+          setInviteMode={setInviteMode}
+          unlinked={unlinked}
+          onInvite={onInvite}
+          onClose={() => setOpen(false)}
+        />
       )}
 
       {resetting && (
@@ -301,20 +335,37 @@ export default function Users() {
             <input required name="password" type="password" minLength={8} placeholder="New password (8+ chars)" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
             <div className="flex items-center justify-end gap-2">
               <button type="button" onClick={() => setResetting(null)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
-              <button type="submit" data-testid="reset-submit" className="text-sm bg-[#133326] text-white px-4 py-2 rounded-md">Save</button>
+              <button type="submit" data-testid="reset-submit" className="text-sm bg-[#0A4A1E] text-white px-4 py-2 rounded-md">Save</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {staleCount !== null && (
+        <div className="fixed inset-0 z-40 bg-black/40 grid place-items-center p-4" data-testid="stale-invites-dialog">
+          <div className="bg-white rounded-lg border border-[#E2DFD6] w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading text-lg font-semibold">Clear stale invitations</h3>
+              <button type="button" onClick={() => setStaleCount(null)} className="text-[#525860]"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-sm text-[#525860]" data-testid="stale-invites-count">
+              {staleCount === 0
+                ? "No pending invitations older than 7 days — nothing to clear."
+                : <><span className="font-data font-bold text-[#B03A2E]">{staleCount}</span> pending invitation{staleCount === 1 ? "" : "s"} older than 7 days will be permanently deleted.</>}
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setStaleCount(null)} className="text-sm px-4 py-2 rounded-md border border-[#E2DFD6]">Cancel</button>
+              {staleCount > 0 && (
+                <button onClick={clearStale} data-testid="stale-invites-confirm" className="text-sm bg-[#B03A2E] text-white px-4 py-2 rounded-md hover:bg-[#8E2E24]">
+                  Delete {staleCount}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="block text-[11px] uppercase tracking-wider text-[#525860] mb-1">{label}</label>
-      {children}
-    </div>
-  );
-}
+

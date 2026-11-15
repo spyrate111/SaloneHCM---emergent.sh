@@ -1,17 +1,29 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle, Fingerprint } from "lucide-react";
 import api from "../lib/api";
 
 const BG = "https://images.unsplash.com/photo-1676029461383-215556e79bc8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwyfHxzaWVycmElMjBsZW9uZSUyMGxhbmRzY2FwZSUyMHN1bnNldHxlbnwwfHx8fDE3Nzg0MjIzODZ8MA&ixlib=rb-4.1.0&q=85";
+
+// WebAuthn helpers — base64url <-> ArrayBuffer for JSON transit
+const b64uEnc = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64uDec = (s) => {
+  const pad = "=".repeat((4 - (s.length % 4)) % 4);
+  const base = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(base);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+};
 
 export default function Login() {
   const [params] = useSearchParams();
   const inviteToken = params.get("invite");
   const [mode, setMode] = useState(inviteToken ? "accept" : "login");
-  const [email, setEmail] = useState("admin@salonehcm.sl");
-  const [password, setPassword] = useState("Admin@2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [needsTotp, setNeedsTotp] = useState(false);
   const [err, setErr] = useState("");
@@ -19,8 +31,51 @@ export default function Login() {
   const [invite, setInvite] = useState(null);
   const [inviteErr, setInviteErr] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [bioAvail, setBioAvail] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
   const { login, applyAuth } = useAuth();
   const nav = useNavigate();
+
+  // Show the biometric button only on devices with a platform authenticator
+  useEffect(() => {
+    if (window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable) {
+      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then((ok) => setBioAvail(!!ok))
+        .catch(() => {});
+    }
+  }, []);
+
+  const bioLogin = async () => {
+    setErr(""); setBioBusy(true);
+    try {
+      const opts = await api.post("/auth/webauthn/login/begin", { email: email || undefined });
+      const publicKey = opts.data;
+      publicKey.challenge = b64uDec(publicKey.challenge);
+      (publicKey.allowCredentials || []).forEach((c) => { c.id = b64uDec(c.id); });
+      const cred = await navigator.credentials.get({ publicKey });
+      const assertion = {
+        id: cred.id,
+        rawId: b64uEnc(cred.rawId),
+        type: cred.type,
+        response: {
+          clientDataJSON: b64uEnc(cred.response.clientDataJSON),
+          authenticatorData: b64uEnc(cred.response.authenticatorData),
+          signature: b64uEnc(cred.response.signature),
+          userHandle: cred.response.userHandle ? b64uEnc(cred.response.userHandle) : null,
+        },
+        clientExtensionResults: cred.getClientExtensionResults(),
+      };
+      const r = await api.post("/auth/webauthn/login/finish", { credential: assertion });
+      applyAuth(r.data);
+      nav("/dashboard");
+    } catch (e) {
+      const d = e?.response?.data?.detail;
+      if (e?.name === "NotAllowedError") setErr("Biometric prompt was cancelled or timed out");
+      else setErr(typeof d === "string" ? d : "Biometric sign-in failed — use your password");
+    } finally {
+      setBioBusy(false);
+    }
+  };
 
   // Look up invite metadata on mount when ?invite=<token>
   useEffect(() => {
@@ -43,7 +98,10 @@ export default function Login() {
       nav("/dashboard");
     } catch (er) {
       const d = er?.response?.data?.detail;
-      setErr((d && typeof d === "object") ? d.message : (typeof d === "string" ? d : "Could not accept invitation"));
+      let msg = "Could not accept invitation";
+      if (d && typeof d === "object") msg = d.message;
+      else if (typeof d === "string") msg = d;
+      setErr(msg);
     } finally { setLoading(false); }
   };
 
@@ -67,12 +125,17 @@ export default function Login() {
     } finally { setLoading(false); }
   };
 
+  const acceptHeading = () => {
+    if (mode !== "accept") return "Sign in to your workspace";
+    return invite ? `Join ${invite.company?.name || "your team"}` : "Accept your invitation";
+  };
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-[#F7F6F2]">
       {/* Left - visual */}
       <div className="relative hidden lg:block">
         <img src={BG} alt="Sierra Leone" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a1f17]/85 via-[#133326]/70 to-[#0a1f17]/90" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#04270E]/85 via-[#0A4A1E]/70 to-[#04270E]/90" />
         <div className="relative z-10 h-full flex flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-[#D1603D] grid place-items-center font-heading font-bold">S</div>
@@ -105,14 +168,14 @@ export default function Login() {
       <div className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md bg-[#133326] grid place-items-center font-heading font-bold text-white">S</div>
+            <div className="w-10 h-10 rounded-md bg-[#0A4A1E] grid place-items-center font-heading font-bold text-white">S</div>
             <div className="font-heading font-bold text-lg">SaloneHCM</div>
           </div>
           <div className="text-[11px] uppercase tracking-[0.22em] text-[#525860] mb-3">
             {mode === "accept" ? "You've been invited" : "Welcome back"}
           </div>
           <h2 className="font-heading text-3xl sm:text-4xl font-bold text-[#1A1C1E] mb-2">
-            {mode === "accept" ? (invite ? `Join ${invite.company?.name || "your team"}` : "Accept your invitation") : "Sign in to your workspace"}
+            {acceptHeading()}
           </h2>
           <p className="text-[#525860] text-sm mb-8">
             {mode === "accept"
@@ -123,7 +186,7 @@ export default function Login() {
           {mode === "accept" ? (
             <>
               {inviteErr ? (
-                <div className="bg-[#FBEAEA] border border-[#F2D0D0] text-[#B83A3A] text-sm rounded-md p-4 flex gap-2" data-testid="invite-error">
+                <div className="bg-[#E9F2FB] border border-[#D0E2F2] text-[#3A7CB8] text-sm rounded-md p-4 flex gap-2" data-testid="invite-error">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <div className="font-medium">{inviteErr}</div>
@@ -156,12 +219,12 @@ export default function Login() {
                       />
                     </div>
                   </div>
-                  {err && <div data-testid="login-error" className="text-sm text-[#B83A3A] bg-[#FBEAEA] border border-[#F2D0D0] rounded-md px-3 py-2">{err}</div>}
+                  {err && <div data-testid="login-error" className="text-sm text-[#3A7CB8] bg-[#E9F2FB] border border-[#D0E2F2] rounded-md px-3 py-2">{err}</div>}
                   <button
                     data-testid="accept-submit-button"
                     type="submit"
                     disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+                    className="w-full inline-flex items-center justify-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
                   >
                     {loading ? "Activating…" : "Accept invitation"}
                     <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
@@ -226,17 +289,37 @@ export default function Login() {
               </div>
             )}
 
-            {err && <div data-testid="login-error" className="text-sm text-[#B83A3A] bg-[#FBEAEA] border border-[#F2D0D0] rounded-md px-3 py-2">{err}</div>}
+            {err && <div data-testid="login-error" className="text-sm text-[#3A7CB8] bg-[#E9F2FB] border border-[#D0E2F2] rounded-md px-3 py-2">{err}</div>}
 
             <button
               data-testid="login-submit-button"
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
             >
               {loading ? "Signing in…" : "Sign In"}
               <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
             </button>
+
+            {bioAvail && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-[#E2DFD6]" />
+                  <span className="text-[10px] uppercase tracking-widest text-[#A1A5AB]">or</span>
+                  <div className="flex-1 h-px bg-[#E2DFD6]" />
+                </div>
+                <button
+                  data-testid="login-biometric-button"
+                  type="button"
+                  onClick={bioLogin}
+                  disabled={bioBusy}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-white border border-[#0A4A1E] text-[#0A4A1E] hover:bg-[#E4F7E7] rounded-md py-2.5 px-4 font-medium transition disabled:opacity-60"
+                >
+                  <Fingerprint className="w-4 h-4" strokeWidth={1.5} />
+                  {bioBusy ? "Waiting for biometric…" : "Sign in with biometrics"}
+                </button>
+              </>
+            )}
           </form>
           )}
 
@@ -244,6 +327,13 @@ export default function Login() {
             <div className="font-semibold uppercase tracking-wider text-[10px] text-[#1A1C1E] mb-2">Demo accounts</div>
             <div className="font-data">Admin · admin@salonehcm.sl · Admin@2026</div>
             <div className="font-data text-[#686D76]">Employee · aminata.kamara@salonehcm.sl · Employee@2026</div>
+          </div>
+
+          <div className="mt-4 text-center">
+            <a href="/careers" data-testid="login-careers-link"
+              className="text-sm text-[#0A4A1E] font-medium hover:underline">
+              We&rsquo;re hiring — view open positions →
+            </a>
           </div>
         </div>
       </div>

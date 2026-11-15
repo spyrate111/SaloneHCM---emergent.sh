@@ -23,11 +23,11 @@ export function SimResultCard({ sim, title }) {
       <div className="grid grid-cols-3 gap-2 text-xs">
         <Stat label="Current/mo" value={fmtSLE(sim.current.employer_total_cost)} />
         <Stat label="Projected/mo" value={fmtSLE(sim.projected.employer_total_cost)} />
-        <div className={`rounded p-2 ${positive ? "bg-[#FBE9DF]" : "bg-[#E6F4EC]"}`}>
+        <div className={`rounded p-2 ${positive ? "bg-[#FBE9DF]" : "bg-[#E4F7E7]"}`}>
           <div className="text-[10px] uppercase tracking-wider text-[#525860] inline-flex items-center gap-1">
             <TrendIcon className="w-3 h-3" /> Δ employer
           </div>
-          <div className={`font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#2D7A5D]"}`}>
+          <div className={`font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#17A035]"}`}>
             {positive ? "+" : ""}{fmtSLE(sim.delta.employer_total_cost)}
           </div>
         </div>
@@ -35,7 +35,7 @@ export function SimResultCard({ sim, title }) {
       <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
         <div className="bg-white border border-[#E2DFD6] rounded p-2">
           <div className="text-[10px] uppercase tracking-wider text-[#525860]">Annualized</div>
-          <div className={`font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#2D7A5D]"}`}>
+          <div className={`font-data font-semibold ${positive ? "text-[#B84F2F]" : "text-[#17A035]"}`}>
             {positive ? "+" : ""}{fmtSLE(sim.annualized_delta_employer_cost)}/yr
           </div>
         </div>
@@ -48,7 +48,7 @@ export function SimResultCard({ sim, title }) {
             {sim.employees.slice(0, 5).map((e) => (
               <div key={e.id} className="flex justify-between">
                 <span>{e.name} <span className="text-[#686D76]">· {e.department}</span></span>
-                <span className={e.delta_gross >= 0 ? "text-[#2D7A5D]" : "text-[#B83A3A]"}>
+                <span className={e.delta_gross >= 0 ? "text-[#17A035]" : "text-[#3A7CB8]"}>
                   {e.delta_gross >= 0 ? "+" : ""}{fmtSLE(e.delta_gross)}
                 </span>
               </div>
@@ -73,8 +73,8 @@ function StepRow({ step, index, result }) {
   const status = result?.status;
   return (
     <li className={`text-sm border rounded-md px-3 py-2 ${
-      status === "ok" ? "border-[#9CC8B1] bg-[#E6F4EC]"
-      : status === "error" ? "border-[#E1A1A1] bg-[#FBEAEA]"
+      status === "ok" ? "border-[#90D8A0] bg-[#E4F7E7]"
+      : status === "error" ? "border-[#A1C3E1] bg-[#E9F2FB]"
       : "border-[#E2DFD6] bg-[#F7F6F2]"
     }`}>
       <div className="flex items-start gap-2">
@@ -85,7 +85,7 @@ function StepRow({ step, index, result }) {
             {JSON.stringify({ ...step, type: undefined }, null, 0).slice(1, -1) || "—"}
           </pre>
           {result && (
-            <div className={`text-xs mt-1 ${status === "ok" ? "text-[#2D7A5D]" : status === "error" ? "text-[#B83A3A]" : "text-[#525860]"}`}>
+            <div className={`text-xs mt-1 ${status === "ok" ? "text-[#17A035]" : status === "error" ? "text-[#3A7CB8]" : "text-[#525860]"}`}>
               {status === "ok" ? "✓ " : status === "error" ? "✗ " : "• "}{result.detail}
             </div>
           )}

@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://salonepaycms.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://127.0.0.1:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN = {"email": "admin@salonehcm.sl", "password": "Admin@2026"}
@@ -125,9 +125,10 @@ def test_shared_run_payroll_equivalent_outputs(admin_token):
     assert r2.status_code == 200, r2.text
     assert r2.json()["executed"] == 1
 
-    # Fetch latest run via list (will be the AI one — sorted by created_at desc)
+    # Fetch latest run via list (will be the AI one — sorted by created_at desc);
+    # list view is lean, so fetch the full run for structural comparison.
     runs = requests.get(f"{API}/payroll/runs", headers=H(admin_token), timeout=30).json()
-    ai_run = runs[0]
+    ai_run = requests.get(f"{API}/payroll/runs/{runs[0]['id']}", headers=H(admin_token), timeout=30).json()
 
     # Same structural keys
     for key in ("id", "period", "period_year", "period_month", "slips", "totals", "status", "created_at"):

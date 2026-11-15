@@ -3,9 +3,14 @@ import os
 import uuid
 from core import db, hash_password, verify_password, now_utc, iso, logger
 
-# Deterministic TOTP seed for the platform superadmin — committed for the testing agent's use.
-# 2FA strict enforcement for superadmin: backend rejects login without a valid 6-digit code.
-SUPERADMIN_TOTP_SECRET = "KRSXG5BANFXSAYTBORQXG43LMR2A"
+# Deterministic TOTP seed for the platform superadmin (read from env so secret
+# is configurable without code changes). The default is a known dev-only value
+# used by the in-repo test suite; production deployments MUST override it via
+# the SUPERADMIN_TOTP_SECRET environment variable.
+SUPERADMIN_TOTP_SECRET = os.environ.get(
+    "SUPERADMIN_TOTP_SECRET",
+    "KRSXG5BANFXSAYTBORQXG43LMR2A",
+)
 
 
 async def seed_admin(company_id: str) -> None:

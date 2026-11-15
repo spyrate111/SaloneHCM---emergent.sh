@@ -43,9 +43,9 @@ export default function Ministry() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPI icon={Users} label="Total headcount" value={totals.headcount_active} sub={`across ${totals.ministries} ministries`} accent="bg-[#26547C]" />
-        <KPI icon={Wallet} label="Monthly gross" value={fmtSLE(totals.monthly_payroll_gross)} accent="bg-[#133326]" />
+        <KPI icon={Wallet} label="Monthly gross" value={fmtSLE(totals.monthly_payroll_gross)} accent="bg-[#0A4A1E]" />
         <KPI icon={Receipt} label="Monthly PAYE" value={fmtSLE(totals.monthly_paye)} sub="To NRA" accent="bg-[#D1603D]" />
-        <KPI icon={ArrowDownToLine} label="Monthly NASSIT" value={fmtSLE(totals.monthly_nassit)} sub="Emp + Employer" accent="bg-[#2D7A5D]" />
+        <KPI icon={ArrowDownToLine} label="Monthly NASSIT" value={fmtSLE(totals.monthly_nassit)} sub="Emp + Employer" accent="bg-[#17A035]" />
       </div>
 
       <div className="bg-white border border-[#E2DFD6] rounded-lg p-6">
@@ -58,7 +58,7 @@ export default function Ministry() {
               <YAxis stroke="#686D76" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
               <Legend wrapperStyle={LEGEND_STYLE} />
-              <Bar dataKey="Gross" fill="#133326" radius={BAR_RADIUS} />
+              <Bar dataKey="Gross" fill="#0A4A1E" radius={BAR_RADIUS} />
               <Bar dataKey="PAYE" fill="#D1603D" radius={BAR_RADIUS} />
               <Bar dataKey="NASSIT" fill="#26547C" radius={BAR_RADIUS} />
             </BarChart>

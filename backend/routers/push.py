@@ -1,10 +1,10 @@
 """Web push subscription management + admin tools for VAPID-based notifications."""
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from core import db, get_current_user, require_admin, audit, now_utc, iso, with_tenant
+from core import db, get_current_user, audit, now_utc, iso, with_tenant
 import push_service
 
 router = APIRouter(prefix="/push", tags=["push"])

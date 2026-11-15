@@ -5,7 +5,11 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 
-from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, require_feature
+from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, require_feature, is_admin
+
+from core import require_roles
+
+from core import can_role
 
 router = APIRouter(prefix="/talent", tags=["talent"], dependencies=[Depends(require_feature("talent"))])
 
@@ -45,7 +49,7 @@ async def list_postings(user: dict = Depends(get_current_user)):
 
 
 @router.post("/postings")
-async def create_posting(body: JobPostingIn, user: dict = Depends(require_admin)):
+async def create_posting(body: JobPostingIn, user: dict = Depends(require_roles("hr"))):
     pid = str(uuid.uuid4())
     doc = with_tenant({**body.model_dump(), "id": pid, "created_at": iso(now_utc())}, user)
     await db.job_postings.insert_one(doc)
@@ -55,7 +59,7 @@ async def create_posting(body: JobPostingIn, user: dict = Depends(require_admin)
 
 
 @router.delete("/postings/{pid}")
-async def delete_posting(pid: str, user: dict = Depends(require_admin)):
+async def delete_posting(pid: str, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     await db.job_postings.delete_one({"id": pid, **tf})
     await db.applicants.delete_many({"posting_id": pid, **tf})
@@ -64,7 +68,7 @@ async def delete_posting(pid: str, user: dict = Depends(require_admin)):
 
 
 @router.get("/applicants")
-async def list_applicants(user: dict = Depends(require_admin)):
+async def list_applicants(user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     rows = await db.applicants.find(tf, {"_id": 0}).sort("created_at", -1).to_list(1000)
     postings = {p["id"]: p["title"] for p in await db.job_postings.find(tf, {"_id": 0}).to_list(500)}
@@ -74,7 +78,7 @@ async def list_applicants(user: dict = Depends(require_admin)):
 
 
 @router.post("/applicants")
-async def create_applicant(body: ApplicantIn, user: dict = Depends(require_admin)):
+async def create_applicant(body: ApplicantIn, user: dict = Depends(require_roles("hr"))):
     aid = str(uuid.uuid4())
     doc = with_tenant({**body.model_dump(), "id": aid, "created_at": iso(now_utc())}, user)
     await db.applicants.insert_one(doc)
@@ -84,7 +88,7 @@ async def create_applicant(body: ApplicantIn, user: dict = Depends(require_admin
 
 
 @router.patch("/applicants/{aid}/stage")
-async def update_stage(aid: str, body: ApplicantStageUpdate, user: dict = Depends(require_admin)):
+async def update_stage(aid: str, body: ApplicantStageUpdate, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     existing = await db.applicants.find_one({"id": aid, **tf}, {"_id": 0})
     if not existing:
@@ -107,7 +111,7 @@ async def update_stage(aid: str, body: ApplicantStageUpdate, user: dict = Depend
 
 
 @router.post("/applicants/{aid}/notes")
-async def add_applicant_note(aid: str, body: ApplicantNoteIn, user: dict = Depends(require_admin)):
+async def add_applicant_note(aid: str, body: ApplicantNoteIn, user: dict = Depends(require_roles("hr"))):
     tf = tenant_filter(user)
     note = {
         "id": str(uuid.uuid4()),
@@ -125,7 +129,7 @@ async def add_applicant_note(aid: str, body: ApplicantNoteIn, user: dict = Depen
 
 
 @router.get("/applicants/pipeline")
-async def applicants_pipeline(user: dict = Depends(require_admin)):
+async def applicants_pipeline(user: dict = Depends(require_roles("hr"))):
     """Return applicants grouped by stage — used by the Kanban UI."""
     tf = tenant_filter(user)
     rows = await db.applicants.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
@@ -150,7 +154,7 @@ class ReviewIn(BaseModel):
 @router.get("/reviews")
 async def list_reviews(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
+    q = {**tf} if can_role(user, "hr") else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.performance_reviews.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
     employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
     for r in rows:
@@ -160,7 +164,7 @@ async def list_reviews(user: dict = Depends(get_current_user)):
 
 
 @router.post("/reviews")
-async def create_review(body: ReviewIn, user: dict = Depends(require_admin)):
+async def create_review(body: ReviewIn, user: dict = Depends(require_roles("hr"))):
     rid = str(uuid.uuid4())
     doc = with_tenant({**body.model_dump(), "id": rid, "reviewer": body.reviewer or user["email"], "created_at": iso(now_utc())}, user)
     await db.performance_reviews.insert_one(doc)
@@ -201,7 +205,7 @@ def _next_due(frequency: str, from_iso: Optional[str]) -> str:
 
 
 @router.post("/programs")
-async def create_program(body: ProgramIn, user: dict = Depends(require_admin)):
+async def create_program(body: ProgramIn, user: dict = Depends(require_roles("hr"))):
     pid = str(uuid.uuid4())
     data = body.model_dump()
     # If recurring but no next_due_at, compute one
@@ -215,7 +219,7 @@ async def create_program(body: ProgramIn, user: dict = Depends(require_admin)):
 
 
 @router.patch("/programs/{pid}")
-async def update_program(pid: str, body: ProgramIn, user: dict = Depends(require_admin)):
+async def update_program(pid: str, body: ProgramIn, user: dict = Depends(require_roles("hr"))):
     data = body.model_dump()
     if data.get("is_recurring") and data.get("frequency") and not data.get("next_due_at"):
         data["next_due_at"] = _next_due(data["frequency"], None)
@@ -230,7 +234,7 @@ async def update_program(pid: str, body: ProgramIn, user: dict = Depends(require
 
 
 @router.delete("/programs/{pid}")
-async def delete_program(pid: str, user: dict = Depends(require_admin)):
+async def delete_program(pid: str, user: dict = Depends(require_roles("hr"))):
     await db.training_programs.delete_one({"id": pid, **tenant_filter(user)})
     await audit("delete", f"training_programs/{pid}", user)
     return {"ok": True}
@@ -239,7 +243,7 @@ async def delete_program(pid: str, user: dict = Depends(require_admin)):
 @router.get("/completions")
 async def list_completions(user: dict = Depends(get_current_user)):
     tf = tenant_filter(user)
-    q = {**tf} if user["role"] == "admin" else {"employee_id": user.get("employee_id"), **tf}
+    q = {**tf} if can_role(user, "hr") else {"employee_id": user.get("employee_id"), **tf}
     rows = await db.training_completions.find(q, {"_id": 0}).sort("completed_on", -1).to_list(1000)
     progs = {p["id"]: p for p in await db.training_programs.find(tf, {"_id": 0}).to_list(500)}
     employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
@@ -345,43 +349,22 @@ async def _maybe_trigger_perf_review(employee_id: str, program_id: str, program:
         pass
 
 
-@router.get("/completions/{cid}/certificate.pdf")
-async def completion_certificate(cid: str, user: dict = Depends(get_current_user)):
-    """Generate a PDF certificate of completion."""
-    from fastapi.responses import StreamingResponse
-    import io as _io
-    from reportlab.lib.pagesizes import landscape, A4
+def _cert_border(c, W: float, H: float, cm: float) -> None:
+    """Draw the ornamental double-line border on the certificate."""
     from reportlab.lib import colors
-    from reportlab.lib.units import cm
-    from reportlab.pdfgen import canvas as pdf_canvas
-
-    tf = tenant_filter(user)
-    completion = await db.training_completions.find_one({"id": cid, **tf}, {"_id": 0})
-    if not completion:
-        raise HTTPException(404, "Completion not found")
-    # Employees can only download their own; admins can download any.
-    if user["role"] not in ("admin", "superadmin") and completion["employee_id"] != user.get("employee_id"):
-        raise HTTPException(403, "Not allowed")
-
-    program = await db.training_programs.find_one({"id": completion["program_id"], **tf}, {"_id": 0}) or {}
-    employee = await db.employees.find_one({"id": completion["employee_id"], **tf}, {"_id": 0}) or {}
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
-
-    buf = _io.BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
-    W, H = landscape(A4)
-
-    # Ornamental border
-    c.setStrokeColor(colors.HexColor("#133326"))
+    c.setStrokeColor(colors.HexColor("#0A4A1E"))
     c.setLineWidth(4)
     c.rect(1.2 * cm, 1.2 * cm, W - 2.4 * cm, H - 2.4 * cm)
     c.setLineWidth(0.8)
     c.rect(1.6 * cm, 1.6 * cm, W - 3.2 * cm, H - 3.2 * cm)
 
-    # Header
-    c.setFillColor(colors.HexColor("#133326"))
+
+def _cert_body(c, W: float, H: float, cm: float, *, company_name: str, full_name: str, program: dict, completion: dict) -> None:
+    """Render the textual content of the certificate."""
+    from reportlab.lib import colors
+    c.setFillColor(colors.HexColor("#0A4A1E"))
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · " + (company.get("name") or "SaloneHCM"))
+    c.drawString(2.4 * cm, H - 2.4 * cm, "SaloneHCM · " + company_name)
 
     c.setFont("Helvetica-Bold", 36)
     c.drawCentredString(W / 2, H - 5.5 * cm, "CERTIFICATE OF COMPLETION")
@@ -390,7 +373,6 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
     c.setFillColor(colors.HexColor("#525860"))
     c.drawCentredString(W / 2, H - 7.2 * cm, "This is to certify that")
 
-    full_name = f"{employee.get('first_name','')} {employee.get('last_name','')}".strip() or "—"
     c.setFont("Helvetica-Bold", 28)
     c.setFillColor(colors.HexColor("#1A1C1E"))
     c.drawCentredString(W / 2, H - 9.0 * cm, full_name)
@@ -411,30 +393,35 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
 
     if completion.get("score") is not None:
         c.setFont("Helvetica-Bold", 14)
-        c.setFillColor(colors.HexColor("#2D7A5D"))
+        c.setFillColor(colors.HexColor("#17A035"))
         c.drawCentredString(W / 2, H - 14.2 * cm, f"Final score: {completion['score']}%")
 
-    # Footer
+
+def _cert_footer(c, W: float, cm: float, *, cid: str, completed_on: str) -> None:
+    """Render the bottom-left date + bottom-right certificate ID."""
+    from reportlab.lib import colors
     c.setFont("Helvetica", 10)
     c.setFillColor(colors.HexColor("#686D76"))
-    c.drawString(2.4 * cm, 2.2 * cm, f"Completed on: {completion.get('completed_on','—')}")
+    c.drawString(2.4 * cm, 2.2 * cm, f"Completed on: {completed_on}")
     c.drawRightString(W - 2.4 * cm, 2.2 * cm, f"Certificate ID: {cid}")
 
-    # QR code → public verify URL
+
+def _cert_qr(c, W: float, cm: float, cid: str) -> None:
+    """Draw a QR code linking to the public verify URL."""
     try:
         import qrcode as _qr
         from reportlab.lib.utils import ImageReader
+        from reportlab.lib import colors
         import io as _io2
         frontend_url = os.environ.get("FRONTEND_URL", "")
         verify_url = f"{frontend_url}/verify/{cid}" if frontend_url else f"/verify/{cid}"
         q = _qr.QRCode(border=1, box_size=4)
         q.add_data(verify_url)
         q.make(fit=True)
-        img = q.make_image(fill_color="#133326", back_color="#FFFFFF").convert("RGB")
+        img = q.make_image(fill_color="#0A4A1E", back_color="#FFFFFF").convert("RGB")
         b = _io2.BytesIO()
         img.save(b, format="PNG")
         b.seek(0)
-        # bottom-right of inner border
         size = 2.6 * cm
         c.drawImage(ImageReader(b), W - 2.4 * cm - size, 2.6 * cm, width=size, height=size)
         c.setFont("Helvetica", 7)
@@ -442,6 +429,38 @@ async def completion_certificate(cid: str, user: dict = Depends(get_current_user
         c.drawRightString(W - 2.4 * cm - size - 0.2 * cm, 3.6 * cm, "Scan to verify")
     except Exception:
         pass
+
+
+@router.get("/completions/{cid}/certificate.pdf")
+async def completion_certificate(cid: str, user: dict = Depends(get_current_user)):
+    """Generate a PDF certificate of completion."""
+    from fastapi.responses import StreamingResponse
+    import io as _io
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.lib.units import cm
+    from reportlab.pdfgen import canvas as pdf_canvas
+
+    tf = tenant_filter(user)
+    completion = await db.training_completions.find_one({"id": cid, **tf}, {"_id": 0})
+    if not completion:
+        raise HTTPException(404, "Completion not found")
+    if user["role"] not in ("admin", "superadmin") and completion["employee_id"] != user.get("employee_id"):
+        raise HTTPException(403, "Not allowed")
+
+    program = await db.training_programs.find_one({"id": completion["program_id"], **tf}, {"_id": 0}) or {}
+    employee = await db.employees.find_one({"id": completion["employee_id"], **tf}, {"_id": 0}) or {}
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+    full_name = f"{employee.get('first_name','')} {employee.get('last_name','')}".strip() or "—"
+
+    buf = _io.BytesIO()
+    c = pdf_canvas.Canvas(buf, pagesize=landscape(A4))
+    W, H = landscape(A4)
+
+    _cert_border(c, W, H, cm)
+    _cert_body(c, W, H, cm, company_name=company.get("name") or "SaloneHCM",
+               full_name=full_name, program=program, completion=completion)
+    _cert_footer(c, W, cm, cid=cid, completed_on=completion.get("completed_on", "—"))
+    _cert_qr(c, W, cm, cid)
 
     c.showPage()
     c.save()

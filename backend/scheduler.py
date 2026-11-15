@@ -115,6 +115,42 @@ def start():
         attach_digest(scheduler)
     except Exception:
         logger.exception("Failed to attach daily digest job")
+    # Attach annual step-increment job
+    try:
+        from step_increments import attach as attach_step_inc
+        attach_step_inc(scheduler)
+    except Exception:
+        logger.exception("Failed to attach step-increment job")
+    # Attach monthly billing cron — issues invoices day 1 of each month, transitions lapsed subs.
+    try:
+        from billing_cron import register as register_billing
+        register_billing(scheduler)
+    except Exception:
+        logger.exception("Failed to attach billing cron")
+    # Attach voucher-deadline nudge scheduler — 72h + 24h reminders to branch supervisors.
+    try:
+        from voucher_nudge import attach as attach_nudges
+        attach_nudges(scheduler)
+    except Exception:
+        logger.exception("Failed to attach voucher nudge scheduler")
+    # Attach 24h reminder sweeps — interview emails + urgent announcement push nudges.
+    try:
+        from reminders import attach as attach_reminders
+        attach_reminders(scheduler)
+    except Exception:
+        logger.exception("Failed to attach reminder sweeps")
+
+    try:
+        from ooz_alerts import attach as attach_ooz
+        attach_ooz(scheduler)
+    except Exception:
+        logger.exception("Failed to attach out-of-zone digest scheduler")
+
+    try:
+        from training_reminders import attach as attach_training_reminders
+        attach_training_reminders(scheduler)
+    except Exception:
+        logger.exception("Failed to attach training reminder scheduler")
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 

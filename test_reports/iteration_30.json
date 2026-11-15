@@ -1,0 +1,73 @@
+{
+  "summary": "Frontend-only regression + new feature testing for iter30 (Options B/C/D/E + video fix). Video URLs correctly updated to media.w3.org (backend fix applied and URLs return HTTP 200 with valid video/mp4). Variance modal fully functional with all required sub-components. Cutoff banner correctly absent when feature disabled. All regression flows pass with zero console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/frontend/src/components/Variance.jsx",
+    "/app/frontend/src/pages/Payroll.jsx"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "The DB accumulates many test payroll runs (found 202 variance buttons on /payroll runs history). Consider adding pagination or a cleanup task for old draft runs in dev/test tenants — but this is not a bug, only housekeeping."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per E1 instruction)", "frontend": "100%"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (gov tenant admin, no 2FA) — worked as expected",
+  "seed_data_creation": "None — used existing seeded payroll runs (202 draft runs available)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Video src URLs are correctly set to media.w3.org/... in the DOM (verified src attribute and currentSrc). URLs return HTTP 200 with content-type video/mp4 (4.3MB for bunny/movie.mp4) via curl. Playback could NOT be verified in headless Chromium because headless Chromium ships without proprietary H.264 codec (v.canPlayType('video/mp4; codecs=\"avc1.42E01E\"') returns ''); real user browsers (Chrome/Safari/Firefox/Edge) all include H.264 and WILL play these files. If verifying playback is required in automation, either (a) use a real Chrome binary with codecs, or (b) switch to a WebM/VP9 sample. The original defect (403 from retired Google gtv-videos-bucket) is fixed.",
+  "detailed_verifications": {
+    "video_fix_verification": {
+      "page_loads": true,
+      "video_count": 9,
+      "src_domain": "media.w3.org (correct)",
+      "gtv_videos_bucket_present": false,
+      "http_status_of_mp4": 200,
+      "content_type": "video/mp4",
+      "content_length_bytes": 4372373,
+      "playback_verified_in_headless": false,
+      "playback_blocker": "Headless Chromium lacks H.264 proprietary codec (canPlayType returns empty); URL and MIME are correct — will play in real browsers.",
+      "tested_urls": [
+        "https://media.w3.org/2010/05/bunny/movie.mp4",
+        "https://media.w3.org/2010/05/sintel/trailer.mp4"
+      ]
+    },
+    "variance_modal_verification": {
+      "opens_from_button": true,
+      "button_testid_pattern": "variance-open-{runId}",
+      "modal_testid": "variance-modal (present)",
+      "heading_format_correct": "Payroll variance · 2026-07",
+      "headline_totals_testid_present": true,
+      "headline_totals_cells": 4,
+      "cells_labels": ["Employees", "Gross", "PAYE", "Net"],
+      "no_anomalies_banner_case": "Shown when latest run has identical prior run — variance-no-anomalies present, correct message",
+      "anomalies_list_case": "For run with no prior (2026-01), shows 'No prior period run' notice + 8 warn anomalies (all baseline/new-starter flags)",
+      "ministry_table_testid_present": true,
+      "ministry_table_columns": ["Ministry", "Prior", "Current", "Δ Gross", "Δ %"],
+      "close_button_works": true
+    },
+    "cutoff_lock_verification": {
+      "banner_on_payroll_page": "absent (0 elements matching [data-testid*='cutoff']) — correct since feature off by default",
+      "banner_on_dashboard": "absent — correct",
+      "layout_regression": "none"
+    },
+    "regression_verification": {
+      "payroll_wizard_preview_button_clickable": true,
+      "ifmis_toggle_works": true,
+      "ifmis_content_reveals": true,
+      "civil_service_page_loads": true,
+      "civil_service_h1": "Civil Service configuration",
+      "civil_service_tabs_visible": ["Grades & Steps", "Allowance Rules", "Budget Codes", "Acting Allowances", "Step Increments", "Ghost-Worker Audit"],
+      "transparency_page_loads": true,
+      "transparency_h1": "Government of Sierra Leone",
+      "careers_page_loads": true,
+      "careers_h1": "Join Government of Sierra Leone",
+      "console_errors_during_regression": 0
+    }
+  }
+}

@@ -1,0 +1,73 @@
+WEBVTT
+
+1
+00:00:00.250 --> 00:00:02.766
+Bua ngi SaloneHCM administrator guide hu.
+
+2
+00:00:02.766 --> 00:00:10.683
+I bi administrator ngi, i ye lɔ ngi a huma nyɛpɛi ma bi kɛ system hu, kɛ wa ti hugbɛ bi kɛ, ɛɛ kɛ i yɛ organisation bi lɔ nya hu.
+
+3
+00:00:10.683 --> 00:00:17.986
+Miniti dɔdɔ ɓɛ a kɔni, mua ta fɛlɛ lɔ user management, role flags, organisation settings, branch offices, ɛɛ audit log.
+
+4
+00:00:19.250 --> 00:00:21.134
+Mu lɔ gbeya users ɛɛ access ma.
+
+5
+00:00:21.134 --> 00:00:27.210
+Yila ngi i ye users fɔwɔi ngɛɛ email kɛtɛ, passwords lɔ fele, ɛɛ accounts ti ŋa ti mia bi gba mu-ma.
+
+6
+00:00:27.210 --> 00:00:32.618
+I kɔlɔ role pills ti ŋa ngi hinɛɛ tɔ kɔnɔ — admin, employee, ɛɛ special capability flags.
+
+7
+00:00:36.250 --> 00:00:39.117
+Flags fele ŋa kpɛkpɛ nɔɔ financial control ma.
+
+8
+00:00:39.117 --> 00:00:43.979
+Finance Officer flag ye hugbɛ bi a user ma a payroll vouchers kɔlɔ ɛɛ approve.
+
+9
+00:00:43.979 --> 00:00:49.090
+M o F approver flag ye hugbɛ bi a payroll runs sign ɛɛ voucher payments authorise.
+
+10
+00:00:49.090 --> 00:00:57.754
+I ga wa bi click ɔkɛ kɛtɛ banknote icon hu — ɛɛ kɔlɔɛ: separation of duties ye enforce lɔ kɛ automatic, ndɛ ŋulu ɔkɛ ŋgua ti nyɔɔ koli ngi.
+
+11
+00:00:58.250 --> 00:01:12.962
+Settings le kɔnɔ, i ye i yɛ organisation profile, i yɛ subscription tier, integrations ti ŋa bi nya ngi S M S ɛɛ email, security policies ti ŋa ngi kpɛɛ two-factor authentication, ɛɛ public transparency portal ti government tenants bi.
+
+12
+00:01:14.250 --> 00:01:21.835
+Bi i yɛ organisation ye payroll vouchers kɔli branches dɔdɔ, districts, kɛ kɛ ministries kɛtɛ, i ye a offices ya lɔ yila.
+
+13
+00:01:21.835 --> 00:01:31.865
+Branch kɔnɔ-kɔnɔ ye code pɛlɛ nga, ministry link ti ŋgua mia bi, ɛɛ branch supervisor ti ŋa yɛ approval ti mia bi a branch ya yɛ voucher ŋga ti pɛ headquarters.
+
+14
+00:01:31.865 --> 00:01:35.250
+I ti nyɔɔ employees lɔ wa yɛ branch hu screen ya kɛtɛ.
+
+15
+00:01:47.250 --> 00:01:58.024
+A kpɛtɛnɔ, audit log. Kɛ sensitive kɔnɔ-kɔnɔ ti SaloneHCM hu — approval kɔnɔ-kɔnɔ, change kɔnɔ-kɔnɔ, payment authorisation kɔnɔ-kɔnɔ — ye record lɔ yila a nyɛpɛ ti i kɛ ɛɛ lɔ a kɛ.
+
+16
+00:01:58.024 --> 00:02:02.034
+Bi regulator kɛ kɛ Auditor General ma nɔɔ, a jawenga bi search ɔkɛ.
+
+17
+00:02:03.250 --> 00:02:12.722
+Na ngi administrator essentials: access control lɔ kpɛkpɛ nɔɔ, financial powers bi kɛ deliberate, i yɛ settings lɔ current, ɛɛ audit log ye a kɔlɔ-lɔ kɛ.
+
+18
+00:02:12.722 --> 00:02:17.674
+Administrator certification quiz kɛ Training Center hu nɛkɛ i yɛ hɔɔndɔ confirm.

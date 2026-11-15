@@ -3,14 +3,18 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from fastapi import APIRouter, Depends
 
-from core import db, get_current_user, tenant_filter, require_feature
+from core import db, get_current_user, tenant_filter, require_feature, require_roles
 
 router = APIRouter(prefix="/analytics", tags=["analytics"], dependencies=[Depends(require_feature("analytics"))])
 
+_INSIGHT = require_roles("hr", "payroll")
+
 
 @router.get("/payroll-trend")
-async def payroll_trend(user: dict = Depends(get_current_user)):
-    runs = await db.payroll_runs.find(tenant_filter(user), {"_id": 0}).sort("created_at", 1).to_list(120)
+async def payroll_trend(user: dict = Depends(_INSIGHT)):
+    runs = await db.payroll_runs.find(
+        tenant_filter(user), {"_id": 0, "period": 1, "totals": 1},
+    ).sort("created_at", 1).to_list(120)
     return [
         {
             "period": r["period"],
@@ -24,10 +28,12 @@ async def payroll_trend(user: dict = Depends(get_current_user)):
 
 
 @router.get("/leave-usage")
-async def leave_usage(user: dict = Depends(get_current_user)):
+async def leave_usage(user: dict = Depends(_INSIGHT)):
     tf = tenant_filter(user)
-    leaves = await db.leave_requests.find(tf, {"_id": 0}).to_list(5000)
-    employees = {e["id"]: e for e in await db.employees.find(tf, {"_id": 0}).to_list(2000)}
+    leaves = await db.leave_requests.find(
+        tf, {"_id": 0, "status": 1, "employee_id": 1, "days": 1, "leave_type": 1}).to_list(5000)
+    employees = {e["id"]: e for e in await db.employees.find(
+        tf, {"_id": 0, "id": 1, "department": 1}).to_list(5000)}
     by_dept = defaultdict(lambda: {"days": 0, "count": 0})
     by_type = defaultdict(int)
     for lv in leaves:
@@ -45,11 +51,12 @@ async def leave_usage(user: dict = Depends(get_current_user)):
 
 
 @router.get("/top-earners")
-async def top_earners(user: dict = Depends(get_current_user)):
+async def top_earners(user: dict = Depends(_INSIGHT)):
     employees = await db.employees.find(
         {"status": "active", **tenant_filter(user)},
-        {"_id": 0},
-    ).to_list(2000)
+        {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "department": 1,
+         "job_title": 1, "basic_salary_sle": 1, "allowances_sle": 1},
+    ).to_list(5000)
     employees.sort(key=lambda e: (e.get("basic_salary_sle", 0) + e.get("allowances_sle", 0)), reverse=True)
     return [
         {
@@ -64,7 +71,7 @@ async def top_earners(user: dict = Depends(get_current_user)):
 
 
 @router.get("/audit-activity")
-async def audit_activity(user: dict = Depends(get_current_user)):
+async def audit_activity(user: dict = Depends(_INSIGHT)):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     rows = await db.audit_logs.find(
         {"ts": {"$gte": cutoff}, **tenant_filter(user)},

@@ -107,6 +107,16 @@ class TestBudgetCodes:
 
 @pytest.fixture(scope="module")
 def gov_payroll_run(gov_token):
+    # Gov payroll now requires a pre-run budget check (iter29 guardrail). Seed
+    # generous allocations for the test period, run the check, then execute.
+    period = "2026-03"
+    for code in ("110.01.001", "110.02.001"):
+        requests.put(f"{API}/payroll-budget/balances/{code}", headers=_h(gov_token), json={
+            "allocated_sle": 10_000_000, "period": period,
+        }, timeout=15)
+    chk = requests.post(f"{API}/payroll-budget/check", headers=_h(gov_token),
+                        json={"period": period}, timeout=15)
+    assert chk.status_code == 200, chk.text
     r = requests.post(f"{API}/payroll/run", headers=_h(gov_token), json={
         "period_year": 2026, "period_month": 3,
     }, timeout=30)
@@ -225,5 +235,7 @@ class TestAuthExposesMoFFlag:
         assert gov_admin.get("mof_approver") is True
 
     def test_employee_is_not_mof_approver(self):
-        emp = _login("adama.sankoh@gov.sl", "Employee@2026")
+        # joseph.williams is a plain employee (adama.sankoh became a seeded
+        # second MoF approver for the voucher dual-control chain in iter32).
+        emp = _login("joseph.williams@gov.sl", "Employee@2026")
         assert emp.get("mof_approver") is False

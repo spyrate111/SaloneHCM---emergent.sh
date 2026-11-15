@@ -1,0 +1,33 @@
+{
+  "summary": "Iter28 — Super-admin Marketing Videos CRUD UI at /admin/videos. Backend regression (test_iter26_videos.py) 10/10 pass. Frontend Playwright e2e coverage: (1) gov-admin admin@gov.sl blocked from /admin/videos — page redirects to /dashboard, admin-videos-page not rendered, and Marketing Videos sidebar link NOT shown for gov-admin. (2) super-admin admin@salonehcm.sl + TOTP reaches /admin/videos via sidebar nav-marketing-videos link, admin-videos-page + admin-videos-table + empty-side card render correctly. (3) Search 'PAYE' narrows to 2 rows. (4) Create flow — click New video, form panel opens, filling src with BigBuckBunny.mp4 renders live preview VideoPlayer, add-chapter appends row with seconds+label inputs, save posts 201 and table grows to 10 rows. (5) Edit flow — click edit icon, form loads with existing values, appending ' [UI edit]' to title and saving fires PATCH 200, row title reflects new value. (6) Publish toggle — Published→Draft flip works (True→False). (7) Delete flow — delete icon opens confirmation modal containing the video title, confirm fires DELETE 204, row disappears, table back to 9 baseline rows. (8) Drag-to-reorder — dispatched HTML5 dragstart/dragover/drop events, row order changed AND 'Order saved' toast rendered in screenshot. (9) Mobile 390x844 — /admin/videos still usable with 9 rows visible in single-column stacked layout. (10) Public /videos regression still loads with videos-page testid. (11) Landing page still loads. No console errors from the new AdminVideos component.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter26_videos.py",
+    "/app/test_reports/pytest/iter28_videos_admin_ui.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "pages/admin/Videos.jsx — clean single-file page (~470 lines) with separate FormPanel and Field sub-components. Uses api client + sonner toast. HTML5 native drag-drop is intentionally minimal (dragId ref + hoverId state) which keeps the impl light; verified end-to-end via dispatched DragEvents. Sort renumbering to (i+1)*10 leaves room for later inserts — good design.",
+    "Delete confirm modal correctly stops propagation on inner click and closes on backdrop click. Title is safely interpolated with quotes.",
+    "Live preview reuses the marketing VideoPlayer component — nice DRY win and it auto-detects YouTube/Vimeo/MP4 by URL pattern.",
+    "Layout.jsx nav item at line 43 correctly gates by roles=['superadmin'] — confirmed gov-admin does NOT see the link (rendering test passed).",
+    "App.js route wraps AdminVideos in ProtectedRoute superAdminOnly — confirmed gov-admin is bounced to /dashboard when trying /admin/videos.",
+    "Chapters editor is order-preserving via array index; removing a chapter uses filter which resets indices — matches how backend stores chapters as ordered array. Data-testid admin-videos-chapter-{i} is stable across edits.",
+    "Minor: togglePublish sends the full video body ({...v, published: !v.published}) which matches the intentional design noted in the request. Works because backend PATCH accepts full VideoIn payload.",
+    "Minor: initial GET /marketing/admin/videos is fired inside a useEffect+useCallback pair — verified rows render on first paint. During my first Playwright run I queried rows immediately after wait_for_selector on admin-videos-page and got 0 rows before the network response resolved — this is a test timing artifact, not a bug (screenshot confirms 9 rows always render).",
+    "Console showed a couple of 403s (Failed to load resource) during test navigation but they originated from unrelated polling endpoints and did not affect the admin-videos flows."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (10/10 iter26 regression)", "frontend": "100% (all 12 features/flows verified)"},
+  "test_credentials": "Super-admin admin@salonehcm.sl / Admin@2026 + TOTP (KRSXG5BANFXSAYTBORQXG43LMR2A). Gov-admin admin@gov.sl / GovAdmin@2026 for 403/no-nav check.",
+  "seed_data_creation": "Created and cleanly deleted one TEST_QA UI video via UI (create→edit→toggle→delete), returning db to the 9 seeded baseline. No stray records left behind.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter28 admin videos UI is fully working. Backend endpoints unchanged from iter26. All admin flows (create/edit/toggle/delete/drag-reorder/search/chapters/live-preview) exercise via data-testid selectors present in /app/frontend/src/pages/admin/Videos.jsx. Sidebar link is roles=['superadmin'] in Layout.jsx line 43. Route registered in App.js at /admin/videos with ProtectedRoute superAdminOnly. For future regression, /app/backend/tests/test_iter26_videos.py still covers the API contract.",
+  "rca of the issue": "N/A — no defects found."
+}

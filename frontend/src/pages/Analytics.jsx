@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { fmtSLE } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
+import { Download, UserMinus } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, Legend,
@@ -7,10 +9,12 @@ import {
 import ChartShell from "../components/ChartShell";
 import { TOOLTIP_STYLE } from "../lib/chartStyles";
 
-const PIE_COLORS = ["#133326", "#26547C", "#D1603D", "#8B6A14", "#2D7A5D", "#9A2A52"];
+const PIE_COLORS = ["#0A4A1E", "#26547C", "#D1603D", "#8B6A14", "#17A035", "#2A5C9C"];
 const LEGEND_STYLE = { fontSize: 12 };
 
 export default function Analytics() {
+  const { user } = useAuth();
+  const showLeavers = ["hr", "admin", "superadmin"].includes(user?.role);
   const [trend, setTrend] = useState([]);
   const [usage, setUsage] = useState({ by_department: [], by_type: [] });
   const [earners, setEarners] = useState([]);
@@ -48,7 +52,7 @@ export default function Analytics() {
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtSLE(v)} />
                 <Legend wrapperStyle={LEGEND_STYLE} />
                 <Line type="monotone" dataKey="gross" stroke="#26547C" strokeWidth={2} dot={false} name="Gross" />
-                <Line type="monotone" dataKey="net" stroke="#133326" strokeWidth={2} dot={false} name="Net" />
+                <Line type="monotone" dataKey="net" stroke="#0A4A1E" strokeWidth={2} dot={false} name="Net" />
                 <Line type="monotone" dataKey="paye" stroke="#D1603D" strokeWidth={2} dot={false} name="PAYE" />
                 <Line type="monotone" dataKey="nassit" stroke="#8B6A14" strokeWidth={2} dot={false} name="NASSIT" />
               </LineChart>
@@ -155,6 +159,78 @@ export default function Analytics() {
           </table>
         </div>
       </div>
+
+      {showLeavers && <LeaversReport />}
+    </div>
+  );
+}
+
+const REASON_LABEL = {
+  resignation: "Resignation", retirement: "Retirement", redundancy: "Redundancy",
+  contract_end: "Contract End", dismissal: "Dismissal", other: "Other",
+};
+
+function LeaversReport() {
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    api.get("/offboarding/report", { params: { month } })
+      .then((r) => setData(r.data)).catch(() => setData(null));
+  }, [month]);
+
+  const exportCsv = async () => {
+    const r = await api.get("/offboarding/report.csv", { params: { month }, responseType: "blob" });
+    const url = URL.createObjectURL(r.data);
+    const a = document.createElement("a");
+    a.href = url; a.download = `leavers-${month}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden" data-testid="leavers-report-section">
+      <div className="px-6 py-4 border-b border-[#E2DFD6] flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="font-heading text-lg font-semibold inline-flex items-center gap-2">
+            <UserMinus className="w-5 h-5 text-[#B03A2E]" strokeWidth={1.5} /> Leavers report
+          </h3>
+          <p className="text-xs text-[#686D76] mt-0.5">
+            Employees whose offboarding completed in the selected month{data ? ` — ${data.count} leaver${data.count === 1 ? "" : "s"}` : ""}.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
+            className="border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data"
+            data-testid="leavers-month-input" />
+          <button onClick={exportCsv} data-testid="leavers-export-csv"
+            className="inline-flex items-center gap-1.5 text-xs border border-[#26547C] text-[#26547C] hover:bg-[#E9F2FB] px-3 py-2 rounded-md">
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </button>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <thead className="bg-[#F7F6F2]">
+          <tr>{["Name", "Role", "Department", "Leaving date", "Leaving reason"].map((h) => (
+            <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+          ))}</tr>
+        </thead>
+        <tbody>
+          {(data?.rows || []).map((r) => (
+            <tr key={r.employee_id} className="border-t border-[#E2DFD6]" data-testid={`leavers-row-${r.employee_id}`}>
+              <td className="py-3 px-4 font-medium">{r.name}</td>
+              <td className="py-3 px-4">{r.job_title || "—"}</td>
+              <td className="py-3 px-4">{r.department || "—"}</td>
+              <td className="py-3 px-4 font-data">{r.leaving_date}</td>
+              <td className="py-3 px-4">{REASON_LABEL[r.leaving_reason] || (r.leaving_reason || "Not recorded")}</td>
+            </tr>
+          ))}
+          {!(data?.rows || []).length && (
+            <tr><td colSpan={5} className="py-10 text-center text-sm text-[#686D76]" data-testid="leavers-empty">
+              No leavers in {month}.
+            </td></tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -57,7 +57,10 @@ export async function unsubscribePush() {
       endpoint: json.endpoint,
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
     });
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    // Server may already have cleared this subscription; non-fatal — proceed with browser unsub.
+    if (typeof console !== "undefined") console.warn("push unsubscribe (server side) failed", e);
+  }
   return sub.unsubscribe();
 }
 

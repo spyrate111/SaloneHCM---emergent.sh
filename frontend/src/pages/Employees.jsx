@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { Plus, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { DatePicker } from "../components/ui/date-picker";
 
 const empty = {
@@ -9,6 +10,7 @@ const empty = {
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
   nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
+  orange_money_number: "", afrimoney_number: "", mobile_money_provider: "auto",
   hire_date: "2025-01-01", status: "active",
 };
 
@@ -34,7 +36,11 @@ export default function Employees() {
       await api.post("/employees", { ...form, basic_salary_sle: Number(form.basic_salary_sle), allowances_sle: Number(form.allowances_sle) });
       setOpen(false); setForm(empty); load();
     } catch (e) {
-      alert(typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Failed to create employee");
+      const d = e?.response?.data?.detail;
+      const msg = typeof d === "string" ? d
+        : Array.isArray(d) ? d.map((x) => `${(x.loc || []).slice(1).join(".")}: ${x.msg}`).join(" · ")
+        : "Failed to create employee";
+      toast.error(msg);
     } finally { setBusy(false); }
   };
 
@@ -49,7 +55,7 @@ export default function Employees() {
         <button
           data-testid="add-employee-button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-[#133326] hover:bg-[#0F281E] text-white text-sm font-medium px-4 py-2.5 rounded-md transition"
+          className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-sm font-medium px-4 py-2.5 rounded-md transition"
         >
           <Plus className="w-4 h-4" strokeWidth={1.5} /> Add employee
         </button>
@@ -94,7 +100,7 @@ export default function Employees() {
                   <td className="py-3 px-4 text-[#525860]">{e.location}</td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      e.status === "active" ? "bg-[#E6F4EC] text-[#2D7A5D]" : e.status === "on_leave" ? "bg-[#FBF1DE] text-[#8B6A14]" : "bg-[#FBEAEA] text-[#B83A3A]"
+                      e.status === "active" ? "bg-[#E4F7E7] text-[#17A035]" : e.status === "on_leave" ? "bg-[#FBF1DE] text-[#8B6A14]" : "bg-[#E9F2FB] text-[#3A7CB8]"
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current" /> {e.status.replace("_", " ")}
                     </span>
@@ -133,6 +139,8 @@ export default function Employees() {
                 ["tin", "TIN", "text"],
                 ["bank_name", "Bank name", "text"],
                 ["bank_account", "Bank account", "text"],
+                ["orange_money_number", "Orange Money wallet number", "tel"],
+                ["afrimoney_number", "Afrimoney wallet number", "tel"],
                 ["basic_salary_sle", "Basic salary (SLE)", "number"],
                 ["allowances_sle", "Allowances (SLE)", "number"],
               ].map(([k, label, type]) => (
@@ -142,6 +150,15 @@ export default function Employees() {
                     className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]" />
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Mobile-money payout preference</label>
+                <select data-testid="emp-mobile-money-provider" value={form.mobile_money_provider} onChange={(e) => setForm({ ...form, mobile_money_provider: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                  <option value="auto">Auto-detect single wallet</option>
+                  <option value="orange_money">Orange Money</option>
+                  <option value="afrimoney">Afrimoney</option>
+                  <option value="none">Bank or other method</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Hire date</label>
                 <DatePicker data-testid="emp-hire_date" value={form.hire_date} onChange={(v) => setForm({ ...form, hire_date: v })} />
@@ -161,7 +178,7 @@ export default function Employees() {
             </div>
             <div className="flex items-center justify-end gap-2 mt-6">
               <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button data-testid="emp-submit" disabled={busy} type="submit" className="px-4 py-2 text-sm bg-[#133326] hover:bg-[#0F281E] text-white rounded-md disabled:opacity-60">{busy ? "Saving…" : "Save employee"}</button>
+              <button data-testid="emp-submit" disabled={busy} type="submit" className="px-4 py-2 text-sm bg-[#0A4A1E] hover:bg-[#063514] text-white rounded-md disabled:opacity-60">{busy ? "Saving…" : "Save employee"}</button>
             </div>
           </form>
         </div>

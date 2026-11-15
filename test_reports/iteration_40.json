@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend E2E + API/DB verification of the three iter51 features: Announcement read receipts, Exit interview notes and Application emails. Everything requested passed. (1) Read receipts: HR posted NORMAL and URGENT announcements; both badges started at '0/81 read'. Then employee1 opened the dashboard, which sent POST /mark-seen with both visible ids. After that both badges showed '1/81 read'. 'Who hasn't read this?' shows only on the urgent row and toggles to 'Hide'. The unread list showed name, email and role and included employee1 before the dashboard view but not after (after a page reload). The employee API response has no read_count/total_staff, and /unread returns 403 for employee. mark-seen ignores bogus ids and repeat calls are idempotent. Deleting an announcement removes its reads. (2) Exit interview: created a throwaway employee via the Employees 'Add employee' UI, started offboarding (confirm dialog), clicked 'Record exit interview' (6 reasons in the dropdown), chose Redundancy with notes and saved. The display shows the badge, notes and 'Recorded by HR Admin 1'. Edit is prefilled; changing the reason to Contract End persisted after reload. Payroll officer sees the record and has no Edit button. API: a bad reason returns 422, payroll PUT returns 403, and the audit_logs entry exit_interview_recorded exists. (3) Application emails: HR posted a vacancy in the UI. A logged-out user applied via /apply/:token with a PDF CV and saw the success message. email_logs got kind=application_confirmation (status=failed due to Resend sandbox, as expected). Changing the stage to shortlisted added kind=application_stage meta.stage=shortlisted. Changing it to hired added NO new log and opened the hire modal. (4) Smoke: the employee dashboard shows the urgent banner and the notice card, with no page errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "email_service._log (application_confirmation / application_stage)", "issue": "email_logs.subject stores only the job title (e.g. 'TEST_Vacancy Emails') instead of the real subject '[Company] Application received — {job}'. This makes the logs misleading."},
+      {"endpoint": "email_service.send_application_confirmation/stage_update", "issue": "applicant_name (public, untrusted input) and job_title are put into the email HTML without escaping. Use html.escape()."},
+      {"endpoint": "DELETE /api/employees/{id}", "issue": "Does not cascade-delete the employee's offboardings document, so the offboarding is left orphaned (seen during cleanup). Existing behaviour, not new."},
+      {"endpoint": "GET /api/payroll/cutoff/status", "issue": "Returns 403 twice on every employee dashboard load (console noise). Existing behaviour, not related to these features."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Announcements.jsx UnreadList", "issue": "The unread list is fetched only once (when list===null). Hiding and re-opening shows the cached list, so new reads appear only after a page reload. Consider refetching on every open.", "selector": "announcement-unread-btn-{id}", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Recruitment hire modal", "issues": ["The backdrop does not cover the whole viewport: the sidebar and urgent banner stay undimmed and the grey area is offset. Existing issue.", "The hire date uses the browser's native date input instead of the shadcn DatePicker. Existing issue."]},
+      {"screen": "AnnouncementsCard", "issues": ["mark-seen POST fires twice per dashboard load (likely StrictMode or a double mount). Harmless because upserts are idempotent."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter52_receipts_exit_emails_api.py", "/app/test_reports/pytest/pytest_iter52.xml"],
+  "action_items": [
+    "Log the real email subject in email_logs for application emails",
+    "HTML-escape applicant_name/job_title in the application email templates",
+    "Optional: refetch the unread list each time it is opened",
+    "Optional: cascade-delete offboardings when an employee is deleted"
+  ],
+  "critical_code_review_comments": [
+    "announcements.list: for hr/auditor without include_expired, the read counts are computed and then expired rows filtered. Fine.",
+    "mark_seen caps ids at 100 and validates them against the tenant. Good.",
+    "ExitInterviewSection form state is initialised from ob only on mount. It works because the section mounts after ob loads, but it would go stale if ob changed without a remount."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter52_receipts_exit_emails_api.py"],
+  "success_rate": {"backend": "100% (2/2 new API tests)", "frontend": "100% (all 7 requested flows)"},
+  "seed_data_creation": "None kept. Cleaned up: 3 TEST announcements (+ their reads), 2 throwaway employees + offboardings, 1 TEST vacancy + application, email_logs rows for test_applicant_bb71b@example.com.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "employee1 links to a real employee and logs in to /dashboard. The audit collection is audit_logs with field 'resource'. Offboarding start uses window.confirm (accept the dialog). The Resend sandbox logs status=failed for example.com addresses. Seeded company has 81 non-disabled users (total_staff)."
+}

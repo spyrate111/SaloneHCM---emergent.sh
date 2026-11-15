@@ -64,13 +64,13 @@ def _wrap_html(title: str, body_html: str, cta_label: Optional[str] = None, cta_
     if cta_label and cta_url:
         cta = f"""
         <tr><td style="padding:24px 0 8px 0;">
-          <a href="{cta_url}" style="background:#133326;color:#ffffff;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;padding:12px 22px;border-radius:6px;display:inline-block;">{cta_label}</a>
+          <a href="{cta_url}" style="background:#0A4A1E;color:#ffffff;text-decoration:none;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:600;padding:12px 22px;border-radius:6px;display:inline-block;">{cta_label}</a>
         </td></tr>"""
     return f"""<!doctype html><html><body style="margin:0;background:#F7F6F2;font-family:Inter,Arial,sans-serif;color:#1A1C1E;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F6F2;padding:32px 12px;">
   <tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #E2DFD6;border-radius:12px;overflow:hidden;">
-      <tr><td style="background:linear-gradient(135deg,#133326,#26547C);color:#ffffff;padding:24px 28px;">
+      <tr><td style="background:linear-gradient(135deg,#0A4A1E,#26547C);color:#ffffff;padding:24px 28px;">
         <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.7;">SaloneHCM</div>
         <div style="font-size:22px;font-weight:700;margin-top:4px;">{title}</div>
       </td></tr>
@@ -131,7 +131,7 @@ async def send_scenario_decision(
     """Notify the requester of an approver's decision."""
     cta_url = f"{FRONTEND_URL}/simulator?scenario={scenario_id}" if FRONTEND_URL else None
     pretty = decision.capitalize()
-    accent = "#2D7A5D" if decision == "approved" else "#B83A3A"
+    accent = "#17A035" if decision == "approved" else "#3A7CB8"
     html = _wrap_html(
         title=f"Scenario {pretty.lower()}",
         body_html=f"""
@@ -181,6 +181,36 @@ async def send_user_invite(
     return res
 
 
+async def send_mof_pack(
+    to: str,
+    period: str,
+    pdf_bytes: bytes,
+    voucher_count: int,
+    total_net: float,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Auto-email the combined MoF voucher pack when a period fully closes."""
+    import base64 as _b64
+    html = _wrap_html(
+        title=f"MoF voucher pack — {period}",
+        body_html=f"""
+          <p>All branch payroll vouchers for <strong>{period}</strong> at <strong>{company_name}</strong> are now payment-authorized.</p>
+          <p>The combined MoF pack is attached: <strong>{voucher_count}</strong> voucher(s), total net <strong>SLE {total_net:,.2f}</strong>.</p>
+          <p style="color:#525860;font-size:12px;">This email was sent automatically the moment the period closed. Each voucher page carries its full signature approval chain.</p>
+        """,
+    )
+    attachments = [{
+        "filename": f"mof-voucher-pack-{period}.pdf",
+        "content": _b64.b64encode(pdf_bytes).decode(),
+    }]
+    res = await _send(to, f"[SaloneHCM] MoF voucher pack {period} — {voucher_count} voucher(s)", html, attachments=attachments)
+    await _log("mof_pack", to, f"MoF pack {period}", res, {
+        "period": period, "voucher_count": voucher_count, "company_id": company_id,
+    })
+    return res
+
+
 async def send_csv_attachment(
     to: str,
     subject: str,
@@ -208,4 +238,149 @@ async def send_csv_attachment(
         "bytes": len(csv_bytes),
         "company_id": company_id,
     })
+    return res
+
+
+async def send_application_confirmation(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Confirm receipt of a public job application."""
+    import html as _html
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
+    html = _wrap_html(
+        title="Application received",
+        body_html=f"""
+          <p>Hi {name or 'there'},</p>
+          <p>Thank you for applying for <strong>{job}</strong> at <strong>{comp}</strong>. Your application has been received and is now with the HR team.</p>
+          <p>You can expect a response within <strong>10 working days</strong> of the vacancy's closing date. We'll email you as soon as your application moves to the next stage.</p>
+        """,
+    )
+    subject = f"[{company_name}] Application received — {job_title}"
+    res = await _send(to, subject, html)
+    await _log("application_confirmation", to, subject, res, {"company_id": company_id, "job_title": job_title})
+    return res
+
+
+STAGE_EMAIL_COPY = {
+    "shortlisted": ("You've been shortlisted",
+                    "Good news — your application for <strong>{job}</strong> has been shortlisted. The HR team will be in touch shortly with details of the next step."),
+    "interview": ("Interview invitation",
+                  "You've been invited to the interview stage for <strong>{job}</strong>. HR will contact you soon to arrange a date and time."),
+    "offer": ("We'd like to make you an offer",
+              "Congratulations — following your interview for <strong>{job}</strong>, we would like to make you an offer. HR will contact you with the full details."),
+    "rejected": ("Application update",
+                 "Thank you for your interest in <strong>{job}</strong>. After careful consideration, we will not be progressing your application on this occasion. We encourage you to apply for future openings."),
+}
+
+
+async def send_application_stage_update(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    stage: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Notify an applicant their application moved stage (shortlisted/interview/offer/rejected)."""
+    import html as _html
+    title, body_tpl = STAGE_EMAIL_COPY[stage]
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
+    html = _wrap_html(
+        title=title,
+        body_html=f"""
+          <p>Hi {name or 'there'},</p>
+          <p>{body_tpl.format(job=job)}</p>
+          <p style="color:#525860;font-size:12px;">This update concerns your application at {comp}.</p>
+        """,
+    )
+    subject = f"[{company_name}] {title} — {job_title}"
+    res = await _send(to, subject, html)
+    await _log("application_stage", to, subject, res,
+               {"stage": stage, "company_id": company_id, "job_title": job_title})
+    return res
+
+
+def _interview_details_block(date: str, time: str, location: str) -> str:
+    import html as _html
+    loc = _html.escape(location or "")
+    loc_row = ""
+    if loc:
+        label = "Video call link" if loc.startswith("http") else "Location"
+        val = f'<a href="{loc}">{loc}</a>' if loc.startswith("http") else loc
+        loc_row = f'<div style="margin-top:6px;"><b>{label}:</b> {val}</div>'
+    return f"""
+      <div style="background:#F7F6F2;border:1px solid #E2DFD6;border-radius:8px;padding:14px 16px;margin:14px 0;font-size:13px;color:#1A1C1E;">
+        <div><b>Date:</b> {date}</div>
+        <div style="margin-top:6px;"><b>Time:</b> {time}</div>
+        {loc_row}
+      </div>"""
+
+
+async def send_interview_scheduled(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    date: str,
+    time: str,
+    location: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Send interview details to an applicant when HR schedules the interview."""
+    import html as _html
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
+    html = _wrap_html(
+        title="Your interview is scheduled",
+        body_html=f"""
+          <p>Hi {name or 'there'},</p>
+          <p>Your interview for <strong>{job}</strong> at <strong>{comp}</strong> has been scheduled. Here are the details:</p>
+          {_interview_details_block(date, time, location)}
+          <p style="color:#525860;font-size:12px;">If you can't make this time, please reply to HR as soon as possible. You'll also receive a reminder 24 hours before the interview.</p>
+        """,
+    )
+    subject = f"[{company_name}] Interview scheduled — {job_title} on {date} at {time}"
+    res = await _send(to, subject, html)
+    await _log("interview_scheduled", to, subject, res,
+               {"company_id": company_id, "job_title": job_title, "date": date, "time": time})
+    return res
+
+
+async def send_interview_reminder(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    date: str,
+    time: str,
+    location: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """24-hours-before reminder for a scheduled interview."""
+    import html as _html
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
+    html = _wrap_html(
+        title="Interview tomorrow — reminder",
+        body_html=f"""
+          <p>Hi {name or 'there'},</p>
+          <p>This is a friendly reminder that your interview for <strong>{job}</strong> at <strong>{comp}</strong> is coming up within the next 24 hours:</p>
+          {_interview_details_block(date, time, location)}
+          <p style="color:#525860;font-size:12px;">Good luck — we look forward to meeting you.</p>
+        """,
+    )
+    subject = f"[{company_name}] Interview reminder — {job_title} on {date} at {time}"
+    res = await _send(to, subject, html)
+    await _log("interview_reminder", to, subject, res,
+               {"company_id": company_id, "job_title": job_title, "date": date, "time": time})
     return res

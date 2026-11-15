@@ -1,0 +1,254 @@
+"""IFMIS (Integrated Financial Management Information System) integration layer.
+
+Provides export endpoints used by the Ministry of Finance to:
+  1. Download bank-specific disbursement files for each clearing bank in SL.
+  2. Reconcile payroll totals against the Treasury Single Account by budget code.
+  3. Mark a payroll run as reconciled (records the IFMIS transaction reference
+     and timestamp; immutable after that until super-admin override).
+
+All endpoints are tier-gated behind `ifmis_integration` (Gov + Enterprise).
+"""
+from __future__ import annotations
+import io
+import csv
+from collections import defaultdict
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+
+from core import db, tenant_filter, require_admin, require_feature, audit, now_utc, iso
+from bank_formats import render_bank_file, available_formats
+
+from core import require_roles
+from pymongo.errors import DuplicateKeyError
+from routers.mobile_money import PROVIDERS, _assignment_id, ensure_latest_payroll_run
+
+router = APIRouter(
+    prefix="/ifmis",
+    tags=["ifmis"],
+    dependencies=[Depends(require_feature("ifmis_integration"))],
+)
+
+
+# ---------- Bank disbursement files ----------
+
+@router.get("/formats")
+async def list_formats(_: dict = Depends(require_roles("payroll"))):
+    """List available bank-specific disbursement formats for this tenant."""
+    return {"formats": available_formats()}
+
+
+@router.get("/runs/{rid}/disbursement/{bank_code}")
+async def disbursement_file(rid: str, bank_code: str, user: dict = Depends(require_roles("payroll"))):
+    """Download a bank-specific workpaper and reserve its payout channel."""
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    await ensure_latest_payroll_run(rid, run.get("period", ""), user)
+
+    bank_format = (bank_code or "").strip().lower()
+    supported_formats = {item["code"] for item in available_formats()}
+    if bank_format not in supported_formats:
+        raise HTTPException(422, "Unsupported bank disbursement format.")
+
+    scope = tenant_filter(user)
+    assignments = await db.mobile_money_assignments.find(
+        {"run_id": rid, **scope}, {"_id": 0},
+    ).to_list(5000)
+    assignment_by_employee = {item["employee_id"]: item for item in assignments}
+    included_slips = []
+    wallet_excluded = 0
+    for slip in run.get("slips", []):
+        if float(slip.get("net", 0) or 0) <= 0:
+            continue
+        employee_id = slip["employee_id"]
+        assignment = assignment_by_employee.get(employee_id)
+        if assignment and assignment.get("provider") in PROVIDERS:
+            wallet_excluded += 1
+            continue
+        if (
+            assignment
+            and assignment.get("provider") == "bank"
+            and assignment.get("bank_format", "generic") != bank_format
+        ):
+            raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
+        if assignment is None:
+            assignment_key = _assignment_id(user["company_id"], rid, employee_id)
+            reservation = {
+                "_id": assignment_key,
+                "company_id": user["company_id"],
+                "run_id": rid,
+                "employee_id": employee_id,
+                "batch_id": f"bank-file:{rid}",
+                "provider": "bank",
+                "bank_format": bank_format,
+                "created_at": iso(now_utc()),
+            }
+            try:
+                await db.mobile_money_assignments.insert_one(reservation)
+                assignment_by_employee[employee_id] = reservation
+            except DuplicateKeyError:
+                assignment = await db.mobile_money_assignments.find_one(
+                    {"_id": assignment_key, **scope}, {"_id": 0},
+                )
+                if assignment is None:
+                    raise HTTPException(409, "The payout assignment changed. Refresh and export again.")
+                assignment_by_employee[employee_id] = assignment
+                if assignment.get("provider") in PROVIDERS:
+                    wallet_excluded += 1
+                    continue
+                if (
+                    assignment.get("provider") == "bank"
+                    and assignment.get("bank_format", "generic") != bank_format
+                ):
+                    raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
+        included_slips.append(slip)
+
+    employees = await db.employees.find(scope, {"_id": 0}).to_list(5000)
+    export_run = {**run, "slips": included_slips}
+    body, media, ext, label = render_bank_file(bank_format, export_run, employees)
+    await audit(
+        "ifmis_disbursement_download",
+        f"payroll_runs/{rid}",
+        user,
+        {
+            "bank": bank_format,
+            "period": run["period"],
+            "rows": len(included_slips),
+            "wallet_excluded": wallet_excluded,
+        },
+    )
+    filename = f"disbursement-{bank_format}-{run['period']}.{ext}"
+    return StreamingResponse(
+        io.BytesIO(body),
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Bank-Label": label,
+            "X-Record-Count": str(len(included_slips)),
+            "X-Mobile-Money-Excluded": str(wallet_excluded),
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+# ---------- Treasury reconciliation ----------
+
+def _reconciliation_rows(run: dict, emp_map: dict) -> tuple[list[dict], dict]:
+    """Group payroll slips by budget_code → MDA vote line. Returns (rows, totals)."""
+    by_code: dict = defaultdict(lambda: {
+        "budget_code": "", "mda_ministry": "", "headcount": 0,
+        "gross": 0.0, "net": 0.0, "paye": 0.0,
+        "nassit_employee": 0.0, "nassit_employer": 0.0,
+    })
+    for s in run["slips"]:
+        e = emp_map.get(s["employee_id"], {})
+        code = e.get("budget_code") or "UNCODED"
+        b = by_code[code]
+        b["budget_code"] = code
+        b["mda_ministry"] = e.get("mda_ministry") or e.get("department") or "—"
+        b["headcount"] += 1
+        b["gross"] += s["gross"]
+        b["net"] += s["net"]
+        b["paye"] += s["paye"]
+        b["nassit_employee"] += s.get("nassit_employee", 0)
+        b["nassit_employer"] += s.get("nassit_employer", 0)
+    rows = [
+        {**v, **{k: round(v[k], 2) for k in
+                 ("gross", "net", "paye", "nassit_employee", "nassit_employer")}}
+        for v in by_code.values()
+    ]
+    rows.sort(key=lambda r: r["budget_code"])
+    totals = {
+        "headcount": sum(r["headcount"] for r in rows),
+        "gross": round(sum(r["gross"] for r in rows), 2),
+        "net": round(sum(r["net"] for r in rows), 2),
+        "paye": round(sum(r["paye"] for r in rows), 2),
+        "nassit_employee": round(sum(r["nassit_employee"] for r in rows), 2),
+        "nassit_employer": round(sum(r["nassit_employer"] for r in rows), 2),
+    }
+    return rows, totals
+
+
+@router.get("/runs/{rid}/reconciliation")
+async def reconciliation_json(rid: str, user: dict = Depends(require_roles("payroll"))):
+    """Return treasury reconciliation as JSON for the UI."""
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(5000)
+    rows, totals = _reconciliation_rows(run, {e["id"]: e for e in employees})
+    company = await db.companies.find_one({"id": run["company_id"]},
+                                          {"_id": 0, "name": 1, "ifmis_org_code": 1}) or {}
+    return {
+        "period": run["period"],
+        "run_id": rid,
+        "org_code": company.get("ifmis_org_code") or "—",
+        "org_name": company.get("name"),
+        "rows": rows,
+        "totals": totals,
+        "reconciled": run.get("ifmis_reconciled") or False,
+        "ifmis_reference": run.get("ifmis_reference"),
+        "ifmis_reconciled_at": run.get("ifmis_reconciled_at"),
+    }
+
+
+@router.get("/runs/{rid}/reconciliation.csv")
+async def reconciliation_csv(rid: str, user: dict = Depends(require_roles("payroll"))):
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    employees = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(5000)
+    rows, totals = _reconciliation_rows(run, {e["id"]: e for e in employees})
+
+    buf = io.StringIO()
+    w = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    w.writerow(["budget_code", "mda_ministry", "headcount", "gross_sle",
+                "paye_sle", "nassit_employee_sle", "nassit_employer_sle", "net_sle"])
+    for r in rows:
+        w.writerow([
+            r["budget_code"], r["mda_ministry"], r["headcount"],
+            f"{r['gross']:.2f}", f"{r['paye']:.2f}",
+            f"{r['nassit_employee']:.2f}", f"{r['nassit_employer']:.2f}", f"{r['net']:.2f}",
+        ])
+    w.writerow([])
+    w.writerow(["TOTAL", "", totals["headcount"],
+                f"{totals['gross']:.2f}", f"{totals['paye']:.2f}",
+                f"{totals['nassit_employee']:.2f}", f"{totals['nassit_employer']:.2f}",
+                f"{totals['net']:.2f}"])
+    await audit("ifmis_reconciliation_csv", f"payroll_runs/{rid}", user, {"period": run["period"]})
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8")), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="ifmis-recon-{run["period"]}.csv"'},
+    )
+
+
+class ReconcileIn(BaseModel):
+    ifmis_reference: str = Field(..., min_length=4, max_length=64)
+
+
+@router.post("/runs/{rid}/mark-reconciled")
+async def mark_reconciled(rid: str, body: ReconcileIn, user: dict = Depends(require_roles("payroll"))):
+    """Lock a payroll run as reconciled against IFMIS with the given transaction reference."""
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.get("ifmis_reconciled"):
+        raise HTTPException(409, "Run already reconciled")
+    ts = iso(now_utc())
+    updated = await db.payroll_runs.update_one(
+        {"id": rid, **tenant_filter(user), "ifmis_reconciled": {"$ne": True}},
+        {"$set": {
+            "ifmis_reconciled": True,
+            "ifmis_reference": body.ifmis_reference,
+            "ifmis_reconciled_at": ts,
+            "ifmis_reconciled_by": user["email"],
+        }},
+    )
+    if updated.matched_count != 1:
+        raise HTTPException(409, "Another user reconciled this run. Refresh and check its current reference.")
+    await audit("ifmis_mark_reconciled", f"payroll_runs/{rid}", user,
+                {"period": run["period"], "ifmis_reference": body.ifmis_reference})
+    return {"ok": True, "ifmis_reference": body.ifmis_reference, "reconciled_at": ts}

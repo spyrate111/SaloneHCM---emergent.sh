@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { fmtSLE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 import { Briefcase, Star, GraduationCap, Plus, X, RefreshCw, Download } from "lucide-react";
 import {
   DndContext, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay,
@@ -9,6 +10,9 @@ import {
   SortableContext, useSortable, verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import TrainingProgressPanel from "../components/TrainingProgressPanel";
+import ReminderNudgeStats from "../components/ReminderNudgeStats";
+import PostJobModal from "../components/PostJobModal";
 
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"];
 const STAGE_BG = {
@@ -16,14 +20,14 @@ const STAGE_BG = {
   screening: "bg-[#E5EEF6] text-[#26547C]",
   interview: "bg-[#FBF1DE] text-[#8B6A14]",
   offer: "bg-[#FBE9DF] text-[#B84F2F]",
-  hired: "bg-[#E6F4EC] text-[#2D7A5D]",
-  rejected: "bg-[#FBEAEA] text-[#B83A3A]",
+  hired: "bg-[#E4F7E7] text-[#17A035]",
+  rejected: "bg-[#E9F2FB] text-[#3A7CB8]",
 };
 
 function Tab({ active, onClick, icon: Icon, children, testId }) {
   return (
     <button data-testid={testId} role="tab" aria-selected={active} onClick={onClick} className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-      active ? "text-[#133326] border-[#133326]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
+      active ? "text-[#0A4A1E] border-[#0A4A1E]" : "text-[#686D76] border-transparent hover:text-[#1A1C1E]"
     }`}>
       <Icon className="w-4 h-4" strokeWidth={1.5} /> {children}
     </button>
@@ -47,7 +51,13 @@ export default function Talent() {
         <Tab active={tab === "learning"} onClick={() => setTab("learning")} icon={GraduationCap} testId="tab-learning">Learning</Tab>
       </div>
       {tab === "recruitment" && <Recruitment isAdmin={isAdmin} />}
-      {tab === "learning" && <Learning isAdmin={isAdmin} />}
+      {tab === "learning" && (
+        <>
+          <Learning isAdmin={isAdmin} />
+          <TrainingProgressPanel />
+          <ReminderNudgeStats />
+        </>
+      )}
     </div>
   );
 }
@@ -56,7 +66,6 @@ function Recruitment({ isAdmin }) {
   const [postings, setPostings] = useState([]);
   const [pipeline, setPipeline] = useState({ stages: [], grouped: {}, total: 0 });
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", department: "", location: "Freetown", employment_type: "Full-time", salary_min_sle: 0, salary_max_sle: 0, description: "", status: "open" });
 
   const load = useCallback(async () => {
     const ps = await api.get("/talent/postings");
@@ -67,12 +76,6 @@ function Recruitment({ isAdmin }) {
     }
   }, [isAdmin]);
   useEffect(() => { load(); }, [load]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    await api.post("/talent/postings", { ...form, salary_min_sle: Number(form.salary_min_sle), salary_max_sle: Number(form.salary_max_sle) });
-    setOpen(false); load();
-  };
 
   const advance = async (aid, stage) => { await api.patch(`/talent/applicants/${aid}/stage`, { stage }); load(); };
 
@@ -88,16 +91,41 @@ function Recruitment({ isAdmin }) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {postings.map((p) => (
-          <div key={p.id} className="bg-white border border-[#E2DFD6] rounded-lg p-5">
-            <div className="flex items-start justify-between">
-              <div>
+          <div
+            key={p.id}
+            data-testid={p.source === "establishment" ? `posting-establishment-${p.id}` : `posting-manual-${p.id}`}
+            className={`bg-white border rounded-lg p-5 ${p.source === "establishment" ? "border-[#C9D7E2]" : "border-[#E2DFD6]"}`}
+          >
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-wider text-[#525860]">{p.department} · {p.location}</div>
-                <h3 className="font-heading text-lg font-semibold mt-0.5">{p.title}</h3>
+                <h3 className="font-heading text-lg font-semibold mt-0.5 truncate">{p.title}</h3>
               </div>
-              <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${p.status === "open" ? "bg-[#E6F4EC] text-[#2D7A5D]" : "bg-[#EBE8E0] text-[#525860]"}`}>{p.status}</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {p.source === "establishment" && (
+                  <span
+                    data-testid="posting-source-establishment"
+                    title={`Auto-published from Establishment Control (${p.establishment_meta?.ministry || ""})`}
+                    className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6EEF6] text-[#26547C] border border-[#C9D7E2]"
+                  >
+                    From Establishment
+                  </span>
+                )}
+                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${p.status === "open" ? "bg-[#E4F7E7] text-[#17A035]" : "bg-[#EBE8E0] text-[#525860]"}`}>{p.status}</span>
+              </div>
             </div>
-            <div className="mt-3 text-sm text-[#525860]">{p.employment_type} · {fmtSLE(p.salary_min_sle)} – {fmtSLE(p.salary_max_sle)}</div>
+            <div className="mt-3 text-sm text-[#525860]">
+              {p.employment_type} · {fmtSLE(p.salary_min_sle)} – {fmtSLE(p.salary_max_sle)}
+            </div>
             {p.description && <p className="text-xs text-[#686D76] mt-2">{p.description}</p>}
+            {p.source === "establishment" && p.establishment_meta && (
+              <div className="mt-3 pt-3 border-t border-[#F1EEE6] flex items-center gap-3 flex-wrap text-[11px] text-[#525860]">
+                <span>{p.establishment_meta.ministry}</span>
+                {p.establishment_meta.grade_code && <span className="font-data">Grade {p.establishment_meta.grade_code}</span>}
+                {p.establishment_meta.budget_code && <span className="font-data">{p.establishment_meta.budget_code}</span>}
+                <span className="ml-auto font-data">{p.establishment_meta.vacancy_count} vacancy(s) / {p.establishment_meta.approved_count} approved</span>
+              </div>
+            )}
           </div>
         ))}
         {!postings.length && <div className="col-span-2 text-center py-12 text-sm text-[#686D76]">No open positions.</div>}
@@ -116,40 +144,10 @@ function Recruitment({ isAdmin }) {
       )}
 
       {open && (
-        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={() => setOpen(false)}>
-          <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className="bg-white rounded-lg w-full max-w-lg p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-heading text-xl font-semibold">New job posting</h2>
-              <button type="button" onClick={() => setOpen(false)} className="p-1 text-[#686D76]"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-3">
-              {[["title", "Title"], ["department", "Department"], ["location", "Location"]].map(([k, l]) => (
-                <div key={k}>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">{l}</label>
-                  <input required value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
-                </div>
-              ))}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Min SLE</label>
-                  <input type="number" value={form.salary_min_sle} onChange={(e) => setForm({ ...form, salary_min_sle: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Max SLE</label>
-                  <input type="number" value={form.salary_max_sle} onChange={(e) => setForm({ ...form, salary_max_sle: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Description</label>
-                <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button type="submit" className="px-4 py-2 text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white rounded-md">Post</button>
-            </div>
-          </form>
-        </div>
+        <PostJobModal
+          onClose={() => setOpen(false)}
+          onPosted={() => { setOpen(false); load(); }}
+        />
       )}
     </div>
   );
@@ -284,7 +282,7 @@ function Learning({ isAdmin }) {
       a.href = url; a.download = `certificate-${cid.slice(0, 8)}.pdf`; a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("Certificate download failed", e);
+      toast.error(e?.response?.data?.detail || "Certificate download failed");
     }
   };
 
@@ -318,7 +316,7 @@ function Learning({ isAdmin }) {
                 <div className="mt-2 text-[10px] text-[#8B6A14] font-data">Next due: {new Date(p.next_due_at).toLocaleDateString()}</div>
               )}
             </div>
-            <button onClick={() => markComplete(p.id)} className="mt-3 text-xs bg-[#133326] hover:bg-[#0F281E] text-white rounded px-3 py-2 font-medium">Mark complete</button>
+            <button onClick={() => markComplete(p.id)} className="mt-3 text-xs bg-[#0A4A1E] hover:bg-[#063514] text-white rounded px-3 py-2 font-medium">Mark complete</button>
           </div>
         ))}
         {!programs.length && <div className="col-span-3 text-center py-12 text-sm text-[#686D76]">No programs yet.</div>}
@@ -342,7 +340,7 @@ function Learning({ isAdmin }) {
                 <td className="py-3 px-4 font-data">{c.completed_on}</td>
                 <td className="py-3 px-4 font-data">{c.score ?? "—"}{c.score && "%"}</td>
                 <td className="py-3 px-4 text-right">
-                  <button data-testid={`cert-download-${c.id}`} onClick={() => downloadCert(c.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#133326] px-2.5 py-1.5 rounded">
+                  <button data-testid={`cert-download-${c.id}`} onClick={() => downloadCert(c.id)} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#0A4A1E] px-2.5 py-1.5 rounded">
                     <Download className="w-3.5 h-3.5" /> Certificate
                   </button>
                 </td>
@@ -377,7 +375,7 @@ function Learning({ isAdmin }) {
               </div>
               <div className="border-t border-[#F1EEE6] pt-3">
                 <label className="inline-flex items-center gap-2 text-sm cursor-pointer" data-testid="program-recurring-toggle">
-                  <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} className="w-4 h-4 accent-[#133326]" />
+                  <input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} className="w-4 h-4 accent-[#0A4A1E]" />
                   <span><RefreshCw className="w-3.5 h-3.5 inline mr-1" />Recurring (mandatory refresher)</span>
                 </label>
                 {form.is_recurring && (
@@ -498,9 +496,23 @@ function KanbanCard({ a }) {
 function KanbanCardView({ a, dragging }) {
   return (
     <div className={dragging ? "bg-white border border-[#26547C] rounded-md p-2.5 shadow-lg" : ""}>
-      <div className="text-[13px] font-medium text-[#1A1C1E] truncate">{a.name}</div>
+      <div className="flex items-start justify-between gap-1.5">
+        <div className="text-[13px] font-medium text-[#1A1C1E] truncate flex-1">{a.name}</div>
+        {a.source === "public_careers" && (
+          <span
+            data-testid="applicant-source-public"
+            title="Applied via public /careers page"
+            className="shrink-0 text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-[#FFF2E5] text-[#B84F2F] border border-[#F1C3A1]"
+          >
+            Public
+          </span>
+        )}
+      </div>
       <div className="text-[11px] text-[#525860] truncate mt-0.5">{a.posting_title}</div>
       <div className="text-[11px] text-[#686D76] truncate mt-0.5 font-data">{a.email}</div>
+      {a.application_ref && (
+        <div className="text-[10px] text-[#9aa0a6] truncate mt-0.5 font-data">{a.application_ref}</div>
+      )}
     </div>
   );
 }

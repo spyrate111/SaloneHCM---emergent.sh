@@ -11,7 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 def _styles():
     base = getSampleStyleSheet()
     return {
-        "h": ParagraphStyle("h", parent=base["Heading1"], fontSize=22, textColor=colors.HexColor("#133326"), spaceAfter=4),
+        "h": ParagraphStyle("h", parent=base["Heading1"], fontSize=22, textColor=colors.HexColor("#0A4A1E"), spaceAfter=4),
         "sub": ParagraphStyle("s", parent=base["Normal"], fontSize=9, textColor=colors.HexColor("#525860")),
         "label": ParagraphStyle("l", parent=base["Normal"], fontSize=8, textColor=colors.HexColor("#525860"), spaceBefore=10),
         "h3": base["Heading3"],
@@ -32,7 +32,7 @@ def _callout_table(data: dict) -> Table:
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#E6F4EC")),
+        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#E4F7E7")),
         ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#FBE9DF")),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2DFD6")),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
@@ -61,13 +61,13 @@ def _comparison_table(data: dict) -> Table:
         ])
     table = Table(rows, colWidths=[20, 145, 70, 50, 70, 75, 60, 65])
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#133326")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A4A1E")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
         ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#F7F6F2"), colors.white]),
-        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#E6F4EC")),  # highlight cheapest
+        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#E4F7E7")),  # highlight cheapest
         ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#E2DFD6")),
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),

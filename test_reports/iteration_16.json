@@ -1,0 +1,31 @@
+{
+  "summary": "Iter16 — Frontend-only end-to-end smoke of the new ADP-inspired public marketing site at `/` + `/pricing` and authenticated regression. ALL 16 requested checks PASS. Public landing renders without login with all 12 sections present (promo-banner, marketing-nav, hero-section, personas-section, products-section, industries-section, stats-section, resources-section, testimonials-section, awards-section, contact-section, marketing-footer). Promo countdown live, promo-cta → /pricing. Hero Solution Wizard: submit disabled until both employees+interest filled; then enables and routes to /pricing (verified). 4 persona cards, 9 product cards (payroll/hr/compliance/ai/civil-service/establishment/loans/ifmis/talent), all industry tiles, stats, resources, testimonials, awards all render. Contact form POSTs to /api/marketing/leads → HTTP 201, contact-success block becomes visible. /pricing renders 4 plans (lite, professional, enterprise, gov) with CTAs. Wildcard /this-page-doesnt-exist redirects to / (landing) — NOT to /dashboard (confirmed). Mobile 390x844: hamburger opens nav-mobile-drawer with collapsible menu sections + Pricing + Sign in + Get pricing; nav-mobile-close shuts it. Authenticated regression with admin@gov.sl/GovAdmin@2026: /dashboard loads, sidebar intact, /civil-service /promotion /sector-presets all load without 402 errors. When logged-in, nav-signin-button label changes to 'Dashboard' and nav-get-pricing-button routes to /dashboard (correct behavior per spec).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "App.js wildcard route correctly uses <Navigate to='/' replace /> — matches requirement that unknown URLs go to landing, not dashboard.",
+    "MarketingNav.jsx goCta() correctly routes to /dashboard if user is authenticated else /login — verified live with Gov admin session.",
+    "Hero.jsx submit button disabled-state derived from controlled state (employees && interest) — works correctly, validated by Playwright is_disabled() before/after fill.",
+    "Contact.jsx POSTs to /api/marketing/leads — backend returned 201 and the contact-success block renders. Endpoint is public (no auth/CSRF) per design.",
+    "PromoBanner.jsx countdown is client-side computed — works on first render (07d 03h 31m 25s observed live). No SSR concerns since this is a SPA.",
+    "MarketingNav dropdowns are hover-triggered (onMouseEnter/onMouseLeave) — works on desktop. Mobile drawer uses <details>/<summary> for collapsible sections which is accessible.",
+    "PricingPage 4-plan layout with plan-professional featured ('Most Popular') — all 4 cards + CTAs render. Consider adding a comparative feature matrix below the cards for parity with ADP, but not blocking.",
+    "Landing page sections are well-modularized in /app/frontend/src/marketing/sections — each file <200 lines, single responsibility. Good code hygiene.",
+    "Authentication regression: dual-auth (cookie+Bearer) and CSRF from iter15 continue to work — admin@gov.sl logged in via cookie session and all protected routes loaded (civil-service, promotion, sector-presets) without 402 billing errors.",
+    "Minor enhancement: nav-get-pricing-button when authenticated currently goes to /dashboard, but the original spec said 'Get pricing → /login (not auth) or /dashboard (auth)'. Implementation matches spec. However, a more product-intuitive flow would route to /pricing in both cases since the button is literally labeled 'Get pricing'. Flagging as UX consideration — NOT a defect."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only scope)", "frontend": "100% (16/16 checks pass)"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (Gov tenant admin, no 2FA) — verified working for authenticated regression.",
+  "seed_data_creation": "Posted one lead (TEST_QA / qa@test.sl / QA Co / 20 / 'Test lead') via the public contact form — returned 201. This is a lightweight insert into marketing_leads collection; safe to leave (no PII, prefixed for cleanup).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New public marketing site at `/` is fully functional. All required data-testids are present. Backend marketing leads endpoint (/api/marketing/leads) was NOT re-tested in this iteration (spec said 'frontend only, skip backend') but live integration via contact form confirmed it returns 201. Cleanup recommendation: a TEST_QA lead was inserted via the contact form during testing — should be cleaned via prefix filter (qa@test.sl) if leads collection is reviewed. Iter15 dual-auth + CSRF infra continues to work end-to-end.",
+  "rca of the issue": "N/A — no bugs found. One Playwright timeout was observed during /promotion networkidle wait but the page itself rendered correctly (sidebar visible, no 402). This is just slow background polling not blocking UI; not a defect."
+}

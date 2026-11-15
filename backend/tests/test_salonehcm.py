@@ -4,7 +4,7 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://salonepaycms.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://127.0.0.1:8001").rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN = {"email": "admin@salonehcm.sl", "password": "Admin@2026"}
@@ -34,7 +34,9 @@ def test_login_admin_returns_token():
     r = requests.post(f"{API}/auth/login", json=ADMIN, timeout=30)
     assert r.status_code == 200
     d = r.json()
-    assert d["role"] == "admin"
+    # admin@salonehcm.sl was promoted to superadmin in iter9 — keep this test
+    # accepting both legacy and current roles so it survives future re-seeds.
+    assert d["role"] in ("admin", "superadmin")
     assert isinstance(d["token"], str) and len(d["token"]) > 10
 
 

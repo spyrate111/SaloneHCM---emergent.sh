@@ -35,6 +35,9 @@ class EmployeeIn(BaseModel):
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
     bank_account: Optional[str] = ""
+    orange_money_number: Optional[str] = ""
+    afrimoney_number: Optional[str] = ""
+    mobile_money_provider: Literal["auto", "orange_money", "afrimoney", "none"] = "auto"
     hire_date: str
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
@@ -43,7 +46,7 @@ class EmployeeIn(BaseModel):
 
 # ---------- Leave ----------
 class LeaveIn(BaseModel):
-    employee_id: str
+    employee_id: Optional[str] = None  # non-admins: taken from their own account
     leave_type: Literal["annual", "sick", "maternity", "paternity", "unpaid"]
     start_date: str
     end_date: str
@@ -64,6 +67,12 @@ class TimeEntryIn(BaseModel):
 
 
 # ---------- Payroll ----------
+class EmployeeMobileMoneyDetailsIn(BaseModel):
+    orange_money_number: Optional[str] = Field(default="", max_length=32)
+    afrimoney_number: Optional[str] = Field(default="", max_length=32)
+    mobile_money_provider: Literal["auto", "orange_money", "afrimoney", "none"] = "auto"
+
+
 class PayrollRunIn(BaseModel):
     period_month: int = Field(..., ge=1, le=12)
     period_year: int = Field(..., ge=2020, le=2100)

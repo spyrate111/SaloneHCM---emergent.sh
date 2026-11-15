@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only smoke of 5 focused flows for Iter 36 (leave calendars desktop+mobile, training progress UI, public payslip verify, regression). All 5 flows PASS. No frontend or backend issues observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "TrainingProgressPanel calls /branches on every mount; consider memoizing / lifting to a shared context since /talent already fetches branch list.",
+    "MobileLeave TeamCalendar and LeaveCalendar both duplicate month-grid rendering logic (buildDayMap, firstDow, cells array). Fine now but if a 3rd calendar surface is added, extract a <MonthGrid> primitive."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (5/5 flows)"},
+  "verified_features": {
+    "F1_desktop_leave_calendar": "PASS — [data-testid=leave-calendar] rendered on /leave for admin@gov.sl. leave-calendar-next advanced August 2026→September 2026, leave-calendar-prev returned to August 2026. After POST /api/leave (Joseph Williams, 2026-08-10 to 2026-08-12, annual, pending), day cells leave-calendar-day-2026-08-10/11/12 showed 'Joseph Williams' name chip (pending, gold).",
+    "F2_mobile_leave_calendar": "PASS — 390x844 /m/leave as admin: mobile-leave-calendar renders, day 2026-08-10 shows count badge, tapping mobile-leave-cal-day-2026-08-10 populates mobile-leave-cal-detail with 'Joseph Williams … annual · pending'. Logged in as sia.kallon@gov.sl (plain employee): mobile-leave-calendar is NOT rendered (backend 403 → hidden as expected).",
+    "F3_training_progress_ui": "PASS — After API POST /api/training-progress/complete {base_slug='getting-started', lang='en'} for sia, /m/training as sia shows mobile-training-my-progress='1/7 done' and mobile-training-done-getting-started badge visible. mobile-training-team is hidden for sia. Admin @ /m/training sees mobile-training-team with row mobile-training-team-row-<sia_eid> showing '1/7'. Desktop /talent → tab-learning → training-progress-panel table shows Sia Kallon row with 1/7 progress and tp-done-<sia_eid>-getting-started green check present.",
+    "F4_public_payslip_verify": "PASS — /verify-payslip/11735cd9-b568-42db-87a6-3e6d1aaec8b0 in a fresh (unauthenticated) context shows verify-payslip-valid with name='Aminata Kamara', period='2026-01', net='SLE 7,063.75'. /verify-payslip/bogus shows verify-payslip-invalid.",
+    "F5_regression": "PASS — admin /m/clock still shows mobile-clock-team-map (with in-zone/out-of-zone stats + loading map placeholder). Classic /login works for both admin@gov.sl and sia.kallon@gov.sl."
+  },
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (gov tenant admin), sia.kallon@gov.sl / Employee@2026 (plain gov employee). Confirmed from /app/memory/test_credentials.md.",
+  "seed_data_creation": "Temporary: (1) leave_requests row id c9d380b0-e1f3-467a-b4a8-08085097b75b for Joseph Williams 2026-08-10..12, (2) training_progress row for sia (user_id 64f38ddd-…, base_slug getting-started). BOTH DELETED at end of run — verified training_progress count=0 and leave_requests row purged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Payslip verification IDs live in mongo db.payslip_verifications; two exist for Aminata Kamara (2026-01 and 2027-02). Training video base slugs (EN) come from /api/marketing/videos?category=training&limit=60 filtered by lang=en (7 items) — 'getting-started' is the first sort-order slug. Leave calendar month keys are YYYY-MM zero-padded; day testids use the same YYYY-MM-DD format for both desktop (leave-calendar-day-*) and mobile (mobile-leave-cal-day-*). TrainingProgressPanel only renders when /training-progress/team returns 200 — hides silently on 403 (correct RBAC). For unauthenticated payslip verify, use a fresh browser context; the endpoint is /api/public/payslip/{id}.",
+  "rca_of_issue": "N/A — no issues found."
+}

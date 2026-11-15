@@ -1,0 +1,28 @@
+{
+  "summary": "Iter23 backend-only regression — verified the (optional hardening) fix for tier/features co-update audit. Outcomes:\n  • PRODUCTION CODE AUDIT VERIFIED: All 3 production callsites that write company.tier (routers/billing.py:263 mark_invoice_paid, routers/billing.py:391 _apply_paid_subscription, routers/admin.py:94 update_tier) already atomically set tier + features + label via features_for(tier) / tier_label(tier). No production callsite mutates tier without features.\n  • TEST FIXTURE FIX VERIFIED: tests/test_iter19_billing.py:_isolate_billing now resets {tier, label, features} atomically via gov_reset dict — previously dropped 7 gov-tier flags.\n  • BELT-AND-BRACES FIX VERIFIED: tests/conftest.py:_restore_superadmin_tenant() now resyncs every company's features to its tier on every module-scoped autouse invocation.\n  • REGRESSION SCENARIO PASSES: ran iter19 (9/9) → IMMEDIATE direct DB check confirmed gov tenant still had all 30 features (0 missing tier flags) → ran iter20 (11/11) back-to-back with ZERO 402s.\n  • Full regression suite: iter18_loans (8/8), iter19_billing (9/9), iter20_presets_and_promotion (11/11), iter21_marketing_leads (4/4), iter22_feature_resync (2/2). Total 34/34 backend PASS.\n  • Production boot logs: latest 5 backend restarts each show 'Seed complete' with NO 'Re-synced features for N' line — confirms drift is zero on clean boot (resync helper logs only when work is done). One historical 're-synced 26 mismatches' entry from before the fixture fix remains in the log (expected).\n  • Skipped frontend per testing_type='backend only'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/test_reports/pytest/iter23_iter19.xml",
+    "/app/test_reports/pytest/iter23_iter20.xml",
+    "/app/test_reports/pytest/iter23_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "The iter19 fixture (_isolate_billing) now correctly uses features_for('gov') + tier_label('gov') atomically with the tier mutation — matches the production pattern in routers/billing.py and routers/admin.py.",
+    "The belt-and-braces fix in conftest.py:_restore_superadmin_tenant() is defensive and well-scoped: it imports tiers lazily (inside the function), uses set() comparison so order doesn't matter, only writes when drift is detected, and silently no-ops if Mongo is unreachable.",
+    "All 3 production tier-mutation callsites verified by direct code inspection: billing.py:263, billing.py:391, admin.py:94 — each is a single $set with tier+label+features bundled — atomically consistent.",
+    "After running iter19 (the historical drift source), direct Mongo check confirmed gov tenant retains all 30 features (no drift) — empirically validates the fixture-level fix."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (34/34)", "frontend": "skipped per request"},
+  "test_credentials": "admin@gov.sl / GovAdmin@2026 (no 2FA) verified. Superadmin TOTP auto-injected via conftest.",
+  "seed_data_creation": "None. iter19 fixture mutates+restores gov tenant atomically.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter23 hardening VERIFIED. The drift gap between restarts is now closed: (1) iter19 fixture co-updates features+label with tier, (2) conftest.py resyncs all companies on every module load. Production callsites were already correct. Be aware /api/auth/login is rate-limited at 30/min by Cloudflare — pause ~30s if running multiple test files back-to-back.",
+  "rca of the issue": "Original RCA (from iter22): some tier-mutation paths wrote company.tier without re-deriving company.features, causing require_feature() 402s for tier-gated routes. Iter22 mitigation = boot-time _resync_all_company_features() in seeders/__init__.py. Iter23 (this run) closes the in-process gap: (a) audit confirmed all 3 production callsites already atomic, (b) the only leak was the iter19 test fixture which is now fixed, (c) added conftest-level safety net to heal drift before every test module. Verified end-to-end with the exact failure scenario (iter19→iter20 back-to-back): both suites now pass cleanly with no 402 errors and the gov tenant retains all 30 features throughout."
+}

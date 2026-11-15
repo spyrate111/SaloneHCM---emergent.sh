@@ -18,12 +18,12 @@ export default function SimulationResults({ result }) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5" data-testid="sim-results">
         <Card label="Current monthly" sub={`${result.current.employee_count} active employees`} value={fmtSLE(result.current.employer_total_cost)} accent="bg-[#26547C]" />
-        <Card label="Projected monthly" sub={`${result.affected_employees_count} affected`} value={fmtSLE(result.projected.employer_total_cost)} accent="bg-[#133326]" />
+        <Card label="Projected monthly" sub={`${result.affected_employees_count} affected`} value={fmtSLE(result.projected.employer_total_cost)} accent="bg-[#0A4A1E]" />
         <Card
           label="Δ Employer cost"
           sub={`Annualized: ${fmtSLE(result.annualized_delta_employer_cost)}`}
           value={fmtSLE(result.delta.employer_total_cost)}
-          accent={positiveCost ? "bg-[#D1603D]" : "bg-[#2D7A5D]"}
+          accent={positiveCost ? "bg-[#D1603D]" : "bg-[#17A035]"}
           icon={positiveCost ? TrendingUp : TrendingDown}
         />
       </div>
@@ -84,8 +84,8 @@ function EmployeeRow({ e }) {
       <td className="py-3 px-4 text-[#525860]">{e.department}</td>
       <td className="py-3 px-4 font-data">{fmtSLE(e.current_gross)}</td>
       <td className="py-3 px-4 font-data">{fmtSLE(e.projected_gross)}</td>
-      <td className={`py-3 px-4 font-data font-semibold ${grossPositive ? "text-[#2D7A5D]" : "text-[#B83A3A]"}`}>{grossPositive ? "+" : ""}{fmtSLE(e.delta_gross)}</td>
-      <td className={`py-3 px-4 font-data font-semibold ${netPositive ? "text-[#2D7A5D]" : "text-[#B83A3A]"}`}>{netPositive ? "+" : ""}{fmtSLE(e.delta_net)}</td>
+      <td className={`py-3 px-4 font-data font-semibold ${grossPositive ? "text-[#17A035]" : "text-[#3A7CB8]"}`}>{grossPositive ? "+" : ""}{fmtSLE(e.delta_gross)}</td>
+      <td className={`py-3 px-4 font-data font-semibold ${netPositive ? "text-[#17A035]" : "text-[#3A7CB8]"}`}>{netPositive ? "+" : ""}{fmtSLE(e.delta_net)}</td>
     </tr>
   );
 }
@@ -112,7 +112,7 @@ function Mini({ label, value }) {
   return (
     <div className="bg-white border border-[#E2DFD6] rounded-md p-3">
       <div className="text-[10px] uppercase tracking-wider text-[#525860]">{label}</div>
-      <div className={`font-data font-semibold mt-1 ${positive ? "text-[#2D7A5D]" : "text-[#B83A3A]"}`}>
+      <div className={`font-data font-semibold mt-1 ${positive ? "text-[#17A035]" : "text-[#3A7CB8]"}`}>
         {positive ? "+" : ""}{fmtSLE(value)}
       </div>
     </div>
