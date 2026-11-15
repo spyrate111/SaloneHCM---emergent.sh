@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "../lib/auth";
+import { useAuth } from "../context/AuthContext";
 import { useParams, Link } from "react-router-dom";
 import api, { fmtSLE } from "../lib/api";
 import { useFeatures } from "../lib/features";
