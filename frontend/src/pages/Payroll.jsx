@@ -9,6 +9,7 @@ import { BudgetCheckModal, BudgetBalancesPanel } from "../components/BudgetCheck
 import { VarianceButton } from "../components/Variance";
 import { MoFSignaturesButton } from "../components/MoFSignatures";
 import PayslipScanPanel from "../components/PayslipScanPanel";
+import MobileMoneyBatchButton from "../components/MobileMoneyBatchButton";
 import MoFConfigCard from "../components/MoFConfigCard";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
@@ -284,6 +285,7 @@ export default function Payroll() {
                       <Download className="w-3.5 h-3.5" /> Bank file
                     </button>
                     {has("ifmis_integration") && <IfmisActions run={r} />}
+                    <MobileMoneyBatchButton run={r} />
                     <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#525860] px-2.5 py-1.5 rounded"><FileText className="w-3.5 h-3.5" /> NRA</a>
                     <VarianceButton runId={r.id} period={r.period} />
                     {has("mof_approval") && (
