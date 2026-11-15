@@ -171,11 +171,11 @@ export function AuthProvider({ children }) {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (!getToken()) return undefined;
     const refreshOnReconnect = () => { void refetch(); };
     window.addEventListener("online", refreshOnReconnect);
     return () => window.removeEventListener("online", refreshOnReconnect);
-  }, [user?.id, refetch]);
+  }, [refetch]);
 
   const value = useMemo(() => ({ user, loading, login, applyAuth, logout, refetch }), [user, loading, login, applyAuth, logout, refetch]);
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
