@@ -3,7 +3,7 @@ import api, { downloadBlob, fmtSLE } from "../lib/api";
 import { toast } from "sonner";
 import { Download, ChevronDown, X, ShieldCheck, FileSpreadsheet, Lock } from "lucide-react";
 
-export default function IfmisActions({ run }) {
+export default function IfmisActions({ run, disbursementDisabled = false }) {
   const [formats, setFormats] = useState([]);
   const [open, setOpen] = useState(false);
   const [reconOpen, setReconOpen] = useState(false);
@@ -32,7 +32,9 @@ export default function IfmisActions({ run }) {
         <button
           data-testid={`ifmis-disbursement-toggle-${run.id}`}
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 text-xs bg-white border border-[#26547C] text-[#26547C] hover:bg-[#E5EEF6] px-2.5 py-1.5 rounded"
+          disabled={disbursementDisabled}
+          title={disbursementDisabled ? "Only the latest run for this period can be disbursed" : ""}
+          className="inline-flex items-center gap-1 text-xs bg-white border border-[#26547C] text-[#26547C] hover:bg-[#E5EEF6] px-2.5 py-1.5 rounded disabled:opacity-50"
         >
           <Download className="w-3.5 h-3.5" /> Bank file
           <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
