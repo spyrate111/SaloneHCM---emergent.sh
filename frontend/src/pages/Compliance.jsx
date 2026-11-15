@@ -29,6 +29,22 @@ export default function Compliance() {
     } finally { setBusy(null); }
   };
 
+  const downloadNassitSchedule = (rid, period) => {
+    const entered = window.prompt("NASSIT contribution payment method (Cash, Cheque, or Bank transfer):");
+    if (!entered?.trim()) return;
+    const methods = { cash: "Cash", cheque: "Cheque", "bank transfer": "Bank transfer" };
+    const method = methods[entered.trim().toLowerCase()];
+    if (!method) {
+      toast.error("Choose Cash, Cheque, or Bank transfer.");
+      return;
+    }
+    const query = new URLSearchParams({ payment_method: method });
+    return downloadBlob(
+      `/compliance/nassit-schedule.xlsx/${rid}?${query.toString()}`,
+      `NASSIT-Contribution-Schedule-${period}.xlsx`,
+    );
+  };
+
   const downloadLegacy = async (rid, period) => {
     const { data } = await api.get(`/compliance/nra-export/${rid}`);
     const headers = ["employee", "gross_sle", "paye_sle", "nassit_employee_sle", "nassit_employer_sle", "net_sle"];
@@ -173,7 +189,7 @@ export default function Compliance() {
                         <button
                           data-testid={`export-nassit-${r.run_id}`}
                           disabled={busy === `NASSIT-Contribution-Schedule-${r.period}.xlsx`}
-                          onClick={() => downloadBlob(`/compliance/nassit-schedule.xlsx/${r.run_id}`, `NASSIT-Contribution-Schedule-${r.period}.xlsx`)}
+                          onClick={() => downloadNassitSchedule(r.run_id, r.period)}
                           className="inline-flex items-center gap-1 text-xs bg-[#17A035] hover:bg-[#148231] text-white px-2.5 py-1.5 rounded"
                         >
                           <Download className="w-3.5 h-3.5" /> NASSIT Excel
