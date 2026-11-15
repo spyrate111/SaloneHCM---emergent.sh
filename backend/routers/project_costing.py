@@ -169,7 +169,7 @@ async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depend
     await audit("project_costing_project_update", f"project_costing_projects/{project_id}", user,
                 {key: value for key, value in updates.items() if key != "updated_at"})
     return await db.project_costing_projects.find_one(
-        {"id": project_id, **tenant_filter(user)}, {"_id": 0}
+        {"id": project_id, **tenant_filter(user)}, {"_id": 0, "company_id": 0}
     )
 
 
@@ -266,7 +266,7 @@ async def save_budget_set(body: BudgetSetIn, user: dict = Depends(ACCESS)):
 @router.post("/budget-sets/{set_id}/approve")
 async def approve_budget_set(set_id: str, user: dict = Depends(ACCESS)):
     item = await db.project_budget_sets.find_one(
-        {"id": set_id, **tenant_filter(user)}, {"_id": 0}
+        {"id": set_id, **tenant_filter(user)}, {"_id": 0, "company_id": 0}
     )
     if not item:
         raise HTTPException(404, "Budget set not found")
@@ -389,7 +389,7 @@ async def save_allocation_set(body: AllocationSetIn, user: dict = Depends(ACCESS
 @router.post("/allocation-sets/{set_id}/approve")
 async def approve_allocation_set(set_id: str, user: dict = Depends(ACCESS)):
     item = await db.project_allocation_sets.find_one(
-        {"id": set_id, **tenant_filter(user)}, {"_id": 0}
+        {"id": set_id, **tenant_filter(user)}, {"_id": 0, "company_id": 0}
     )
     if not item:
         raise HTTPException(404, "Allocation set not found")
