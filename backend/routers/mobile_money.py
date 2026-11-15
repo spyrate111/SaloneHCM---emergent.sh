@@ -661,47 +661,47 @@ async def reconcile_mobile_money_recipient(
         raise HTTPException(422, "Enter the provider transaction reference for a successful payment.")
     if body.status == "failed" and not failure_reason:
         raise HTTPException(422, "Enter a reason for the failed payment.")
-    if (
+    already_recorded = (
         recipient.get("status") == body.status
         and recipient.get("provider_reference", "") == provider_reference
         and recipient.get("failure_reason", "") == failure_reason
-    ):
-        return batch
-    if recipient.get("status", "pending") != "pending":
+    )
+    if not already_recorded and recipient.get("status", "pending") != "pending":
         raise HTTPException(
             409,
             "This recipient is already reconciled. Create a retry batch for failed payments.",
         )
 
     recorded_at = iso(now_utc())
-    event = {
-        "status": body.status,
-        "provider_reference": provider_reference,
-        "failure_reason": failure_reason,
-        "recorded_by": user["email"],
-        "recorded_at": recorded_at,
-    }
-    result = await db.mobile_money_batches.update_one(
-        {
-            "id": bid,
-            **scope,
-            "recipients": {"$elemMatch": {"id": pid, "status": "pending"}},
-        },
-        {
-            "$set": {
-                "recipients.$.status": body.status,
-                "recipients.$.provider_reference": provider_reference,
-                "recipients.$.failure_reason": failure_reason,
-                "recipients.$.reconciled_at": recorded_at,
+    if not already_recorded:
+        event = {
+            "status": body.status,
+            "provider_reference": provider_reference,
+            "failure_reason": failure_reason,
+            "recorded_by": user["email"],
+            "recorded_at": recorded_at,
+        }
+        result = await db.mobile_money_batches.update_one(
+            {
+                "id": bid,
+                **scope,
+                "recipients": {"$elemMatch": {"id": pid, "status": "pending"}},
             },
-            "$push": {"recipients.$.reconciliation_history": event},
-        },
-    )
-    if result.matched_count != 1:
-        raise HTTPException(
-            409,
-            "This recipient was reconciled by another user. Refresh the batch before continuing.",
+            {
+                "$set": {
+                    "recipients.$.status": body.status,
+                    "recipients.$.provider_reference": provider_reference,
+                    "recipients.$.failure_reason": failure_reason,
+                    "recipients.$.reconciled_at": recorded_at,
+                },
+                "$push": {"recipients.$.reconciliation_history": event},
+            },
         )
+        if result.matched_count != 1:
+            raise HTTPException(
+                409,
+                "This recipient was reconciled by another user. Refresh the batch before continuing.",
+            )
 
     # Recalculate from the latest recipient states in one atomic update. Concurrent
     # reconciliations can finish in any order without leaving stale batch totals.
@@ -746,15 +746,16 @@ async def reconcile_mobile_money_recipient(
     updated = await db.mobile_money_batches.find_one(
         {"id": bid, **scope}, {"_id": 0},
     )
-    await audit(
-        "mobile_money_payment_reconciled",
-        f"payroll_runs/{batch['run_id']}",
-        user,
-        {
-            "batch_id": bid,
-            "recipient_id": pid,
-            "status": body.status,
-            "provider_reference_recorded": bool(provider_reference),
-        },
-    )
+    if not already_recorded:
+        await audit(
+            "mobile_money_payment_reconciled",
+            f"payroll_runs/{batch['run_id']}",
+            user,
+            {
+                "batch_id": bid,
+                "recipient_id": pid,
+                "status": body.status,
+                "provider_reference_recorded": bool(provider_reference),
+            },
+        )
     return updated
