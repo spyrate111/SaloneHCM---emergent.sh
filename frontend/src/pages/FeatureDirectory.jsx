@@ -19,6 +19,7 @@ const META = {
   "/schedules": { group: "Payroll & Finance", desc: "Recurring auto-run payroll schedules." },
   "/vouchers": { group: "Payroll & Finance", desc: "Centralized payroll voucher repository — branch submission, supervisor/finance/MoF approval chain, immutable audit trail." },
   "/loans": { group: "Payroll & Finance", desc: "Salary advances with automatic payroll repayment deductions." },
+  "/project-costing": { group: "Payroll & Finance", desc: "Donor project budgets, maker-checker approvals and payroll cost allocation in SLE." },
   "/simulator": { group: "Payroll & Finance", desc: "What-if payroll scenarios, comparisons and decision-brief PDFs." },
   "/billing": { group: "Payroll & Finance", desc: "Your SaloneHCM subscription — bank transfer or Stripe." },
   "/compliance": { group: "Payroll & Finance", desc: "NRA PAYE returns, NASSIT filings and compliance score." },

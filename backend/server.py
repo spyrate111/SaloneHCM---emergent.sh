@@ -21,7 +21,7 @@ from routers import (
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
     expenses, recruitment, announcements, offboarding,
-    vouchers, training, mobile, webauthn, onboarding, training_progress,
+    vouchers, training, mobile, webauthn, onboarding, training_progress, project_costing,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -85,6 +85,7 @@ api.include_router(promotion.router)
 api.include_router(marketing.router)
 api.include_router(payroll_budget.router)
 api.include_router(payroll_variance.router)
+api.include_router(project_costing.router)
 api.include_router(expenses.router)
 api.include_router(recruitment.router)
 api.include_router(recruitment.public_router)

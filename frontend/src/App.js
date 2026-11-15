@@ -33,6 +33,7 @@ import Verify from "./pages/Verify";
 import VerifyPayslip from "./pages/VerifyPayslip";
 import CivilService from "./pages/CivilService";
 import Establishment from "./pages/Establishment";
+import ProjectCosting from "./pages/ProjectCosting";
 import Loans from "./pages/Loans";
 import Billing from "./pages/Billing";
 import SectorPresets from "./pages/SectorPresets";
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="/performance" element={<Performance />} />
             <Route path="/civil-service" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><CivilService /></ProtectedRoute>} />
             <Route path="/establishment" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><Establishment /></ProtectedRoute>} />
+            <Route path="/project-costing" element={<ProtectedRoute roles={["admin", "superadmin", "hr", "payroll"]}><ProjectCosting /></ProtectedRoute>} />
             <Route path="/loans" element={<Loans />} />
             <Route path="/billing" element={<ProtectedRoute adminOnly><Billing /></ProtectedRoute>} />
             <Route path="/sector-presets" element={<ProtectedRoute roles={["admin", "superadmin", "hr"]}><SectorPresets /></ProtectedRoute>} />
