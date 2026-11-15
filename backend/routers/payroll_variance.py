@@ -133,14 +133,15 @@ def _raise_anomalies(cur_by_id: dict, prev_by_id: dict) -> list[dict]:
     return out
 
 
-def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, cur_period: str) -> list[dict]:
+def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, cur_period: str, excluded_ids=None) -> list[dict]:
     try:
         cur_date = datetime.strptime(cur_period + "-01", "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except Exception:
         cur_date = datetime.now(timezone.utc)
     out = []
+    excluded_ids = set(excluded_ids or [])
     for eid, cur in cur_by_id.items():
-        if eid in prev_by_id:
+        if eid in prev_by_id or eid in excluded_ids:
             continue
         emp = emp_index.get(eid) or {}
         hd = emp.get("hire_date")
@@ -162,6 +163,69 @@ def _new_starter_anomalies(cur_by_id: dict, prev_by_id: dict, emp_index: dict, c
                 "delta_pct": None,
                 "message": f"First payslip in ≥ {days_before} days since hire — possible late-add or ghost worker.",
             })
+    return out
+
+
+def _resurrected_anomalies(cur_by_id: dict, history_runs: list[dict], emp_index: dict) -> list[dict]:
+    """Flag long-tenured employees returning after two completed payroll periods."""
+    completed_runs = sorted(
+        (
+            run for run in history_runs
+            if re.match(r"^\d{4}-(0[1-9]|1[0-2])$", str(run.get("period") or ""))
+        ),
+        key=lambda run: str(run.get("period") or ""),
+        reverse=True,
+    )[:2]
+    if len(completed_runs) < 2:
+        return []
+
+    periods = [str(run.get("period") or "") for run in completed_runs]
+    if len(set(periods)) < 2:
+        return []
+    period_employee_ids = []
+    for run in completed_runs:
+        slips = run.get("slips")
+        if not isinstance(slips, list) or not slips:
+            return []
+        period_employee_ids.append({
+            str(slip.get("employee_id") or "").strip()
+            for slip in slips
+            if str(slip.get("employee_id") or "").strip()
+        })
+
+    try:
+        oldest_period_start = datetime.strptime(periods[1] + "-01", "%Y-%m-%d")
+    except ValueError:
+        return []
+
+    out = []
+    for eid, cur in cur_by_id.items():
+        emp = emp_index.get(eid) or {}
+        if emp.get("status") == "terminated" or any(eid in ids for ids in period_employee_ids):
+            continue
+        hire_date = emp.get("hire_date")
+        try:
+            hired = datetime.strptime(str(hire_date)[:10], "%Y-%m-%d")
+        except (TypeError, ValueError):
+            continue
+        # A recent hire may legitimately have no payslip in the prior periods.
+        if hired >= oldest_period_start:
+            continue
+        out.append({
+            "severity": "warn",
+            "kind": "resurrected",
+            "subject": cur.get("employee_name") or eid,
+            "employee_id": eid,
+            "before": 0,
+            "after": _round(cur.get("net", 0)),
+            "delta_pct": None,
+            "periods_absent": periods,
+            "message": (
+                f"Employee is present after being absent from the two latest completed "
+                f"payroll periods ({periods[0]} and {periods[1]}). Confirm reinstatement "
+                "or return from leave before approval."
+            ),
+        })
     return out
 
 
@@ -431,9 +495,12 @@ def _detect_anomalies(cur_slips, prev_slips, emp_index, cur_period, history_runs
         for s in cur_slips
         if str(s.get("employee_id") or "").strip()
     }
+    resurrected = _resurrected_anomalies(cur_by_id, history_runs or [], emp_index)
+    resurrected_ids = {item.get("employee_id") for item in resurrected}
     return (
         _raise_anomalies(cur_by_id, prev_by_id)
-        + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period)
+        + _new_starter_anomalies(cur_by_id, prev_by_id, emp_index, cur_period, resurrected_ids)
+        + resurrected
         + _terminated_paid_anomalies(cur_by_id, emp_index)
         + _duplicate_identifier_anomalies(cur_slips, emp_index)
         + _missing_employee_id_anomalies(cur_slips)
