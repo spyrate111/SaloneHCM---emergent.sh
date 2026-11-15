@@ -67,7 +67,7 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             )
     updates = body.model_dump()
     # Older clients omit newly added optional fields; preserve saved identity data.
-    for optional_field in ("middle_name", "staff_number"):
+    for optional_field in ("middle_name", "nassit_member_name", "staff_number"):
         if optional_field not in body.model_fields_set:
             updates.pop(optional_field, None)
     res = await db.employees.update_one(
