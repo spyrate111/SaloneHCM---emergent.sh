@@ -21,7 +21,7 @@ from routers import (
     push, performance, civil_service, ifmis, establishment, loans, billing, stripe_webhook,
     sector_presets, promotion, marketing, payroll_budget, payroll_variance, payroll_rails,
     expenses, recruitment, announcements, offboarding,
-    vouchers, training, mobile, webauthn, onboarding, training_progress,
+    vouchers, training, mobile, webauthn, onboarding, training_progress, mobile_money,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +53,7 @@ api = APIRouter(prefix="/api", dependencies=[Depends(csrf_protect)])
 api.include_router(auth.router)
 api.include_router(employees.router)
 api.include_router(payroll.router)
+api.include_router(mobile_money.router)
 api.include_router(compliance.router)
 api.include_router(leave.router)
 api.include_router(attendance.router)
