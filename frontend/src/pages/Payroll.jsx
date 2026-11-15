@@ -38,6 +38,13 @@ export default function Payroll() {
   const loadRuns = useCallback(() => api.get("/payroll/runs").then((r) => setRuns(r.data)), []);
   useEffect(() => { loadRuns(); }, [loadRuns]);
 
+  const latestRunByPeriod = {};
+  for (const candidate of [...runs].sort((left, right) =>
+    String(right.created_at || "").localeCompare(String(left.created_at || ""))
+  )) {
+    if (!latestRunByPeriod[candidate.period]) latestRunByPeriod[candidate.period] = candidate.id;
+  }
+
   const downloadPdf = async (rid, eid, name) => {
     await downloadBlob(`/payroll/runs/${rid}/payslip/${eid}.pdf`, `payslip-${name.replace(/\s/g, "_")}.pdf`);
   };
@@ -251,6 +258,7 @@ export default function Payroll() {
           <tbody>
             {runs.map((r) => {
               const pill = MOF_PILL[r.mof_status || "draft"];
+              const isLatestRun = latestRunByPeriod[r.period] === r.id;
               return (
               <tr key={r.id} className="border-t border-[#E2DFD6]" data-testid={`payroll-run-row-${r.id}`}>
                 <td className="py-3 px-4 font-medium">{r.period}</td>
@@ -281,11 +289,17 @@ export default function Payroll() {
                         </button>
                       </>
                     )}
-                    <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className={`inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded ${has("ifmis_integration") ? "hidden" : ""}`}>
-                      <Download className="w-3.5 h-3.5" /> Bank file
-                    </button>
-                    {has("ifmis_integration") && <IfmisActions run={r} />}
-                    <MobileMoneyBatchButton run={r} />
+                    {!has("ifmis_integration") && (
+                      <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)}
+                        disabled={!isLatestRun} title={!isLatestRun ? "Only the latest run for this period can be disbursed" : ""}
+                        className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded disabled:opacity-50">
+                        <Download className="w-3.5 h-3.5" /> {isLatestRun ? "Bank file" : "Superseded"}
+                      </button>
+                    )}
+                    {has("ifmis_integration") && <IfmisActions run={r} disbursementDisabled={!isLatestRun} />}
+                    {isLatestRun
+                      ? <MobileMoneyBatchButton run={r} />
+                      : <span className="text-[10px] text-[#8A8F96]">Superseded · no wallet payout</span>}
                     <a href={`/compliance#${r.id}`} className="inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#525860] px-2.5 py-1.5 rounded"><FileText className="w-3.5 h-3.5" /> NRA</a>
                     <VarianceButton runId={r.id} period={r.period} />
                     {has("mof_approval") && (
