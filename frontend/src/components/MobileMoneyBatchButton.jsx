@@ -134,7 +134,7 @@ export default function MobileMoneyBatchButton({ run }) {
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#525860]">Payroll disbursement workpaper</div>
                 <h2 className="font-heading text-xl font-semibold mt-1">Wallet batches · {run.period}</h2>
                 <p className="text-xs text-[#686D76] mt-2 max-w-3xl">
-                  SaloneHCM does not call Orange Money or Afrimoney. This SLE workpaper must be reviewed, uploaded manually in the provider portal, and reconciled here. Confirm employer API and upload requirements with the provider before relying on a direct integration.
+                  SaloneHCM does not call Orange Money or Afrimoney. This SLE workpaper must be reviewed, uploaded manually in the provider portal, and reconciled here. Confirm employer API and upload requirements with the provider before relying on a direct integration. Create wallet batches before exporting the bank file; bank-file exports reserve the remaining employees for the bank channel to prevent duplicate payment files.
                 </p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="p-1 text-[#686D76]" aria-label="Close wallet batches">
@@ -201,6 +201,11 @@ export default function MobileMoneyBatchButton({ run }) {
                     <div className="mx-4 mt-3 rounded-md bg-[#FBF1DE] px-3 py-2 text-xs text-[#8B6A14]">
                       <AlertCircle className="inline w-3.5 h-3.5 mr-1" /> {batch.excluded.length} employee(s) assigned to this provider have no wallet number and were excluded. Cancel this draft, update their profile, then create it again.
                       <div className="mt-1">{batch.excluded.map((item) => item.employee_name).join(", ")}</div>
+                    </div>
+                  )}
+                  {!batch.lines.length && (
+                    <div className="px-4 py-4 text-xs text-[#686D76]">
+                      No positive-net employees are configured for this provider yet. Cancel this draft, set a provider and wallet number on employee profiles, then create it again.
                     </div>
                   )}
                   <div className="divide-y divide-[#F1EEE6]">
