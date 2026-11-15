@@ -197,6 +197,8 @@ async def bank_file(
     bank_rows = 0
     wallet_excluded = 0
     for slip in r.get("slips", []):
+        if float(slip.get("net", 0) or 0) <= 0:
+            continue
         employee_id = slip["employee_id"]
         assignment = assignment_by_employee.get(employee_id)
         if assignment and assignment.get("provider") in PROVIDERS:
