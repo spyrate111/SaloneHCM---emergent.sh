@@ -98,7 +98,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict, payment_method
         [],
         [
             "No.", "Member Name (as on SS card)", "SS Number",
-            "Contribution Base (Le)", "10% (Le)", "5% (Le)", "15% (Le)",
+            "Contribution Base (Le)", "Employer 10% (Le)", "Employee 5% (Le)", "Total 15% (Le)",
         ],
     ]
     totals = {"basic": 0.0, "employer": 0.0, "employee": 0.0, "total": 0.0}
