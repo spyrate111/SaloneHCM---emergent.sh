@@ -492,8 +492,11 @@ async def export_mobile_money_workbook(
     )
     if not batch:
         raise HTTPException(404, "Mobile-money batch not found")
-    if batch.get("status") not in ("approved", "exported", "partially_reconciled", "reconciled"):
-        raise HTTPException(409, "A manager must approve this batch before export.")
+    if batch.get("status") != "approved" or batch.get("exported_at"):
+        raise HTTPException(
+            409,
+            "This batch workpaper has already been exported or changed. Do not upload another copy; reconcile its results or prepare a failed-payment retry.",
+        )
     pending_recipients = [
         recipient for recipient in batch.get("recipients", [])
         if recipient.get("status") == "pending"
@@ -509,12 +512,16 @@ async def export_mobile_money_workbook(
         ),
     }
     payload = _build_mobile_money_xlsx(export_batch)
-    exported_at = batch.get("exported_at") or iso(now_utc())
-    next_status = "exported" if batch.get("status") == "approved" else batch["status"]
-    await db.mobile_money_batches.update_one(
-        {"id": bid, **scope},
-        {"$set": {"status": next_status, "exported_at": exported_at}},
+    exported_at = iso(now_utc())
+    claimed = await db.mobile_money_batches.update_one(
+        {"id": bid, **scope, "status": "approved", "exported_at": None},
+        {"$set": {"status": "exported", "exported_at": exported_at}},
     )
+    if claimed.modified_count != 1:
+        raise HTTPException(
+            409,
+            "Another user already exported or changed this batch. Do not upload another copy; refresh the batch.",
+        )
     await audit(
         "mobile_money_batch_workbook_exported",
         f"payroll_runs/{batch['run_id']}",
