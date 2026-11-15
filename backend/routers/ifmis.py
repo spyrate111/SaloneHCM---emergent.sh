@@ -52,6 +52,11 @@ async def disbursement_file(
         raise HTTPException(404, "Run not found")
     await ensure_latest_payroll_run(rid, run.get("period", ""), user)
 
+    bank_format = (bank_code or "").strip().lower()
+    supported_formats = {item["code"] for item in available_formats()}
+    if bank_format not in supported_formats:
+        raise HTTPException(422, "Unsupported bank disbursement format.")
+
     scope = tenant_filter(user)
     assignments = await db.mobile_money_assignments.find(
         {"run_id": rid, **scope}, {"_id": 0},
@@ -67,7 +72,7 @@ async def disbursement_file(
         if assignment and assignment.get("provider") in PROVIDERS:
             wallet_excluded += 1
             continue
-        if assignment and assignment.get("provider") == "bank" and assignment.get("bank_format", "generic") != bank_code.lower():
+        if assignment and assignment.get("provider") == "bank" and assignment.get("bank_format", "generic") != bank_format:
             raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
         if assignment is None:
             assignment_key = _assignment_id(user["company_id"], rid, employee_id)
@@ -78,7 +83,7 @@ async def disbursement_file(
                 "employee_id": employee_id,
                 "batch_id": f"bank-file:{rid}",
                 "provider": "bank",
-                "bank_format": bank_code.lower(),
+                "bank_format": bank_format,
                 "created_at": iso(now_utc()),
             }
             try:
@@ -92,17 +97,17 @@ async def disbursement_file(
                 if assignment and assignment.get("provider") in PROVIDERS:
                     wallet_excluded += 1
                     continue
-                if assignment and assignment.get("provider") == "bank" and assignment.get("bank_format", "generic") != bank_code.lower():
+                if assignment and assignment.get("provider") == "bank" and assignment.get("bank_format", "generic") != bank_format:
                     raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
         included_slips.append(slip)
 
     employees = await db.employees.find(scope, {"_id": 0}).to_list(5000)
     export_run = {**run, "slips": included_slips}
-    body, media, ext, label = render_bank_file(bank_code, export_run, employees)
+    body, media, ext, label = render_bank_file(bank_format, export_run, employees)
     await audit("ifmis_disbursement_download", f"payroll_runs/{rid}", user,
-                {"bank": bank_code, "period": run["period"], "rows": len(included_slips),
+                {"bank": bank_format, "period": run["period"], "rows": len(included_slips),
                  "wallet_excluded": wallet_excluded})
-    fn = f"disbursement-{bank_code.lower()}-{run['period']}.{ext}"
+    fn = f"disbursement-{bank_format}-{run['period']}.{ext}"
     return StreamingResponse(
         io.BytesIO(body), media_type=media,
         headers={
