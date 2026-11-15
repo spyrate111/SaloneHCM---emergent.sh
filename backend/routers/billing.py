@@ -237,15 +237,18 @@ async def mark_invoice_paid(iid: str, body: MarkPaidIn, user: dict = Depends(req
     if inv["status"] != "open":
         raise HTTPException(409, f"Invoice already {inv['status']}")
     start, end = _next_period_dates()
-    await db.subscription_invoices.update_one(
-        {"id": iid},
+    paid_at = iso(now_utc())
+    claimed = await db.subscription_invoices.update_one(
+        {"id": iid, "status": "open"},
         {"$set": {
             "status": "paid",
-            "paid_at": start,
+            "paid_at": paid_at,
             "paid_by": user["email"],
             "bank_reference": body.bank_reference,
         }},
     )
+    if claimed.matched_count != 1:
+        raise HTTPException(409, "Invoice was paid or changed by another administrator.")
     # Update tenant subscription
     await db.subscriptions.update_one(
         {"company_id": inv["company_id"]},
@@ -373,11 +376,11 @@ async def stripe_status(session_id: str, http_request: Request, user: dict = Dep
         new_status = "expired"
 
     if new_status != txn["payment_status"]:
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
+        claimed = await db.payment_transactions.update_one(
+            {"session_id": session_id, "payment_status": txn["payment_status"]},
             {"$set": {"payment_status": new_status, "status": status_resp.status}},
         )
-        if new_status == "paid":
+        if claimed.matched_count == 1 and new_status == "paid":
             await _apply_paid_subscription(txn["company_id"], txn["plan_id"], txn["amount_sle"], "stripe")
 
     fresh = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
