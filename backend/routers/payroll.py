@@ -17,7 +17,7 @@ from core import require_roles
 
 from core import can_role
 from pymongo.errors import DuplicateKeyError
-from routers.mobile_money import PROVIDERS, _assignment_id
+from routers.mobile_money import PROVIDERS, _assignment_id, ensure_latest_payroll_run
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -183,6 +183,7 @@ async def bank_file(
     r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
     if not r:
         raise HTTPException(404, "Run not found")
+    await ensure_latest_payroll_run(rid, r.get("period", ""), user)
     scope = tenant_filter(user)
     emps = await db.employees.find(scope, {"_id": 0}).to_list(2000)
     emp_map = {e["id"]: e for e in emps}
