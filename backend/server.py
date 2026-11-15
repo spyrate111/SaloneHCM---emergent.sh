@@ -129,17 +129,18 @@ app.mount("/api/static", StaticFiles(directory=str(_static_dir)), name="static")
 # CORS — when cookies are used, browsers reject Access-Control-Allow-Origin='*'.
 #
 # Production cutover: set `CORS_ALLOWED_ORIGINS` to a comma-separated allowlist
-# of explicit https origins (e.g. https://app.salonehcm.gov.sl,https://hcm.mof.gov.sl)
-# and unset `CORS_ALLOW_PREVIEW` to disable the wildcard preview regex.
+# of explicit https origins (e.g. https://app.salonehcm.gov.sl,https://hcm.mof.gov.sl).
+# Preview origins are disabled by default whenever an explicit origin is configured;
+# set `CORS_ALLOW_PREVIEW=1` only in environments that intentionally need preview access.
 #
-# When `CORS_ALLOWED_ORIGINS` is unset we fall back to the preview-host regex
-# (any *.preview.emergentagent.com) + localhost. This keeps preview/dev working
-# but is NOT safe for prod.
+# When no explicit origin is configured we retain the preview-host regex for
+# development convenience. Do not use that default in production.
 _explicit = [o.strip().rstrip("/") for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
 _legacy_frontend_url = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
 if _legacy_frontend_url and _legacy_frontend_url not in _explicit:
     _explicit.append(_legacy_frontend_url)
-_allow_preview = os.environ.get("CORS_ALLOW_PREVIEW", "1") not in ("0", "false", "False", "")
+_preview_default = "0" if _explicit else "1"
+_allow_preview = os.environ.get("CORS_ALLOW_PREVIEW", _preview_default).strip().lower() not in ("0", "false", "")
 _preview_regex = r"https://[^/]+\.preview\.emergentagent\.com" if _allow_preview else None
 
 # When neither an explicit allowlist nor the preview regex is configured, fall
