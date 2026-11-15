@@ -69,6 +69,9 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
     # Older clients omit this field; preserve an existing tax-residency choice.
     if "tax_residency" not in body.model_fields_set:
         updates.pop("tax_residency", None)
+    for field in ("mobile_money_provider", "mobile_money_number"):
+        if field not in body.model_fields_set:
+            updates.pop(field, None)
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
         {"$set": updates},
