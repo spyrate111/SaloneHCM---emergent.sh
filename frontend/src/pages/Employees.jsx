@@ -10,7 +10,7 @@ const empty = {
   job_title: "", department: "", location: "Freetown",
   employment_type: "Full-time", basic_salary_sle: 0, allowances_sle: 0,
   nassit_no: "", tin: "", bank_name: "Sierra Leone Commercial Bank", bank_account: "",
-  orange_money_number: "", afrimoney_number: "",
+  orange_money_number: "", afrimoney_number: "", mobile_money_provider: "auto",
   hire_date: "2025-01-01", status: "active",
 };
 
@@ -150,6 +150,15 @@ export default function Employees() {
                     className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#26547C]" />
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Mobile-money payout preference</label>
+                <select data-testid="emp-mobile-money-provider" value={form.mobile_money_provider} onChange={(e) => setForm({ ...form, mobile_money_provider: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                  <option value="auto">Auto-detect single wallet</option>
+                  <option value="orange_money">Orange Money</option>
+                  <option value="afrimoney">Afrimoney</option>
+                  <option value="none">Bank or other method</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Hire date</label>
                 <DatePicker data-testid="emp-hire_date" value={form.hire_date} onChange={(v) => setForm({ ...form, hire_date: v })} />

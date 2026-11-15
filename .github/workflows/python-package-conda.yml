@@ -48,6 +48,12 @@ jobs:
             python -m pytest -q backend/tests/test_nassit_workpaper.py
           fi
 
+      - name: Run isolated mobile-money routing unit test when present
+        run: |
+          if [ -f backend/tests/test_mobile_money_routing.py ]; then
+            python -m pytest -q backend/tests/test_mobile_money_routing.py
+          fi
+
       # The remaining suite includes deployment and provider integration tests.
       # Collect those tests without executing requests or sending test email.
       - name: Collect backend tests

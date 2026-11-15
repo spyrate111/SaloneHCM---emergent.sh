@@ -37,6 +37,7 @@ class EmployeeIn(BaseModel):
     bank_account: Optional[str] = ""
     orange_money_number: Optional[str] = ""
     afrimoney_number: Optional[str] = ""
+    mobile_money_provider: Literal["auto", "orange_money", "afrimoney", "none"] = "auto"
     hire_date: str
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
@@ -69,6 +70,7 @@ class TimeEntryIn(BaseModel):
 class EmployeeMobileMoneyDetailsIn(BaseModel):
     orange_money_number: Optional[str] = Field(default="", max_length=32)
     afrimoney_number: Optional[str] = Field(default="", max_length=32)
+    mobile_money_provider: Literal["auto", "orange_money", "afrimoney", "none"] = "auto"
 
 
 class PayrollRunIn(BaseModel):

@@ -63,7 +63,7 @@ export default function MobileMoneyBatchActions({ run }) {
       setSelectedBatchId(data.id);
       toast.success(data.already_exists
         ? "This provider batch already exists for the payroll run"
-        : "Batch created and sent for manager approval");
+        : `${data.recipient_count} employee(s) routed to ${data.provider_name}; ${data.excluded_count || 0} excluded from this provider batch`);
     } catch (error) {
       toast.error(error?.response?.data?.detail || "Could not prepare mobile money batch");
     } finally {
@@ -191,6 +191,7 @@ export default function MobileMoneyBatchActions({ run }) {
 
             <div className="mt-5 rounded-lg border border-[#E2DFD6] bg-[#F7F6F2] p-4">
               <h3 className="font-medium text-sm">Prepare a batch for this payroll run</h3>
+              <p className="text-xs text-[#686D76] mt-1">Only employees assigned to the selected provider are included. Prepare the other provider separately; employees paid by bank are excluded.</p>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end mt-3">
                 <label className="text-xs text-[#525860]">
                   Provider
@@ -253,7 +254,7 @@ export default function MobileMoneyBatchActions({ run }) {
                   <div>
                     <div className="font-medium text-sm">{batch.provider_name} · {batch.status.replaceAll("_", " ")}</div>
                     <div className="text-xs text-[#686D76] mt-1">
-                      {batch.recipient_count} staff · {fmtSLE(batch.total_amount_sle)} · payment date {batch.payment_date} · {batch.currency}
+                      {batch.recipient_count} of {batch.source_employee_count ?? batch.recipient_count} payroll employees · {batch.excluded_count ?? 0} excluded · {fmtSLE(batch.total_amount_sle)} · payment date {batch.payment_date} · {batch.currency}
                     </div>
                     <div className="text-xs text-[#686D76] mt-1">
                       {batch.paid_count} paid · {batch.failed_count} failed · {batch.pending_count} pending

@@ -5,6 +5,7 @@ confirmed employer payout specifications. The workbook is a provider-neutral
 workpaper for manual use with each operator's approved salary-payment flow.
 """
 import io
+import math
 import re
 import uuid
 import zipfile
@@ -48,6 +49,87 @@ def _normalize_wallet_number(raw: object) -> Optional[str]:
     return value
 
 
+def _assigned_mobile_money_provider(employee: dict) -> Optional[str]:
+    preference = employee.get("mobile_money_provider") or "auto"
+    if preference in PROVIDERS:
+        return preference
+    if preference == "none":
+        return None
+    if preference != "auto":
+        return "invalid"
+
+    wallets = {
+        "orange_money": str(employee.get("orange_money_number") or "").strip(),
+        "afrimoney": str(employee.get("afrimoney_number") or "").strip(),
+    }
+    available = [provider for provider, number in wallets.items() if number]
+    if len(available) == 1:
+        return available[0]
+    if len(available) > 1:
+        return "ambiguous"
+    return None
+
+
+def _route_mobile_money_recipients(
+    slips: list[dict], employee_map: dict[str, dict], provider: str, period: str,
+) -> tuple[list[dict], int, int, int]:
+    recipients = []
+    seen_employee_ids = set()
+    invalid_count = 0
+    ambiguous_count = 0
+    excluded_count = 0
+    wallet_field = "orange_money_number" if provider == "orange_money" else "afrimoney_number"
+
+    for slip in slips:
+        employee_id = slip.get("employee_id")
+        if not employee_id or employee_id in seen_employee_ids:
+            invalid_count += 1
+            continue
+        seen_employee_ids.add(employee_id)
+        employee = employee_map.get(employee_id)
+        if not employee:
+            invalid_count += 1
+            continue
+
+        assigned_provider = _assigned_mobile_money_provider(employee)
+        if assigned_provider == "ambiguous":
+            ambiguous_count += 1
+            continue
+        if assigned_provider == "invalid":
+            invalid_count += 1
+            continue
+        if assigned_provider != provider:
+            excluded_count += 1
+            continue
+
+        wallet = _normalize_wallet_number(employee.get(wallet_field))
+        try:
+            raw_amount = float(slip.get("net", 0) or 0)
+        except (TypeError, ValueError):
+            invalid_count += 1
+            continue
+        if not wallet or not math.isfinite(raw_amount) or raw_amount <= 0:
+            invalid_count += 1
+            continue
+        amount = round(raw_amount, 2)
+        if amount <= 0:
+            invalid_count += 1
+            continue
+        recipients.append({
+            "id": str(uuid.uuid4()),
+            "employee_id": employee_id,
+            "employee_name": _employee_name(employee) or slip.get("employee_name", "Employee"),
+            "mobile_number": wallet,
+            "amount_sle": amount,
+            "payment_reference": f"SHCM-{str(period).replace('-', '')}-{uuid.uuid4().hex[:8].upper()}",
+            "status": "pending",
+            "provider_reference": "",
+            "failure_reason": "",
+            "reconciliation_history": [],
+        })
+    return recipients, invalid_count, ambiguous_count, excluded_count
+
+
 def _employee_name(employee: dict) -> str:
     return " ".join(
         str(employee.get(field) or "").strip()
@@ -62,7 +144,7 @@ def _batch_summary(batch: dict) -> dict:
         for key in (
             "id", "run_id", "period", "provider", "provider_name", "currency", "retry_of", "attempt_number",
             "payment_date", "status", "total_amount_sle", "recipient_count",
-            "paid_count", "failed_count", "pending_count", "created_by",
+            "paid_count", "failed_count", "pending_count", "source_employee_count", "excluded_count", "created_by",
             "created_at", "approved_by", "approved_at", "exported_at",
             "reconciled_at",
         )
@@ -89,6 +171,9 @@ def _build_mobile_money_xlsx(batch: dict) -> bytes:
         ["Payroll Period", batch["period"]],
         ["Payment Date", batch["payment_date"]],
         ["Currency", batch["currency"]],
+        ["Employees in payroll", batch.get("source_employee_count", batch["recipient_count"])],
+        ["Recipients in this provider batch", batch["recipient_count"]],
+        ["Excluded (other provider or bank)", batch.get("excluded_count", 0)],
         [],
         ["Recipient Name", "Mobile Number", "Amount (SLE)", "Payment Reference"],
     ]
@@ -124,7 +209,7 @@ def _build_mobile_money_xlsx(batch: dict) -> bytes:
     sheet_xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        '<sheetViews><sheetView workbookViewId="0"><pane ySplit="6" topLeftCell="A7" '
+        '<sheetViews><sheetView workbookViewId="0"><pane ySplit="9" topLeftCell="A10" '
         'activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
         f'<sheetData>{"".join(sheet_rows)}</sheetData></worksheet>'
     )
@@ -221,51 +306,57 @@ async def create_run_mobile_money_batch(
 
     slips = run.get("slips", [])
     employee_ids = list({slip.get("employee_id") for slip in slips if slip.get("employee_id")})
-    wallet_field = (
-        "orange_money_number" if body.provider == "orange_money"
-        else "afrimoney_number"
-    )
     employees = []
     if employee_ids:
         employees = await db.employees.find(
             {"id": {"$in": employee_ids}, **scope},
             {
                 "_id": 0, "id": 1, "first_name": 1, "middle_name": 1,
-                "last_name": 1, wallet_field: 1,
+                "last_name": 1, "orange_money_number": 1, "afrimoney_number": 1,
+                "mobile_money_provider": 1,
             },
         ).to_list(len(employee_ids))
     employee_map = {employee["id"]: employee for employee in employees}
-    invalid = []
-    recipients = []
-    for slip in slips:
-        employee = employee_map.get(slip.get("employee_id"), {})
-        wallet = _normalize_wallet_number(employee.get(wallet_field))
-        amount = round(float(slip.get("net", 0) or 0), 2)
-        if not wallet or amount <= 0:
-            invalid.append(slip.get("employee_name", "Employee"))
-            continue
-        recipients.append({
-            "id": str(uuid.uuid4()),
-            "employee_id": slip["employee_id"],
-            "employee_name": _employee_name(employee) or slip.get("employee_name", "Employee"),
-            "mobile_number": wallet,
-            "amount_sle": amount,
-            "payment_reference": (
-                f"SHCM-{run['period'].replace('-', '')}-"
-                f"{uuid.uuid4().hex[:8].upper()}"
-            ),
-            "status": "pending",
-            "provider_reference": "",
-            "failure_reason": "",
-            "reconciliation_history": [],
-        })
-    if invalid:
+    recipients, invalid_count, ambiguous_count, excluded_count = _route_mobile_money_recipients(
+        slips, employee_map, body.provider, run.get("period", ""),
+    )
+    if ambiguous_count:
         raise HTTPException(
             422,
-            f"{len(invalid)} employee(s) have a missing/invalid {PROVIDERS[body.provider]} wallet number or non-positive net pay. Correct the records and prepare the batch again.",
+            f"{ambiguous_count} employee(s) have both provider wallets but no payout preference. Choose Orange Money or Afrimoney in each employee profile.",
+        )
+    if invalid_count:
+        raise HTTPException(
+            422,
+            f"{invalid_count} payroll row(s) assigned to {PROVIDERS[body.provider]} have an invalid wallet number, non-positive net pay, or missing/duplicate employee data.",
         )
     if not recipients:
-        raise HTTPException(422, "This payroll run has no positive net-pay recipients.")
+        raise HTTPException(
+            422,
+            f"No employees are assigned to {PROVIDERS[body.provider]} with a valid wallet in this payroll run.",
+        )
+
+    initial_batches = await db.mobile_money_batches.find(
+        {"run_id": rid, "retry_of": {"$exists": False}, **scope},
+        {"_id": 0, "provider": 1, "recipients.employee_id": 1},
+    ).to_list(10)
+    already_in_other_provider = {
+        payment.get("employee_id")
+        for batch in initial_batches
+        if batch.get("provider") != body.provider
+        for payment in batch.get("recipients", [])
+        if payment.get("employee_id")
+    }
+    overlap = {
+        payment["employee_id"] for payment in recipients
+        if payment["employee_id"] in already_in_other_provider
+    }
+    if overlap:
+        raise HTTPException(
+            409,
+            f"{len(overlap)} employee(s) are already included in another provider batch for this payroll run.",
+        )
+    source_employee_count = len(slips)
 
     batch_id = str(uuid.uuid4())
     now = iso(now_utc())
@@ -284,6 +375,8 @@ async def create_run_mobile_money_batch(
         "status": "pending_approval",
         "total_amount_sle": total_amount,
         "recipient_count": len(recipients),
+        "source_employee_count": source_employee_count,
+        "excluded_count": excluded_count,
         "paid_count": 0,
         "failed_count": 0,
         "pending_count": len(recipients),
@@ -382,6 +475,8 @@ async def retry_failed_mobile_money_payments(
         "retry_of": bid,
         "total_amount_sle": total_amount,
         "recipient_count": len(recipients),
+        "source_employee_count": len(recipients),
+        "excluded_count": 0,
         "paid_count": 0,
         "failed_count": 0,
         "pending_count": len(recipients),

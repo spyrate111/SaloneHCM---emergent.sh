@@ -20,7 +20,7 @@ export default function EmployeeDetail() {
   const [savingCs, setSavingCs] = useState(false);
   const [qr, setQr] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
-  const [wallets, setWallets] = useState({ orange_money_number: "", afrimoney_number: "" });
+  const [wallets, setWallets] = useState({ orange_money_number: "", afrimoney_number: "", mobile_money_provider: "auto" });
   const [savingWallets, setSavingWallets] = useState(false);
 
   const issueQr = async () => {
@@ -40,6 +40,7 @@ export default function EmployeeDetail() {
     setWallets({
       orange_money_number: r.data.orange_money_number || "",
       afrimoney_number: r.data.afrimoney_number || "",
+      mobile_money_provider: r.data.mobile_money_provider || "auto",
     });
     setCs({
       grade_code: r.data.grade_code || "",
@@ -165,7 +166,7 @@ export default function EmployeeDetail() {
             <div className="bg-white border border-[#E2DFD6] rounded-lg p-6 space-y-4" data-testid="mobile-money-profile-editor">
               <div>
                 <h3 className="font-heading text-lg font-semibold">Mobile money payment details</h3>
-                <p className="text-xs text-[#686D76] mt-1">Enter the wallet number for each provider. These numbers are used only to prepare SLE payroll batches.</p>
+                <p className="text-xs text-[#686D76] mt-1">Enter wallet numbers and choose the provider for SLE payroll batches. Auto-detect works when exactly one wallet is saved.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
@@ -184,6 +185,21 @@ export default function EmployeeDetail() {
                     />
                   </div>
                 ))}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#525860] mb-1.5 uppercase tracking-wider">Mobile-money payout preference</label>
+                <select
+                  data-testid="mobile-money-provider-preference"
+                  value={wallets.mobile_money_provider}
+                  onChange={(event) => setWallets({ ...wallets, mobile_money_provider: event.target.value })}
+                  className="w-full sm:max-w-sm bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="auto">Auto-detect single wallet</option>
+                  <option value="orange_money">Orange Money</option>
+                  <option value="afrimoney">Afrimoney</option>
+                  <option value="none">Bank or other method</option>
+                </select>
+                <p className="text-xs text-[#686D76] mt-1">If both wallets are saved, choose one provider explicitly. Bank or other method keeps this employee out of mobile-money batches.</p>
               </div>
               <div className="flex justify-end">
                 <button

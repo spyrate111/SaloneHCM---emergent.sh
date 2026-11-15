@@ -75,7 +75,7 @@ export default function MobileMoneyApprovals() {
                   <span>{item.provider_name}</span>
                   <span>{item.period}</span>
                 </div>
-                <div className="text-xs text-[#686D76] mt-1">{item.recipient_count} employees · {fmtSLE(item.total_amount_sle)}</div>
+                <div className="text-xs text-[#686D76] mt-1">{item.recipient_count} of {item.source_employee_count ?? item.recipient_count} payroll employees · {item.excluded_count ?? 0} excluded · {fmtSLE(item.total_amount_sle)}</div>
                 <div className="text-xs text-[#686D76] mt-1">Payment date {item.payment_date} · prepared by {item.created_by}</div>
               </button>
             ))}
@@ -99,7 +99,7 @@ export default function MobileMoneyApprovals() {
                 <div>
                   <h2 className="font-heading text-lg font-semibold">{batch.provider_name} · {batch.period}</h2>
                   <p className="text-xs text-[#686D76] mt-1">
-                    {batch.recipient_count} recipients · {fmtSLE(batch.total_amount_sle)} · {batch.payment_date} · {batch.currency}
+                    {batch.recipient_count} of {batch.source_employee_count ?? batch.recipient_count} payroll employees · {batch.excluded_count ?? 0} excluded · {fmtSLE(batch.total_amount_sle)} · {batch.payment_date} · {batch.currency}
                   </p>
                   <p className="text-xs text-[#686D76] mt-1">Prepared by {batch.created_by}</p>
                 </div>

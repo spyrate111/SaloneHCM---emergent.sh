@@ -66,8 +66,8 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
     updates = body.model_dump()
-    # Preserve payout numbers when older clients omit the new optional fields.
-    for field in ("orange_money_number", "afrimoney_number"):
+    # Preserve payout details when older clients omit the newer optional fields.
+    for field in ("orange_money_number", "afrimoney_number", "mobile_money_provider"):
         if field not in body.model_fields_set:
             updates.pop(field, None)
     res = await db.employees.update_one(
@@ -88,11 +88,13 @@ async def update_mobile_money_details(
     user: dict = Depends(require_roles("hr")),
 ):
     employee = await db.employees.find_one(
-        {"id": eid, **tenant_filter(user)}, {"_id": 0, "id": 1},
+        {"id": eid, **tenant_filter(user)}, {"_id": 0, "id": 1, "mobile_money_provider": 1},
     )
     if not employee:
         raise HTTPException(404, "Not found")
     details = body.model_dump()
+    if "mobile_money_provider" not in body.model_fields_set:
+        details.pop("mobile_money_provider", None)
     await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
         {"$set": details},
@@ -104,6 +106,7 @@ async def update_mobile_money_details(
         {
             "orange_money_number_updated": bool(details.get("orange_money_number")),
             "afrimoney_number_updated": bool(details.get("afrimoney_number")),
+            "mobile_money_provider": details.get("mobile_money_provider"),
         },
     )
     return await db.employees.find_one(
