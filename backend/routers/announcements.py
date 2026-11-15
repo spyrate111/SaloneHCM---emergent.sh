@@ -118,7 +118,7 @@ async def mark_seen(body: SeenIn, user: dict = Depends(get_current_user)):
 async def trigger_announcement_reminders(user: dict = Depends(require_admin)):
     """Manual/internal trigger for the 24h urgent-announcement reminder sweep."""
     import reminders
-    return {"ok": True, "sent": await reminders.run_announcement_reminders()}
+    return {"ok": True, "sent": await reminders.run_announcement_reminders(user["company_id"])}
 
 
 @router.get("/{aid}/unread")
@@ -142,5 +142,6 @@ async def delete_announcement(aid: str, user: dict = Depends(require_roles("hr")
         raise HTTPException(404, "Announcement not found")
     await db.announcements.delete_one({"id": aid, **tenant_filter(user)})
     await db.announcement_reads.delete_many({"announcement_id": aid})
+    await db.announcement_reminders.delete_many({"announcement_id": aid})
     await audit("announcement_deleted", f"announcements/{aid}", user, {"title": row["title"]})
     return {"ok": True}

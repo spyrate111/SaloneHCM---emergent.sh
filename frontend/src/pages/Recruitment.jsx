@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import api from "../lib/api";
 import { toast } from "sonner";
 import { Briefcase, Plus, Link2, Download, UserPlus, CalendarClock } from "lucide-react";
@@ -230,7 +231,7 @@ function InterviewModal({ app, onClose, onSaved }) {
     } finally { setBusy(false); }
   };
   const inp = "mt-1 w-full border border-[#E2DFD6] rounded-md px-3 py-2 text-sm";
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" data-testid="interview-modal">
       <form onSubmit={submit} className="bg-white rounded-xl p-6 w-full max-w-md space-y-3">
         <div className="font-heading text-lg font-semibold">
@@ -259,7 +260,8 @@ function InterviewModal({ app, onClose, onSaved }) {
           <button type="button" onClick={onClose} className="border border-[#E2DFD6] text-sm px-4 py-2.5 rounded-md">Cancel</button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }
 

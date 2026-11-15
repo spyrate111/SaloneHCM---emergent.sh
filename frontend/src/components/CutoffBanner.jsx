@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { Lock } from "lucide-react";
+
+const CUTOFF_ROLES = ["payroll", "admin", "superadmin"];
 
 /** Top-of-page banner shown when the tenant is in a payroll cutoff lock window.
  *  Renders nothing when unlocked or cutoff disabled. Anti-fraud: warns admins
  *  that no employee mutations are being accepted right now. */
 export default function CutoffBanner() {
+  const { user } = useAuth();
+  const allowed = CUTOFF_ROLES.includes(user?.role);
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
+    if (!allowed) return;
     (async () => {
       try {
         const r = await api.get("/payroll/cutoff/status");
         setStatus(r.data);
       } catch { /* feature not available on this tenant — silently ignore */ }
     })();
-  }, []);
+  }, [allowed]);
 
   if (!status?.locked) return null;
   return (

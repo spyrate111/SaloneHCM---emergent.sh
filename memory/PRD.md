@@ -758,8 +758,26 @@ Comprehensive anti-fraud guardrail closing the Establishment ↔ IFMIS ↔ Payro
 - New pages/Careers.jsx at route /careers (public, before pre-existing /careers/:slug PublicCareers for the legacy job_postings module). Cards link to /apply/{public_token}. testids: careers-page/vacancy-{token}/empty/login-link.
 - Login.jsx: "We're hiring — view open positions →" link (login-careers-link) under demo accounts box.
 ### Testing
-- tests/test_iter50_careers_claim_notifications.py (2: unauth listing filters open/closed/past + field whitelist; claim submit+reject-with-note regression). iter48 suite re-run: 10/10 passed. Visual: /careers card renders + click-through to apply form + login link verified via screenshots. Push delivery itself depends on browser subscriptions (VAPID configured in backend/.env).
+- tests/test_iter50_careers_claim_notifications.py (2). iter48 suite re-run 10/10. Visual: /careers + login link verified. Push delivery depends on browser subscriptions (VAPID configured).
 - NOTE: production needs REDEPLOY.
+
+## v1.51 (Nov 2026) — Interview scheduling + announcement reminders + leavers report (iter53)
+### Interview scheduling (routers/recruitment.py)
+- PUT /recruitment/applications/{aid}/interview (hr/admin): date YYYY-MM-DD + time HH:MM (stored starts_at UTC — SL is GMT) + location/video link (300 cap). 422 past/bad format. Reschedule allowed (resets reminder_sent). Audited interview_scheduled. Emails applicant via email_service.send_interview_scheduled (details block w/ auto link detection).
+- 24h-before reminder: reminders.run_interview_reminders — email_service.send_interview_reminder, once per interview (interview.reminder_sent flag).
+- Recruitment.jsx: calendar button per application (application-interview-btn-{id}) → InterviewModal (portal-rendered; date/time/location, prefills on reschedule); chip on card (application-interview-chip-{id}).
+### Announcement reminders (reminders.py, collection announcement_reminders)
+- Sweep: urgent + created>24h ago + not expired → push fanout_to_user to each non-disabled company user who hasn't read AND hasn't been reminded (one record per announcement per user, recorded even when push skipped). Announcement gets $inc reminder_count + reminder_last_at.
+- NEW /app/backend/reminders.py attached to shared APScheduler (scheduler.py start(), every 15 min, id=reminder_sweeps). Manual triggers (require_admin, TENANT-SCOPED via company_id param): POST /announcements/run-reminders, POST /recruitment/run-interview-reminders.
+- Announcements.jsx: "Reminder sent · N" badge (announcement-reminder-status-{id}) + summary line inside unread panel.
+### Leavers report (routers/offboarding.py)
+- GET /offboarding/report?month=YYYY-MM + /report.csv (require_roles hr → hr/admin/superadmin; 422 bad month): completed offboardings in month joined w/ employees → name, job_title, department, leaving_date (completed_at), leaving_reason (exit_interview).
+- Analytics.jsx: LeaversReport section at bottom (rendered only for hr/admin/superadmin) — month picker, table, Export CSV (leavers-{month}.csv). testids leavers-report-section/month-input/export-csv/row-{eid}/empty.
+### Fixes from testing agent (iteration_41 — all 8 flows PASS)
+- DELETE announcement cascades announcement_reminders; manual reminder triggers tenant-scoped; InterviewModal via createPortal (full-viewport backdrop); CutoffBanner fetches /payroll/cutoff/status only for payroll/admin/superadmin (was 403 spam for HR).
+### Testing
+- tests/test_iter53_interviews_reminders_leavers.py (3 pytest). Testing agent: 100% backend+frontend. Post-fix re-run iter49/51/53: 12/12. Full-suite regression run.
+- NOTE: production deployed earlier does NOT include iter50+ features — needs REDEPLOY.
 
 ## v1.50 (Nov 2026) — Application emails + read receipts + exit interview notes (iter51)
 ### Application emails (email_service.py + routers/recruitment.py)

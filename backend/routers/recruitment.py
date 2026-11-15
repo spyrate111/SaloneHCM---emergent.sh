@@ -196,7 +196,7 @@ async def schedule_interview(aid: str, body: InterviewIn, bg: BackgroundTasks,
 async def trigger_interview_reminders(user: dict = Depends(require_admin)):
     """Manual/internal trigger for the 24h interview reminder sweep."""
     import reminders
-    return {"ok": True, "sent": await reminders.run_interview_reminders()}
+    return {"ok": True, "sent": await reminders.run_interview_reminders(user["company_id"])}
 
 
 @router.get("/applications/{aid}/cv")

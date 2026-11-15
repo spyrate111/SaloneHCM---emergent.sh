@@ -10,15 +10,19 @@ import push_service
 logger = logging.getLogger("salonehcm.reminders")
 
 
-async def run_interview_reminders() -> int:
-    """Email applicants whose interview starts within the next 24h (once per interview)."""
+async def run_interview_reminders(company_id: str | None = None) -> int:
+    """Email applicants whose interview starts within the next 24h (once per interview).
+    company_id scopes manual triggers; the cron tick passes None (all tenants)."""
     import email_service
     now = now_utc()
     lo, hi = iso(now), iso(now + timedelta(hours=24))
-    apps = await db.job_applications.find({
+    q = {
         "interview.starts_at": {"$gt": lo, "$lte": hi},
         "interview.reminder_sent": {"$ne": True},
-    }, {"_id": 0}).to_list(500)
+    }
+    if company_id:
+        q["company_id"] = company_id
+    apps = await db.job_applications.find(q, {"_id": 0}).to_list(500)
     sent = 0
     for a in apps:
         iv = a["interview"]
@@ -36,14 +40,16 @@ async def run_interview_reminders() -> int:
     return sent
 
 
-async def run_announcement_reminders() -> int:
+async def run_announcement_reminders(company_id: str | None = None) -> int:
     """Push-nudge staff who still haven't read an urgent announcement 24h after posting.
-    Exactly one reminder per announcement per employee."""
+    Exactly one reminder per announcement per employee. company_id scopes manual triggers."""
     now = now_utc()
     cutoff = iso(now - timedelta(hours=24))
     today = iso(now)[:10]
-    anns = await db.announcements.find(
-        {"priority": "urgent", "created_at": {"$lte": cutoff}}, {"_id": 0}).to_list(500)
+    q = {"priority": "urgent", "created_at": {"$lte": cutoff}}
+    if company_id:
+        q["company_id"] = company_id
+    anns = await db.announcements.find(q, {"_id": 0}).to_list(500)
     total = 0
     for a in anns:
         if a.get("expires_at") and a["expires_at"] < today:
