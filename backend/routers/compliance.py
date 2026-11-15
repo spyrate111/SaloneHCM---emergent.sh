@@ -98,8 +98,8 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
         ["Method of Payment (complete before submission)", ""],
         [],
         [
-            "No.", "Surname", "First Name", "Other Name(s)", "SS Number",
-            "Basic Salary (Le)", "10% (Le)", "5% (Le)", "15% (Le)",
+            "No.", "Member Name (as on SS card)", "SS Number",
+            "Contribution Base (Le)", "10% (Le)", "5% (Le)", "15% (Le)",
         ],
     ]
     totals = {"basic": 0.0, "employer": 0.0, "employee": 0.0, "total": 0.0}
@@ -115,9 +115,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
         totals["total"] += total_share
         rows.append([
             index,
-            _payroll_identity_value(slip, "employee_last_name", employee, "last_name"),
-            _payroll_identity_value(slip, "employee_first_name", employee, "first_name"),
-            _payroll_identity_value(slip, "employee_middle_name", employee, "middle_name"),
+            _payroll_identity_value(slip, "employee_nassit_member_name", employee, "nassit_member_name"),
             _payroll_identity_value(slip, "employee_nassit_no", employee, "nassit_no"),
             basic,
             employer_share,
@@ -127,7 +125,7 @@ def _build_nassit_xlsx(run: dict, employees: list, company: dict) -> bytes:
     rows.extend([
         [],
         [
-            "TOTAL", "", "", "", "",
+            "TOTAL", "", "",
             round(totals["basic"], 2),
             round(totals["employer"], 2),
             round(totals["employee"], 2),
@@ -382,14 +380,22 @@ async def nassit_schedule_xlsx(rid: str, user: dict = Depends(require_feature("n
         )
     emp_map = {employee["id"]: employee for employee in employees}
     missing_nassit_ids = []
+    missing_member_names = []
     for slip in run["slips"]:
         employee = emp_map.get(slip.get("employee_id"), {})
         if not _payroll_identity_value(slip, "employee_nassit_no", employee, "nassit_no"):
             missing_nassit_ids.append(slip.get("employee_name", "Employee"))
-    if missing_nassit_ids:
+        if not _payroll_identity_value(slip, "employee_nassit_member_name", employee, "nassit_member_name"):
+            missing_member_names.append(slip.get("employee_name", "Employee"))
+    if missing_nassit_ids or missing_member_names:
+        missing_fields = []
+        if missing_member_names:
+            missing_fields.append(f"NASSIT member names for {len(missing_member_names)} employee(s)")
+        if missing_nassit_ids:
+            missing_fields.append(f"NASSIT numbers for {len(missing_nassit_ids)} employee(s)")
         raise HTTPException(
             422,
-            f"Complete NASSIT numbers for {len(missing_nassit_ids)} employee(s) and rerun payroll before exporting.",
+            "Complete " + " and ".join(missing_fields) + " and rerun payroll before exporting.",
         )
 
     payload = _build_nassit_xlsx(run, employees, company)
