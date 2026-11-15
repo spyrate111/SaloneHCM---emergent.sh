@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
-import api, { getToken, setToken, clearToken } from "../lib/api";
+import api from "../lib/api";
 
 const AuthCtx = createContext(null);
 
@@ -8,26 +8,28 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const tok = getToken();
-    if (!tok) {
-      setLoading(false);
-      return;
-    }
+    let cancelled = false;
     api
       .get("/auth/me")
-      .then((r) => setUser(r.data))
-      .catch((err) => {
-        console.warn("[Auth] session restore failed:", err?.message || err);
-        clearToken();
+      .then((r) => {
+        if (!cancelled) setUser(r.data);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err?.response?.status !== 401 && err?.response?.status !== 403) {
+          console.warn("[Auth] session restore failed:", err?.message || err);
+        }
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const login = useCallback(async (email, password, totpCode) => {
     const payload = { email, password };
     if (totpCode) payload.totp_code = totpCode;
     const { data } = await api.post("/auth/login", payload);
-    setToken(data.token);
     setUser({
       id: data.id,
       email: data.email,
@@ -44,7 +46,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   const applyAuth = useCallback((data) => {
-    if (data?.token) setToken(data.token);
     setUser({
       id: data.id,
       email: data.email,
@@ -65,7 +66,6 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.warn("[Auth] logout request failed (proceeding to clear local session):", err?.message || err);
     }
-    clearToken();
     setUser(null);
   }, []);
 
