@@ -1,6 +1,7 @@
 """All Pydantic request/response models."""
+from datetime import date
 from typing import Optional, Literal, List, Union, Annotated
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ---------- Auth ----------
@@ -29,6 +30,7 @@ class EmployeeIn(BaseModel):
     department: str
     location: str = "Freetown"
     employment_type: Literal["Full-time", "Part-time", "Contract", "Intern"] = "Full-time"
+    contract_end_date: Optional[str] = None
     basic_salary_sle: float
     allowances_sle: float = 0
     nassit_no: Optional[str] = ""
@@ -39,6 +41,36 @@ class EmployeeIn(BaseModel):
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
     is_manager: bool = False
+
+    @field_validator("contract_end_date")
+    @classmethod
+    def validate_contract_end_date(cls, value: Optional[str]) -> Optional[str]:
+        if value in (None, ""):
+            return None
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("contract_end_date must be a valid YYYY-MM-DD date") from exc
+        if parsed.isoformat() != value:
+            raise ValueError("contract_end_date must be a valid YYYY-MM-DD date")
+        return value
+
+
+class ContractEndDateIn(BaseModel):
+    contract_end_date: Optional[str] = None
+
+    @field_validator("contract_end_date")
+    @classmethod
+    def validate_contract_end_date(cls, value: Optional[str]) -> Optional[str]:
+        if value in (None, ""):
+            return None
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("contract_end_date must be a valid YYYY-MM-DD date") from exc
+        if parsed.isoformat() != value:
+            raise ValueError("contract_end_date must be a valid YYYY-MM-DD date")
+        return value
 
 
 # ---------- Leave ----------

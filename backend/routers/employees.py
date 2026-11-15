@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn
+from models import ContractEndDateIn, EmployeeIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
@@ -30,12 +30,51 @@ async def list_employees(user: dict = Depends(get_current_user)):
 @router.post("")
 async def create_employee(body: EmployeeIn, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "hiring a new employee")
+    if body.contract_end_date and body.hire_date and body.contract_end_date < body.hire_date:
+        raise HTTPException(422, "Contract end date cannot be before the hire date")
     eid = str(uuid.uuid4())
     doc = with_tenant({**body.model_dump(), "id": eid, "created_at": iso(now_utc())}, user)
     await db.employees.insert_one(doc)
     doc.pop("_id", None)
     await audit("create", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return doc
+
+
+@router.patch("/{eid}/contract")
+async def update_contract_end_date(
+    eid: str, body: ContractEndDateIn, user: dict = Depends(require_roles("hr")),
+):
+    emp = await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
+    if not emp:
+        raise HTTPException(404, "Not found")
+    if body.contract_end_date and emp.get("hire_date") and body.contract_end_date < emp["hire_date"]:
+        raise HTTPException(422, "Contract end date cannot be before the hire date")
+
+    old_date = emp.get("contract_end_date")
+    new_date = body.contract_end_date
+    update_filter = {"id": eid, **tenant_filter(user), "contract_end_date": old_date}
+    result = await db.employees.update_one(
+        update_filter,
+        {"$set": {"contract_end_date": new_date, "updated_at": iso(now_utc())}},
+    )
+    if result.matched_count != 1:
+        raise HTTPException(409, "Employee contract changed; refresh the record and try again")
+    if old_date != new_date:
+        await db.contract_expiry_alerts.update_many(
+            {
+                "company_id": user["company_id"], "employee_id": eid,
+                "status": {"$in": ["pending", "processing"]},
+            },
+            {
+                "$set": {"status": "cancelled", "cancelled_at": iso(now_utc())},
+                "$unset": {"claim_token": "", "claim_expires_at": ""},
+            },
+        )
+    await audit(
+        "contract_end_date_updated", f"employees/{eid}", user,
+        {"previous_end_date": old_date, "contract_end_date": new_date},
+    )
+    return await db.employees.find_one({"id": eid, **tenant_filter(user)}, {"_id": 0})
 
 
 @router.get("/{eid}")
@@ -65,20 +104,63 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             await assert_not_cutoff_locked(
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
+    update_doc = body.model_dump()
+    # Older clients omit this field; an explicit null still clears the contract date.
+    if "contract_end_date" not in body.model_fields_set:
+        update_doc.pop("contract_end_date", None)
+    effective_contract_end = update_doc.get(
+        "contract_end_date", (existing or {}).get("contract_end_date"),
+    )
+    if effective_contract_end and body.hire_date and effective_contract_end < body.hire_date:
+        raise HTTPException(422, "Contract end date cannot be before the hire date")
+    contract_date_changed = bool(
+        existing and "contract_end_date" in body.model_fields_set
+        and existing.get("contract_end_date") != update_doc.get("contract_end_date")
+    )
+    employee_inactive = body.status not in ("active", "on_leave")
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
-        {"$set": body.model_dump()},
+        {"$set": update_doc},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
+    if contract_date_changed or employee_inactive:
+        await db.contract_expiry_alerts.update_many(
+            {
+                "company_id": user["company_id"], "employee_id": eid,
+                "status": {"$in": ["pending", "processing"]},
+            },
+            {
+                "$set": {"status": "cancelled", "cancelled_at": iso(now_utc())},
+                "$unset": {"claim_token": "", "claim_expires_at": ""},
+            },
+        )
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
+    if contract_date_changed:
+        await audit(
+            "contract_end_date_updated", f"employees/{eid}", user,
+            {
+                "previous_end_date": (existing or {}).get("contract_end_date"),
+                "contract_end_date": update_doc.get("contract_end_date"),
+            },
+        )
     return e
 
 
 @router.delete("/{eid}")
 async def delete_employee(eid: str, user: dict = Depends(require_roles("hr"))):
     await assert_not_cutoff_locked(user, "terminating/deleting an employee")
+    await db.contract_expiry_alerts.update_many(
+        {
+            "company_id": user["company_id"], "employee_id": eid,
+            "status": {"$in": ["pending", "processing"]},
+        },
+        {
+            "$set": {"status": "cancelled", "cancelled_at": iso(now_utc())},
+            "$unset": {"claim_token": "", "claim_expires_at": ""},
+        },
+    )
     await db.employees.delete_one({"id": eid, **tenant_filter(user)})
     await db.offboardings.delete_many({"employee_id": eid, **tenant_filter(user)})
     await audit("delete", f"employees/{eid}", user)

@@ -145,6 +145,13 @@ def start():
         attach_training_reminders(scheduler)
     except Exception:
         logger.exception("Failed to attach training reminder scheduler")
+
+    try:
+        from contract_expiry_alerts import attach as attach_contract_expiry_alerts
+        attach_contract_expiry_alerts(scheduler)
+    except Exception:
+        logger.exception("Failed to attach contract expiry alert scheduler")
+
     scheduler.start()
     logger.info("Payroll scheduler started (tick every %ss)", TICK_SECONDS)
 
