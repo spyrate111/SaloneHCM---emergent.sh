@@ -36,6 +36,8 @@ class EmployeeIn(BaseModel):
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
     bank_account: Optional[str] = ""
+    mobile_money_provider: Literal["", "orange_money", "afrimoney"] = ""
+    mobile_money_number: Optional[str] = ""
     hire_date: str
     status: Literal["active", "on_leave", "terminated"] = "active"
     manager_id: Optional[str] = None
