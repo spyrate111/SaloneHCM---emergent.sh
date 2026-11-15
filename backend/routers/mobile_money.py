@@ -207,7 +207,7 @@ async def create_mobile_money_batch(
     existing_assignments = await db.mobile_money_assignments.find(
         {"_id": {"$in": assignment_keys}, **scope},
         {"_id": 1, "employee_id": 1, "batch_id": 1, "provider": 1},
-    ).to_list(len(assignment_keys))
+    ).to_list(2000)
     assignment_by_key = {item["_id"]: item for item in existing_assignments}
 
     for line in lines:
@@ -345,7 +345,7 @@ async def approve_mobile_money_batch(
     if batch.get("status") != "draft":
         raise HTTPException(409, "Only a draft wallet batch can be approved.")
     if batch.get("created_by_email") == user.get("email"):
-        raise HTTPException(403, "A different admin must approve the wallet batch.")
+        raise HTTPException(403, "A different payroll user must approve the wallet batch.")
     if not batch.get("lines"):
         raise HTTPException(409, "Add a configured wallet number before approving this batch.")
     result = await db.mobile_money_batches.update_one(
