@@ -34,6 +34,9 @@ class EmployeeIn(BaseModel):
     allowances_sle: float = 0
     nassit_no: Optional[str] = ""
     nassit_member_name: Optional[str] = Field(default="", max_length=180)
+    nassit_member_first_name: Optional[str] = Field(default="", max_length=80)
+    nassit_member_middle_name: Optional[str] = Field(default="", max_length=80)
+    nassit_member_last_name: Optional[str] = Field(default="", max_length=80)
     staff_number: Optional[str] = Field(default="", max_length=64)
     tin: Optional[str] = ""
     bank_name: Optional[str] = "Sierra Leone Commercial Bank"
@@ -47,6 +50,9 @@ class EmployeeIn(BaseModel):
 class EmployeeNassitDetailsIn(BaseModel):
     nassit_no: str = Field(default="", max_length=64)
     nassit_member_name: str = Field(default="", max_length=180)
+    nassit_member_first_name: str = Field(default="", max_length=80)
+    nassit_member_middle_name: str = Field(default="", max_length=80)
+    nassit_member_last_name: str = Field(default="", max_length=80)
 
 
 # ---------- Leave ----------

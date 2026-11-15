@@ -67,7 +67,11 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             )
     updates = body.model_dump()
     # Older clients omit newly added optional fields; preserve saved identity data.
-    for optional_field in ("middle_name", "nassit_member_name", "staff_number"):
+    for optional_field in (
+        "middle_name", "nassit_member_name",
+        "nassit_member_first_name", "nassit_member_middle_name", "nassit_member_last_name",
+        "staff_number",
+    ):
         if optional_field not in body.model_fields_set:
             updates.pop(optional_field, None)
     res = await db.employees.update_one(
@@ -92,6 +96,14 @@ async def update_nassit_details(
     if not employee:
         raise HTTPException(404, "Not found")
     details = body.model_dump()
+    # Older profile clients send only the full SS-card name and number; preserve
+    # separately recorded card-name components when those keys are omitted.
+    for optional_field in (
+        "nassit_no", "nassit_member_name",
+        "nassit_member_first_name", "nassit_member_middle_name", "nassit_member_last_name",
+    ):
+        if optional_field not in body.model_fields_set:
+            details.pop(optional_field, None)
     await db.employees.update_one({"id": eid, **scope}, {"$set": details})
     await audit(
         "employee_nassit_identity_updated",
@@ -100,6 +112,14 @@ async def update_nassit_details(
         {
             "nassit_number_updated": bool(details.get("nassit_no")),
             "member_name_updated": bool(details.get("nassit_member_name")),
+            "member_name_parts_updated": any(
+                key in body.model_fields_set
+                for key in (
+                    "nassit_member_first_name",
+                    "nassit_member_middle_name",
+                    "nassit_member_last_name",
+                )
+            ),
         },
     )
     return await db.employees.find_one({"id": eid, **scope}, {"_id": 0})

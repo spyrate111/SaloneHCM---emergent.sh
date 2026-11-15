@@ -20,7 +20,10 @@ export default function EmployeeDetail() {
   const [savingCs, setSavingCs] = useState(false);
   const [qr, setQr] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
-  const [nassitIdentity, setNassitIdentity] = useState({ nassit_no: "", nassit_member_name: "" });
+  const [nassitIdentity, setNassitIdentity] = useState({
+    nassit_no: "", nassit_member_name: "",
+    nassit_member_first_name: "", nassit_member_middle_name: "", nassit_member_last_name: "",
+  });
   const [savingNassit, setSavingNassit] = useState(false);
   const canEditNassit = ["hr", "admin", "superadmin"].includes(user?.role);
 
@@ -41,6 +44,9 @@ export default function EmployeeDetail() {
     setNassitIdentity({
       nassit_no: r.data.nassit_no || "",
       nassit_member_name: r.data.nassit_member_name || "",
+      nassit_member_first_name: r.data.nassit_member_first_name || "",
+      nassit_member_middle_name: r.data.nassit_member_middle_name || "",
+      nassit_member_last_name: r.data.nassit_member_last_name || "",
     });
     setCs({
       grade_code: r.data.grade_code || "",
@@ -168,7 +174,7 @@ export default function EmployeeDetail() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="font-heading text-lg font-semibold">NASSIT identity</h3>
-                  <p className="text-xs text-[#686D76] mt-1">Enter the member name exactly as it appears on the NASSIT Social Security card.</p>
+                  <p className="text-xs text-[#686D76] mt-1">Enter the full member name and its first, middle, and last parts as printed on the NASSIT Social Security card. Leave middle name blank if the card has none.</p>
                 </div>
                 <button data-testid="nassit-identity-save" onClick={saveNassitIdentity} disabled={savingNassit} className="inline-flex items-center gap-2 bg-[#0A4A1E] hover:bg-[#063514] text-white text-xs px-3 py-2 rounded-md disabled:opacity-50">
                   <Save className="w-3.5 h-3.5" /> {savingNassit ? "Saving…" : "Save"}
@@ -180,8 +186,20 @@ export default function EmployeeDetail() {
                   <input data-testid="nassit-identity-number" value={nassitIdentity.nassit_no} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_no: ev.target.value })} maxLength={64} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Member name on SS card</label>
+                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Full member name on SS card</label>
                   <input data-testid="nassit-identity-name" value={nassitIdentity.nassit_member_name} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_member_name: ev.target.value })} maxLength={180} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">First name on SS card</label>
+                  <input data-testid="nassit-identity-first-name" value={nassitIdentity.nassit_member_first_name} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_member_first_name: ev.target.value })} maxLength={80} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Middle name on SS card</label>
+                  <input data-testid="nassit-identity-middle-name" value={nassitIdentity.nassit_member_middle_name} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_member_middle_name: ev.target.value })} maxLength={80} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#525860] mb-1 uppercase tracking-wider">Last name on SS card</label>
+                  <input data-testid="nassit-identity-last-name" value={nassitIdentity.nassit_member_last_name} onChange={(ev) => setNassitIdentity({ ...nassitIdentity, nassit_member_last_name: ev.target.value })} maxLength={80} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
                 </div>
               </div>
             </div>

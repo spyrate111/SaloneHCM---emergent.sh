@@ -123,7 +123,7 @@ export default function Compliance() {
         <div className="px-6 py-4 border-b border-[#E2DFD6]">
           <h3 className="font-heading text-lg font-semibold">Payroll filing workpapers</h3>
           <p className="text-xs text-[#686D76] mt-0.5 max-w-4xl">
-            The NRA export is a preparation workpaper; download the current PAYE workbook for ITAS. The NASSIT schedule includes the published employer and employee fields and should accompany the SS4A payment advice form. Complete its method-of-payment field before submission; this is not an authority-approved upload template.
+            The NRA export is a preparation workpaper; download the current PAYE workbook for ITAS. The NASSIT Excel schedule supports the SS4A payment advice form. The optional electronic CSV follows the field order shown in NASSIT&rsquo;s Employer&rsquo;s Guide, but current intake acceptance must be confirmed with NASSIT. Public guidance differs on the contribution base, so confirm the applicable base before remittance.
           </p>
           <div className="flex flex-wrap gap-4 mt-2 text-xs">
             <a href="https://mail.nra.gov.sl/document/paye-return-form" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
@@ -131,6 +131,9 @@ export default function Compliance() {
             </a>
             <a href="https://www.nassit.org.sl/images/NASSIT_Reports/My_NASSIT_Companion.pdf" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
               NASSIT contribution schedule guide
+            </a>
+            <a href="https://www.nassit.org.sl/images/NASSIT_Reports/employer.pdf" target="_blank" rel="noreferrer" className="text-[#26547C] underline">
+              NASSIT Employer&rsquo;s Guide
             </a>
           </div>
         </div>
@@ -193,6 +196,18 @@ export default function Compliance() {
                           className="inline-flex items-center gap-1 text-xs bg-[#17A035] hover:bg-[#148231] text-white px-2.5 py-1.5 rounded"
                         >
                           <Download className="w-3.5 h-3.5" /> NASSIT Excel
+                        </button>
+                        <button
+                          data-testid={`export-nassit-electronic-${r.run_id}`}
+                          disabled={busy === `NASSIT-Electronic-Schedule-${r.period}.csv`}
+                          onClick={() => downloadBlob(
+                            `/compliance/nassit-electronic.csv/${r.run_id}`,
+                            `NASSIT-Electronic-Schedule-${r.period}.csv`,
+                          )}
+                          className="inline-flex items-center gap-1 text-xs bg-white border border-[#17A035] text-[#148231] hover:bg-[#E4F7E7] px-2.5 py-1.5 rounded"
+                          title="CSV following the electronic schedule field order in NASSIT's Employer's Guide"
+                        >
+                          <Download className="w-3.5 h-3.5" /> NASSIT electronic CSV
                         </button>
                         {!r.nra_filed && canManageFilings && (
                           <button

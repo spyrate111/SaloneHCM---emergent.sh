@@ -466,6 +466,110 @@ async def nassit_schedule_csv(rid: str, user: dict = Depends(require_feature("nr
     )
 
 
+@router.get("/nassit-electronic.csv/{rid}")
+async def nassit_electronic_csv(rid: str, user: dict = Depends(require_feature("nra_export"))):
+    """Electronic schedule workpaper following the field order in NASSIT's Employer's Guide."""
+    if not can_role(user, "payroll", "auditor"):
+        raise HTTPException(403, "Payroll, auditor or admin only")
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
+        raise HTTPException(404, "Run not found")
+    _require_completed_run(run)
+    employees = await _employees_for_payroll_run(run, user)
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+    if not company.get("name") or not company.get("nassit_employer"):
+        raise HTTPException(
+            422,
+            "Complete the establishment name and NASSIT employer registration number before exporting.",
+        )
+    try:
+        period_code = datetime.strptime(run.get("period", ""), "%Y-%m").strftime("%Y%m")
+    except (TypeError, ValueError):
+        raise HTTPException(422, "Payroll period must use YYYY-MM before exporting the NASSIT schedule.")
+
+    emp_map = {employee["id"]: employee for employee in employees}
+    entries = []
+    missing_member_names = []
+    missing_nassit_numbers = []
+    missing_name_parts = []
+    mismatched_card_names = []
+    for slip in run["slips"]:
+        employee = emp_map.get(slip.get("employee_id"), {})
+        full_name = _payroll_identity_value(
+            slip, "employee_nassit_member_name", employee, "nassit_member_name",
+        )
+        nassit_no = _payroll_identity_value(slip, "employee_nassit_no", employee, "nassit_no")
+        first_name = _payroll_identity_value(
+            slip, "employee_nassit_member_first_name", employee, "nassit_member_first_name",
+        )
+        middle_name = _payroll_identity_value(
+            slip, "employee_nassit_member_middle_name", employee, "nassit_member_middle_name",
+        )
+        last_name = _payroll_identity_value(
+            slip, "employee_nassit_member_last_name", employee, "nassit_member_last_name",
+        )
+        staff_number = _payroll_identity_value(
+            slip, "employee_staff_number", employee, "staff_number",
+        )
+        employee_label = slip.get("employee_name", "Employee")
+        if not full_name:
+            missing_member_names.append(employee_label)
+        if not nassit_no:
+            missing_nassit_numbers.append(employee_label)
+        if not first_name or not last_name:
+            missing_name_parts.append(employee_label)
+        elif full_name:
+            split_name = " ".join(part for part in (first_name, middle_name, last_name) if part)
+            if " ".join(split_name.split()).casefold() != " ".join(full_name.split()).casefold():
+                mismatched_card_names.append(employee_label)
+        entries.append((nassit_no, last_name, first_name, middle_name, staff_number, float(
+            slip.get("nassit_employee", 0) or 0
+        ) + float(slip.get("nassit_employer", 0) or 0)))
+
+    if missing_member_names or missing_nassit_numbers or missing_name_parts or mismatched_card_names:
+        missing_fields = []
+        if missing_member_names:
+            missing_fields.append(f"full SS-card names for {len(missing_member_names)} employee(s)")
+        if missing_nassit_numbers:
+            missing_fields.append(f"NASSIT numbers for {len(missing_nassit_numbers)} employee(s)")
+        if missing_name_parts:
+            missing_fields.append(f"first and last SS-card name components for {len(missing_name_parts)} employee(s)")
+        if mismatched_card_names:
+            missing_fields.append(f"SS-card name components matching the saved full name for {len(mismatched_card_names)} employee(s)")
+        raise HTTPException(
+            422,
+            "Complete " + "; ".join(missing_fields)
+            + " on employee profiles and rerun payroll before exporting.",
+        )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "ER Number", "Establishment Name", "Social Security Number",
+        "Last Name of Employee", "First Name", "Middle Name", "Period",
+        "Social Security Contribution (15%)", "Staff Number",
+    ])
+    for nassit_no, last_name, first_name, middle_name, staff_number, contribution in entries:
+        writer.writerow([
+            company["nassit_employer"], company["name"], nassit_no,
+            last_name, first_name, middle_name, period_code, f"{contribution:.2f}", staff_number,
+        ])
+    await audit(
+        "nassit_electronic_schedule_export",
+        f"payroll_runs/{rid}",
+        user,
+        {"period": run["period"], "rows": len(run["slips"])},
+    )
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="NASSIT-Electronic-Schedule-{run["period"]}.csv"'
+        },
+    )
+
+
 class FilingReferenceIn(BaseModel):
     nra_reference: str = Field(..., min_length=1, max_length=120)
 
