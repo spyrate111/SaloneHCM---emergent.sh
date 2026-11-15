@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr
 
-from core import (db, require_roles, audit, tenant_filter, with_tenant,
+from core import (db, require_roles, require_admin, audit, tenant_filter, with_tenant,
                   now_utc, iso)
 from storage import put_object, get_object, APP_NAME
 from routers.payroll_rails import assert_not_cutoff_locked
@@ -150,6 +150,53 @@ async def create_employee_from_application(aid: str, body: HireIn, user: dict = 
     await audit("hired_from_application", f"employees/{eid}", user,
                 {"application_id": aid, "name": app_doc["name"]})
     return emp
+
+
+class InterviewIn(BaseModel):
+    date: str  # YYYY-MM-DD
+    time: str  # HH:MM
+    location: str = ""
+
+
+@router.put("/applications/{aid}/interview")
+async def schedule_interview(aid: str, body: InterviewIn, bg: BackgroundTasks,
+                             user: dict = Depends(_HR)):
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        start = _dt.strptime(f"{body.date} {body.time}", "%Y-%m-%d %H:%M").replace(tzinfo=_tz.utc)
+    except ValueError:
+        raise HTTPException(422, "date must be YYYY-MM-DD and time must be HH:MM")
+    if start <= now_utc():
+        raise HTTPException(422, "Interview must be scheduled in the future")
+    app_doc = await db.job_applications.find_one({"id": aid, **tenant_filter(user)}, {"_id": 0})
+    if not app_doc:
+        raise HTTPException(404, "Application not found")
+    interview = {
+        "date": body.date,
+        "time": body.time,
+        "location": body.location.strip()[:300],
+        "starts_at": start.isoformat(),
+        "scheduled_by": user.get("name") or user["email"],
+        "scheduled_at": iso(now_utc()),
+        "reminder_sent": False,
+    }
+    await db.job_applications.update_one({"id": aid}, {"$set": {"interview": interview}})
+    await audit("interview_scheduled", f"job_applications/{aid}", user,
+                {"name": app_doc["name"], "date": body.date, "time": body.time})
+    company = await db.companies.find_one(
+        {"id": user["company_id"]}, {"_id": 0, "name": 1}) or {}
+    bg.add_task(email_service.send_interview_scheduled,
+                app_doc["email"], app_doc["name"], app_doc["vacancy_title"],
+                body.date, body.time, interview["location"],
+                company.get("name", "SaloneHCM"), user["company_id"])
+    return {"ok": True, "interview": interview}
+
+
+@router.post("/run-interview-reminders")
+async def trigger_interview_reminders(user: dict = Depends(require_admin)):
+    """Manual/internal trigger for the 24h interview reminder sweep."""
+    import reminders
+    return {"ok": True, "sent": await reminders.run_interview_reminders()}
 
 
 @router.get("/applications/{aid}/cv")

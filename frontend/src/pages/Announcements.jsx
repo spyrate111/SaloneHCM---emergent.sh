@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { toast } from "sonner";
-import { Megaphone, Plus, Trash2, AlertTriangle, Archive, Eye, Users } from "lucide-react";
+import { Megaphone, Plus, Trash2, AlertTriangle, Archive, Eye, Users, BellRing } from "lucide-react";
 
 export default function Announcements() {
   const [rows, setRows] = useState([]);
@@ -42,6 +42,13 @@ export default function Announcements() {
               data-testid={`announcement-readcount-${a.id}`}>
               <Eye className="w-3 h-3" /> {a.read_count ?? 0}/{a.total_staff ?? "—"} read
             </span>
+            {(a.reminder_count || 0) > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-[#8B6A14] bg-[#F6EDD8] px-2 py-0.5 rounded-full"
+                title={a.reminder_last_at ? `Last reminder ${a.reminder_last_at.slice(0, 10)}` : ""}
+                data-testid={`announcement-reminder-status-${a.id}`}>
+                <BellRing className="w-3 h-3" /> Reminder sent · {a.reminder_count}
+              </span>
+            )}
           </div>
           <p className="text-sm text-[#525860] mt-1 whitespace-pre-wrap">{a.body}</p>
           <div className="text-[11px] text-[#8A8F96] mt-1">
@@ -118,6 +125,13 @@ function UnreadList({ announcement }) {
       {open && (
         <div className="mt-2 bg-[#F7F6F2] border border-[#E2DFD6] rounded-md p-3"
           data-testid={`announcement-unread-list-${announcement.id}`}>
+          {(announcement.reminder_count || 0) > 0 && (
+            <div className="text-[11px] text-[#8B6A14] mb-2 inline-flex items-center gap-1.5">
+              <BellRing className="w-3 h-3" />
+              Reminder push sent to {announcement.reminder_count} staff
+              {announcement.reminder_last_at ? ` · last on ${announcement.reminder_last_at.slice(0, 10)}` : ""}
+            </div>
+          )}
           {list === null ? (
             <div className="text-xs text-[#686D76]">Loading…</div>
           ) : list.length === 0 ? (

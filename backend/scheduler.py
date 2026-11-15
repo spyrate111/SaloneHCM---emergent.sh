@@ -133,6 +133,12 @@ def start():
         attach_nudges(scheduler)
     except Exception:
         logger.exception("Failed to attach voucher nudge scheduler")
+    # Attach 24h reminder sweeps — interview emails + urgent announcement push nudges.
+    try:
+        from reminders import attach as attach_reminders
+        attach_reminders(scheduler)
+    except Exception:
+        logger.exception("Failed to attach reminder sweeps")
 
     try:
         from ooz_alerts import attach as attach_ooz

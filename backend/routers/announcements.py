@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from core import (db, get_current_user, require_roles, can_role, audit,
+from core import (db, get_current_user, require_roles, require_admin, can_role, audit,
                   tenant_filter, with_tenant, now_utc, iso)
 import push_service
 
@@ -112,6 +112,13 @@ async def mark_seen(body: SeenIn, user: dict = Depends(get_current_user)):
             }},
             upsert=True)
     return {"ok": True, "marked": len(valid)}
+
+
+@router.post("/run-reminders")
+async def trigger_announcement_reminders(user: dict = Depends(require_admin)):
+    """Manual/internal trigger for the 24h urgent-announcement reminder sweep."""
+    import reminders
+    return {"ok": True, "sent": await reminders.run_announcement_reminders()}
 
 
 @router.get("/{aid}/unread")

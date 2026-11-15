@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { toast } from "sonner";
-import { Briefcase, Plus, Link2, Download, UserPlus } from "lucide-react";
+import { Briefcase, Plus, Link2, Download, UserPlus, CalendarClock } from "lucide-react";
 
 const STAGES = ["applied", "shortlisted", "interview", "offer", "hired", "rejected"];
 const STAGE_CLS = {
@@ -16,6 +16,7 @@ export default function Recruitment() {
   const [apps, setApps] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [hireApp, setHireApp] = useState(null);
+  const [interviewApp, setInterviewApp] = useState(null);
 
   const load = useCallback(() => {
     api.get("/recruitment/vacancies").then((r) => setVacancies(r.data)).catch(() => {});
@@ -120,6 +121,15 @@ export default function Recruitment() {
                     <div className="text-sm font-semibold">{a.name}</div>
                     <div className="text-xs text-[#686D76]">{a.email}{a.phone ? ` · ${a.phone}` : ""}</div>
                     {a.cover_note && <div className="text-xs text-[#8A8F96] mt-1 max-w-lg truncate" title={a.cover_note}>{a.cover_note}</div>}
+                    {a.interview && (
+                      <div className="text-[11px] text-[#8B6A14] mt-1 inline-flex items-center gap-1"
+                        data-testid={`application-interview-chip-${a.id}`}
+                        title={a.interview.location || ""}>
+                        <CalendarClock className="w-3 h-3" />
+                        Interview {a.interview.date} at {a.interview.time}
+                        {a.interview.location ? ` · ${a.interview.location.length > 40 ? `${a.interview.location.slice(0, 40)}…` : a.interview.location}` : ""}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {a.cv && (
@@ -127,6 +137,11 @@ export default function Recruitment() {
                         <Download className="w-4 h-4" />
                       </button>
                     )}
+                    <button onClick={() => setInterviewApp(a)} className="p-1.5 text-[#8B6A14]"
+                      title={a.interview ? "Reschedule interview" : "Schedule interview"}
+                      data-testid={`application-interview-btn-${a.id}`}>
+                      <CalendarClock className="w-4 h-4" />
+                    </button>
                     {a.hired_employee_id ? (
                       <span className="text-[10px] uppercase px-2 py-1 rounded-full bg-[#E4F7E7] text-[#0A4A1E]">Employee created</span>
                     ) : a.stage === "hired" ? (
@@ -152,6 +167,14 @@ export default function Recruitment() {
         <HireModal app={hireApp} vacancy={selected}
           onClose={() => setHireApp(null)}
           onHired={() => { setHireApp(null); openVacancy(selected); }} />
+      )}
+      {interviewApp && (
+        <InterviewModal app={interviewApp}
+          onClose={() => setInterviewApp(null)}
+          onSaved={(interview) => {
+            setApps((prev) => prev.map((x) => (x.id === interviewApp.id ? { ...x, interview } : x)));
+            setInterviewApp(null);
+          }} />
       )}
     </div>
   );
@@ -185,6 +208,58 @@ function VacancyForm({ onClose, onSaved }) {
         <button type="button" onClick={onClose} className="border border-[#E2DFD6] text-sm px-5 py-2.5 rounded-md">Cancel</button>
       </div>
     </form>
+  );
+}
+
+function InterviewModal({ app, onClose, onSaved }) {
+  const [f, setF] = useState({
+    date: app.interview?.date || "",
+    time: app.interview?.time || "",
+    location: app.interview?.location || "",
+  });
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { data } = await api.put(`/recruitment/applications/${app.id}/interview`, f);
+      toast.success("Interview scheduled — applicant emailed");
+      onSaved(data.interview);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not schedule interview");
+    } finally { setBusy(false); }
+  };
+  const inp = "mt-1 w-full border border-[#E2DFD6] rounded-md px-3 py-2 text-sm";
+  return (
+    <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4" data-testid="interview-modal">
+      <form onSubmit={submit} className="bg-white rounded-xl p-6 w-full max-w-md space-y-3">
+        <div className="font-heading text-lg font-semibold">
+          {app.interview ? "Reschedule interview" : "Schedule interview"}
+        </div>
+        <p className="text-xs text-[#686D76]">
+          {app.name} ({app.email}) will get the details by email, plus a reminder 24h before.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-[#525860] block">Date
+            <input required type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })}
+              className={inp} data-testid="interview-form-date" /></label>
+          <label className="text-xs text-[#525860] block">Time
+            <input required type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })}
+              className={inp} data-testid="interview-form-time" /></label>
+        </div>
+        <label className="text-xs text-[#525860] block">Location or video call link
+          <input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })}
+            placeholder="e.g. HQ Freetown, Room 2 — or https://meet…"
+            className={inp} data-testid="interview-form-location" /></label>
+        <div className="flex gap-2 pt-1">
+          <button disabled={busy} className="bg-[#0A4A1E] text-white text-sm px-5 py-2.5 rounded-md flex-1 disabled:opacity-50"
+            data-testid="interview-form-submit">
+            {busy ? "Scheduling…" : "Schedule & email applicant"}
+          </button>
+          <button type="button" onClick={onClose} className="border border-[#E2DFD6] text-sm px-4 py-2.5 rounded-md">Cancel</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

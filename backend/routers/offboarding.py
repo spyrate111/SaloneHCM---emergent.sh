@@ -1,7 +1,10 @@
 """Offboarding workflow — exit checklist with role-gated sign-offs, account deactivation on completion."""
+import csv
+import io
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from core import (db, get_current_user, require_roles, can_role, is_admin, audit,
@@ -28,6 +31,50 @@ def _may_complete(user: dict, item: dict) -> bool:
 async def list_offboardings(user: dict = Depends(require_roles("hr", "payroll", "auditor"))):
     return await db.offboardings.find(
         tenant_filter(user), {"_id": 0}).sort("started_at", -1).to_list(500)
+
+
+async def _leavers_rows(month: str, user: dict) -> list:
+    if len(month) != 7 or month[4] != "-" or not (month[:4] + month[5:]).isdigit():
+        raise HTTPException(422, "month must be YYYY-MM")
+    obs = await db.offboardings.find(
+        {**tenant_filter(user), "status": "completed",
+         "completed_at": {"$regex": f"^{month}"}},
+        {"_id": 0}).sort("completed_at", 1).to_list(1000)
+    eids = [o["employee_id"] for o in obs]
+    emps = {e["id"]: e async for e in db.employees.find(
+        {"id": {"$in": eids}}, {"_id": 0, "id": 1, "job_title": 1, "department": 1})}
+    rows = []
+    for o in obs:
+        e = emps.get(o["employee_id"], {})
+        rows.append({
+            "employee_id": o["employee_id"],
+            "name": o["employee_name"],
+            "job_title": e.get("job_title", ""),
+            "department": e.get("department", ""),
+            "leaving_date": (o.get("completed_at") or "")[:10],
+            "leaving_reason": (o.get("exit_interview") or {}).get("leaving_reason", ""),
+        })
+    return rows
+
+
+@router.get("/report")
+async def leavers_report(month: str, user: dict = Depends(require_roles("hr"))):
+    """Monthly leavers report — employees whose offboarding completed in the month."""
+    rows = await _leavers_rows(month, user)
+    return {"month": month, "count": len(rows), "rows": rows}
+
+
+@router.get("/report.csv")
+async def leavers_report_csv(month: str, user: dict = Depends(require_roles("hr"))):
+    rows = await _leavers_rows(month, user)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Name", "Job title", "Department", "Leaving date", "Leaving reason"])
+    for r in rows:
+        w.writerow([r["name"], r["job_title"], r["department"],
+                    r["leaving_date"], r["leaving_reason"]])
+    return Response(buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": f'attachment; filename="leavers-{month}.csv"'})
 
 
 @router.get("/employee/{eid}")

@@ -306,3 +306,81 @@ async def send_application_stage_update(
     await _log("application_stage", to, subject, res,
                {"stage": stage, "company_id": company_id, "job_title": job_title})
     return res
+
+
+def _interview_details_block(date: str, time: str, location: str) -> str:
+    import html as _html
+    loc = _html.escape(location or "")
+    loc_row = ""
+    if loc:
+        label = "Video call link" if loc.startswith("http") else "Location"
+        val = f'<a href="{loc}">{loc}</a>' if loc.startswith("http") else loc
+        loc_row = f'<div style="margin-top:6px;"><b>{label}:</b> {val}</div>'
+    return f"""
+      <div style="background:#F7F6F2;border:1px solid #E2DFD6;border-radius:8px;padding:14px 16px;margin:14px 0;font-size:13px;color:#1A1C1E;">
+        <div><b>Date:</b> {date}</div>
+        <div style="margin-top:6px;"><b>Time:</b> {time}</div>
+        {loc_row}
+      </div>"""
+
+
+async def send_interview_scheduled(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    date: str,
+    time: str,
+    location: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """Send interview details to an applicant when HR schedules the interview."""
+    import html as _html
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
+    html = _wrap_html(
+        title="Your interview is scheduled",
+        body_html=f"""
+          <p>Hi {name or 'there'},</p>
+          <p>Your interview for <strong>{job}</strong> at <strong>{comp}</strong> has been scheduled. Here are the details:</p>
+          {_interview_details_block(date, time, location)}
+          <p style="color:#525860;font-size:12px;">If you can't make this time, please reply to HR as soon as possible. You'll also receive a reminder 24 hours before the interview.</p>
+        """,
+    )
+    subject = f"[{company_name}] Interview scheduled — {job_title} on {date} at {time}"
+    res = await _send(to, subject, html)
+    await _log("interview_scheduled", to, subject, res,
+               {"company_id": company_id, "job_title": job_title, "date": date, "time": time})
+    return res
+
+
+async def send_interview_reminder(
+    to: str,
+    applicant_name: str,
+    job_title: str,
+    date: str,
+    time: str,
+    location: str,
+    company_name: str,
+    company_id: Optional[str] = None,
+) -> dict:
+    """24-hours-before reminder for a scheduled interview."""
+    import html as _html
+    name = _html.escape(applicant_name or "")
+    job = _html.escape(job_title or "")
+    comp = _html.escape(company_name or "")
+    html = _wrap_html(
+        title="Interview tomorrow — reminder",
+        body_html=f"""
+          <p>Hi {name or 'there'},</p>
+          <p>This is a friendly reminder that your interview for <strong>{job}</strong> at <strong>{comp}</strong> is coming up within the next 24 hours:</p>
+          {_interview_details_block(date, time, location)}
+          <p style="color:#525860;font-size:12px;">Good luck — we look forward to meeting you.</p>
+        """,
+    )
+    subject = f"[{company_name}] Interview reminder — {job_title} on {date} at {time}"
+    res = await _send(to, subject, html)
+    await _log("interview_reminder", to, subject, res,
+               {"company_id": company_id, "job_title": job_title, "date": date, "time": time})
+    return res
