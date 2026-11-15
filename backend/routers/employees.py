@@ -10,21 +10,36 @@ from core import require_roles
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
+def _visible_employee(employee: dict, user: dict) -> dict:
+    """Hide wallet destinations from roles without HR/payroll need."""
+    if (
+        employee
+        and employee.get("id") != user.get("employee_id")
+        and not can_role(user, "hr", "payroll")
+    ):
+        employee.pop("mobile_money_provider", None)
+        employee.pop("mobile_money_number", None)
+    return employee
+
+
 @router.get("")
 async def list_employees(user: dict = Depends(get_current_user)):
     """HR/payroll/admin/auditor: full register. Manager: self + direct reports.
     Employee: own record only."""
     tf = tenant_filter(user)
     if can_role(user, "hr", "payroll", "auditor"):
-        return await db.employees.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
+        rows = await db.employees.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
+        return [_visible_employee(row, user) for row in rows]
     my_eid = user.get("employee_id")
     if not my_eid:
         return []
     if user.get("role") == "manager":
-        return await db.employees.find(
+        rows = await db.employees.find(
             {**tf, "$or": [{"id": my_eid}, {"manager_id": my_eid}]},
             {"_id": 0}).sort("created_at", -1).to_list(2000)
-    return await db.employees.find({**tf, "id": my_eid}, {"_id": 0}).to_list(1)
+        return [_visible_employee(row, user) for row in rows]
+    rows = await db.employees.find({**tf, "id": my_eid}, {"_id": 0}).to_list(1)
+    return [_visible_employee(row, user) for row in rows]
 
 
 @router.post("")
@@ -49,7 +64,7 @@ async def get_employee(eid: str, user: dict = Depends(get_current_user)):
         is_report = user.get("role") == "manager" and e.get("manager_id") == my_eid
         if not (is_own or is_report):
             raise HTTPException(403, "You may only view your own record")
-    return e
+    return _visible_employee(e, user)
 
 
 @router.put("/{eid}")
