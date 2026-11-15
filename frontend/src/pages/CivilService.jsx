@@ -475,104 +475,201 @@ function BudgetCodesTab() {
 function ActingsTab() {
   const [actings, setActings] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [grades, setGrades] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ employee_id: "", acting_role_title: "", monthly_allowance_sle: 0, start_date: new Date().toISOString().split("T")[0], end_date: "" });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    employee_id: "",
+    acting_role_title: "",
+    acting_grade_code: "",
+    allowance_mode: "flat",
+    monthly_allowance_sle: "",
+    percentage: "",
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: "",
+  });
+
+  const blankForm = () => ({
+    employee_id: "",
+    acting_role_title: "",
+    acting_grade_code: "",
+    allowance_mode: "flat",
+    monthly_allowance_sle: "",
+    percentage: "",
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: "",
+  });
 
   const load = useCallback(async () => {
-    const [a, e] = await Promise.all([api.get("/civil-service/actings"), api.get("/employees")]);
-    setActings(a.data);
-    setEmployees(e.data);
+    setLoading(true);
+    try {
+      const [actingResponse, employeeResponse, gradeResponse] = await Promise.all([
+        api.get("/civil-service/actings"),
+        api.get("/employees"),
+        api.get("/civil-service/grades"),
+      ]);
+      setActings(actingResponse.data);
+      setEmployees(employeeResponse.data);
+      setGrades(gradeResponse.data);
+    } catch {
+      toast.error("Could not load acting allowances");
+    } finally {
+      setLoading(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const submit = async (event) => {
+    event.preventDefault();
+    if (form.end_date && form.end_date < form.start_date) {
+      toast.error("End date must be on or after start date");
+      return;
+    }
+    setBusy(true);
     try {
-      const payload = { ...form, monthly_allowance_sle: Number(form.monthly_allowance_sle) };
-      if (!payload.end_date) delete payload.end_date;
+      const payload = {
+        employee_id: form.employee_id,
+        acting_role_title: form.acting_role_title.trim(),
+        acting_grade_code: form.acting_grade_code,
+        monthly_allowance_sle: form.allowance_mode === "flat" ? Number(form.monthly_allowance_sle) : null,
+        pct_of_basic: form.allowance_mode === "percentage" ? Number(form.percentage) / 100 : null,
+        start_date: form.start_date,
+        end_date: form.end_date || null,
+      };
       await api.post("/civil-service/actings", payload);
-      toast.success("Acting role created");
+      toast.success("Acting assignment created");
       setOpen(false);
-      setForm({ employee_id: "", acting_role_title: "", monthly_allowance_sle: 0, start_date: new Date().toISOString().split("T")[0], end_date: "" });
-      load();
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Could not create");
+      setForm(blankForm());
+      await load();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not create acting assignment");
+    } finally {
+      setBusy(false);
     }
   };
 
   const remove = async (aid) => {
     if (!window.confirm("Delete this acting allowance?")) return;
-    await api.delete(`/civil-service/actings/${aid}`);
-    toast.success("Deleted"); load();
+    try {
+      await api.delete("/civil-service/actings/" + aid);
+      toast.success("Acting allowance deleted");
+      await load();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not delete acting allowance");
+    }
   };
 
   const today = new Date().toISOString().split("T")[0];
-  const isActive = (a) => a.start_date <= today && (!a.end_date || a.end_date >= today);
+  const isExpired = (acting) => Boolean(acting.end_date && acting.end_date < today);
+  const isActive = (acting) => acting.start_date <= today && (!acting.end_date || acting.end_date >= today);
+  const statusLabel = (acting) => isExpired(acting) ? "Expired" : isActive(acting) ? "Active" : "Scheduled";
+  const statusClass = (acting) => isExpired(acting)
+    ? "bg-[#FDEBE7] text-[#9B2C1F]"
+    : isActive(acting) ? "bg-[#E4F7E7] text-[#17A035]" : "bg-[#EBE8E0] text-[#525860]";
+  const selectedEmployee = employees.find((employee) => employee.id === form.employee_id);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-heading text-xl font-semibold">Acting allowances</h2>
-          <p className="text-xs text-[#686D76] mt-0.5">Temporary acting-in-role allowances automatically appear on payslips during the active period.</p>
+          <p className="text-xs text-[#686D76] mt-0.5">Temporary acting assignments add the configured allowance to payslips during the active period.</p>
         </div>
         <button data-testid="acting-new" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 bg-[#D1603D] hover:bg-[#B84F2F] text-white text-sm px-4 py-2 rounded-md">
           <Plus className="w-4 h-4" /> New acting
         </button>
       </div>
-      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-hidden">
+      <div className="bg-white border border-[#E2DFD6] rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-[#F7F6F2]">
-            <tr>{["Employee", "Acting role", "Monthly allowance", "Start", "End", "Status", ""].map((h) => (
-              <th key={h} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{h}</th>
+            <tr>{["Employee", "Acting grade", "Acting role", "Allowance", "Start", "End", "Status", ""].map((heading) => (
+              <th key={heading} className="text-left text-[10px] uppercase tracking-wider text-[#525860] py-3 px-4 font-medium">{heading}</th>
             ))}</tr>
           </thead>
           <tbody>
-            {actings.map((a) => (
-              <tr key={a.id} className="border-t border-[#E2DFD6]" data-testid={`acting-row-${a.id}`}>
-                <td className="py-3 px-4 font-medium">{a.employee_name}</td>
-                <td className="py-3 px-4 text-[#525860]">{a.acting_role_title}</td>
-                <td className="py-3 px-4 font-data">{fmtSLE(a.monthly_allowance_sle)}</td>
-                <td className="py-3 px-4 font-data">{a.start_date}</td>
-                <td className="py-3 px-4 font-data">{a.end_date || <span className="text-[#A1A5AB]">open</span>}</td>
+            {actings.map((acting) => (
+              <tr
+                key={acting.id}
+                className={"border-t border-[#E2DFD6] " + (isExpired(acting) ? "bg-[#FEF7F5]" : "")}
+                data-testid={"acting-row-" + acting.id}
+              >
+                <td className="py-3 px-4 font-medium">{acting.employee_name}</td>
+                <td className="py-3 px-4 font-data">{acting.acting_grade_code || "—"}</td>
+                <td className="py-3 px-4 text-[#525860]">{acting.acting_role_title}</td>
+                <td className="py-3 px-4 font-data">
+                  {acting.pct_of_basic != null
+                    ? (Number(acting.pct_of_basic) * 100) + "% of basic pay"
+                    : fmtSLE(acting.monthly_allowance_sle)}
+                </td>
+                <td className="py-3 px-4 font-data">{acting.start_date}</td>
+                <td className="py-3 px-4 font-data">{acting.end_date || <span className="text-[#A1A5AB]">open</span>}</td>
                 <td className="py-3 px-4">
-                  <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${isActive(a) ? "bg-[#E4F7E7] text-[#17A035]" : "bg-[#EBE8E0] text-[#525860]"}`}>{isActive(a) ? "Active" : "Inactive"}</span>
+                  <span className={"text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full " + statusClass(acting)}>
+                    {statusLabel(acting)}
+                  </span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button onClick={() => remove(a.id)} className="text-xs text-[#3A7CB8] hover:underline"><Trash2 className="w-3.5 h-3.5 inline" /></button>
+                  <button onClick={() => remove(acting.id)} className="text-xs text-[#3A7CB8] hover:underline" aria-label={"Delete acting assignment for " + acting.employee_name}>
+                    <Trash2 className="w-3.5 h-3.5 inline" />
+                  </button>
                 </td>
               </tr>
             ))}
-            {!actings.length && <tr><td colSpan={7} className="py-12 text-center text-sm text-[#686D76]">No acting allowances configured.</td></tr>}
+            {!loading && !actings.length && <tr><td colSpan={8} className="py-12 text-center text-sm text-[#686D76]">No acting allowances configured.</td></tr>}
+            {loading && <tr><td colSpan={8} className="py-12 text-center text-sm text-[#686D76]">Loading acting allowances…</td></tr>}
           </tbody>
         </table>
       </div>
       {open && (
-        <Modal title="New acting allowance" onClose={() => setOpen(false)}>
+        <Modal title="New acting allowance" onClose={() => !busy && setOpen(false)}>
           <form onSubmit={submit} className="space-y-3">
             <Field label="Employee">
-              <select data-testid="acting-employee" required value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+              <select data-testid="acting-employee" required value={form.employee_id} onChange={(event) => setForm({ ...form, employee_id: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
                 <option value="">— Select —</option>
-                {employees.map((em) => <option key={em.id} value={em.id}>{em.first_name} {em.last_name} · {em.job_title}</option>)}
+                {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.first_name} {employee.last_name} · {employee.job_title}</option>)}
               </select>
             </Field>
             <Field label="Acting role title">
-              <input data-testid="acting-role" required value={form.acting_role_title} onChange={(e) => setForm({ ...form, acting_role_title: e.target.value })} placeholder="e.g. Acting Director General" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
+              <input data-testid="acting-role" required value={form.acting_role_title} onChange={(event) => setForm({ ...form, acting_role_title: event.target.value })} placeholder="e.g. Acting Director General" className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm" />
             </Field>
-            <Field label="Monthly allowance (SLE)">
-              <input data-testid="acting-amount" required type="number" min="0" step="50" value={form.monthly_allowance_sle} onChange={(e) => setForm({ ...form, monthly_allowance_sle: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+            <Field label="Acting grade">
+              <select data-testid="acting-grade" required value={form.acting_grade_code} onChange={(event) => setForm({ ...form, acting_grade_code: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                <option value="">— Select grade —</option>
+                {grades.map((grade) => <option key={grade.code} value={grade.code}>{grade.code} · {grade.name}</option>)}
+              </select>
             </Field>
+            <Field label="Allowance calculation">
+              <select data-testid="acting-allowance-mode" value={form.allowance_mode} onChange={(event) => setForm({ ...form, allowance_mode: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm">
+                <option value="flat">Fixed monthly amount (SLE)</option>
+                <option value="percentage">Percentage of current basic pay</option>
+              </select>
+            </Field>
+            {form.allowance_mode === "flat" ? (
+              <Field label="Monthly allowance (SLE)">
+                <input data-testid="acting-amount" required type="number" min="0" step="0.01" value={form.monthly_allowance_sle} onChange={(event) => setForm({ ...form, monthly_allowance_sle: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+              </Field>
+            ) : (
+              <div>
+                <Field label="Percentage of current basic salary">
+                  <input data-testid="acting-percentage" required type="number" min="0" max="200" step="0.01" value={form.percentage} onChange={(event) => setForm({ ...form, percentage: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                </Field>
+                {selectedEmployee && <p className="text-xs text-[#686D76] mt-1">Based on current basic pay of {fmtSLE(selectedEmployee.basic_salary_sle)} per month.</p>}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Start date">
-                <input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                <input data-testid="acting-start-date" required type="date" value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
               </Field>
               <Field label="End date (optional)">
-                <input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
+                <input data-testid="acting-end-date" type="date" min={form.start_date} value={form.end_date} onChange={(event) => setForm({ ...form, end_date: event.target.value })} className="w-full bg-white border border-[#E2DFD6] rounded-md px-3 py-2 text-sm font-data" />
               </Field>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setOpen(false)} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md">Cancel</button>
-              <button data-testid="acting-submit" type="submit" className="text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2 rounded-md">Create</button>
+              <button type="button" disabled={busy} onClick={() => setOpen(false)} className="text-sm px-4 py-2 border border-[#E2DFD6] rounded-md disabled:opacity-50">Cancel</button>
+              <button data-testid="acting-submit" disabled={busy} type="submit" className="text-sm bg-[#D1603D] hover:bg-[#B84F2F] text-white px-4 py-2 rounded-md disabled:opacity-50">
+                {busy ? "Saving…" : "Create"}
+              </button>
             </div>
           </form>
         </Modal>
