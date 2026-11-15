@@ -795,10 +795,12 @@ async def edit_voucher(vid: str, body: VoucherPatch, user: dict = Depends(get_cu
         raise HTTPException(403, "Not authorised to edit this voucher")
     items = await _resolve_items(body.line_items, user, v["period"], v["branch_id"], exclude_voucher_id=vid)
     hist = _hist(user, "edited", v["status"], v["status"])
-    await db.payroll_vouchers.update_one(
-        {"id": vid, **tenant_filter(user)},
+    updated = await db.payroll_vouchers.update_one(
+        {"id": vid, **tenant_filter(user), "status": v["status"]},
         {"$set": {"line_items": items, "totals": _totals(items), "updated_at": iso(now_utc())},
          "$push": {"status_history": hist}})
+    if updated.matched_count != 1:
+        raise HTTPException(409, "Voucher status changed. Refresh before editing.")
     await audit("voucher_edit", f"payroll_vouchers/{vid}", user, {"lines": len(items)})
     return {"ok": True, "totals": _totals(items)}
 
@@ -810,7 +812,11 @@ async def delete_voucher(vid: str, user: dict = Depends(get_current_user)):
         raise HTTPException(409, "Only draft vouchers can be deleted — submitted vouchers are permanent records")
     if not (_is_finance(user) or v["created_by"] == user["email"]):
         raise HTTPException(403, "Not authorised")
-    await db.payroll_vouchers.delete_one({"id": vid, **tenant_filter(user)})
+    deleted = await db.payroll_vouchers.delete_one(
+        {"id": vid, **tenant_filter(user), "status": "draft"},
+    )
+    if deleted.deleted_count != 1:
+        raise HTTPException(409, "Voucher status changed. Refresh before deleting.")
     await audit("voucher_delete", f"payroll_vouchers/{vid}", user, {"voucher_ref": v["voucher_ref"]})
     return {"ok": True}
 
@@ -866,11 +872,15 @@ async def _push_next_approvers(v_full: dict, new_status: str, user: dict) -> Non
 async def _apply_transition(vid: str, user: dict, new_status: str, action: str,
                             note: str, extra: Optional[dict] = None) -> dict:
     v = await db.payroll_vouchers.find_one({"id": vid, **tenant_filter(user)}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Voucher not found")
     hist = _hist(user, action, v["status"], new_status, note)
     sets = {"status": new_status, "updated_at": iso(now_utc()), **(extra or {})}
-    await db.payroll_vouchers.update_one(
-        {"id": vid, **tenant_filter(user)},
+    updated = await db.payroll_vouchers.update_one(
+        {"id": vid, **tenant_filter(user), "status": v["status"]},
         {"$set": sets, "$push": {"status_history": hist}})
+    if updated.matched_count != 1:
+        raise HTTPException(409, "Voucher status changed. Refresh before taking this action.")
     await audit(f"voucher_{action}", f"payroll_vouchers/{vid}", user, {"to": new_status, "note": note})
     try:
         await _push_next_approvers(v, new_status, user)
