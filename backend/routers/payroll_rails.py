@@ -159,25 +159,23 @@ async def delete_retro_pay(rid: str, user: dict = Depends(require_roles("payroll
 
 
 async def settle_pending_retros_for_run(run_id: str, period: str, company_id: str) -> dict:
-    """Called by payroll_engine after a successful run: mark applicable retros
-    as settled and stamp settled_run_id. Returns count of settled + sum owed."""
-    q = {
+    """Keep arrears pending until they are included in payslips and paid.
+    
+    Retro-pay tax and contribution treatment must be approved before these
+    adjustments can be added to payroll, so a normal run must not mark them
+    settled without including the amount in the employee's net pay.
+    """
+    pending_count = await db.retro_pay_adjustments.count_documents({
         "company_id": company_id,
         "status": "pending",
         "effective_to": {"$lte": period},
-    }
-    docs = await db.retro_pay_adjustments.find(q, {"_id": 0}).to_list(500)
-    if not docs:
-        return {"settled": 0, "total_sle": 0}
-    ids = [d["id"] for d in docs]
-    total = sum(d["total_owed_sle"] for d in docs)
-    await db.retro_pay_adjustments.update_many(
-        {"company_id": company_id, "id": {"$in": ids}},
-        {"$set": {"status": "settled", "settled_run_id": run_id,
-                  "settled_at": iso(now_utc())}},
-    )
-    log.info("[retro] settled %d rows against run %s (SLE %.2f)", len(docs), run_id, total)
-    return {"settled": len(docs), "total_sle": round(total, 2)}
+    })
+    if pending_count:
+        log.warning(
+            "[retro] %d eligible adjustments remain pending; payroll does not yet include arrears",
+            pending_count,
+        )
+    return {"settled": 0, "pending": pending_count, "total_sle": 0}
 
 
 # ============================================================
@@ -288,9 +286,16 @@ async def sign_run(run_id: str, body: SignAction, user: dict = Depends(require_r
     new_status, meta = _resolve_sign_status(sigs, required, user)
     approves, rejects = meta.pop("approves"), meta.pop("rejects")
 
-    await db.payroll_runs.update_one(
-        {"id": run_id, **tenant_filter(user)},
+    update_filter = {"id": run_id, **tenant_filter(user), "mof_status": run["mof_status"]}
+    if "mof_signatures" in run:
+        update_filter["mof_signatures"] = run["mof_signatures"]
+    else:
+        update_filter["mof_signatures"] = {"$exists": False}
+    result = await db.payroll_runs.update_one(
+        update_filter,
         {"$set": {"mof_signatures": sigs, "mof_status": new_status, **meta}})
+    if not result.matched_count:
+        raise HTTPException(409, "Another MoF signature changed this run. Refresh and try again.")
     await audit(f"mof_sign_{body.action}", f"payroll_runs/{run_id}", user,
                 {"period": run["period"], "approves": approves, "required": required, "new_status": new_status})
     return {
