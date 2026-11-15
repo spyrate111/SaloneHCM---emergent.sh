@@ -351,7 +351,12 @@ async def update_snooze(sid: str, body: SnoozePatch, user: dict = Depends(get_cu
         raise HTTPException(422, "end_date is before start_date")
     if "reason" in updates:
         updates["reason"] = updates["reason"].strip()
-    await db.ooz_snoozes.update_one({"id": sid}, {"$set": updates})
+    result = await db.ooz_snoozes.update_one(
+        {"id": sid, **tenant_filter(user)},
+        {"$set": updates},
+    )
+    if result.matched_count != 1:
+        raise HTTPException(409, "The snooze rule changed. Refresh and try again.")
     return _with_active({**doc, **updates})
 
 
