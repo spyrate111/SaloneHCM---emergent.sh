@@ -8,7 +8,7 @@ const thisMonth = () => {
   const now = new Date();
   return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0")].join("-");
 };
-const sle = (value) => value == null ? "—" : \`SLE \${Number(value).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\`;
+const sle = (value) => value == null ? "—" : `SLE ${Number(value).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const errorMessage = (error, fallback) =>
   typeof error?.response?.data?.detail === "string" ? error.response.data.detail : fallback;
 
@@ -87,7 +87,7 @@ export default function ProjectCosting() {
   const toggleProject = async (project) => {
     setSaving(true);
     try {
-      await api.patch(\`/project-costing/projects/\${project.id}\`, {
+      await api.patch(`/project-costing/projects/${project.id}`, {
         status: project.status === "active" ? "closed" : "active",
       });
       toast.success(project.status === "active" ? "Project closed" : "Project reopened");
@@ -119,7 +119,7 @@ export default function ProjectCosting() {
     if (!budgetSet?.id) return;
     setSaving(true);
     try {
-      await api.post(\`/project-costing/budget-sets/\${budgetSet.id}/approve\`);
+      await api.post(`/project-costing/budget-sets/${budgetSet.id}/approve`);
       toast.success("Budget approved");
       await refresh();
     } catch (error) {
@@ -153,7 +153,7 @@ export default function ProjectCosting() {
     if (!allocationSet?.id) return;
     setSaving(true);
     try {
-      await api.post(\`/project-costing/allocation-sets/\${allocationSet.id}/approve\`);
+      await api.post(`/project-costing/allocation-sets/${allocationSet.id}/approve`);
       toast.success("Employee allocations approved");
       await refresh();
     } catch (error) {
@@ -193,7 +193,7 @@ export default function ProjectCosting() {
           <button type="button" onClick={refresh} disabled={loading}
             className="rounded-md border border-[#D9D6CC] bg-white p-2 text-[#26547C] disabled:opacity-50"
             aria-label="Refresh project costing">
-            <RefreshCw className={\`w-4 h-4 \${loading ? "animate-spin" : ""}\`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </header>
@@ -204,7 +204,7 @@ export default function ProjectCosting() {
           <Metric title="Employer payroll cost" value={sle(report.totals.actual_employer_cost_sle)} />
           <Metric title="Variance" value={sle(report.totals.variance_sle)} />
           <Metric title="Unallocated payroll" value={report.totals.unallocated_employer_cost_sle == null
-            ? "—" : \`\${sle(report.totals.unallocated_employer_cost_sle)} · \${report.totals.unallocated_headcount || 0} staff\`} />
+            ? "—" : `${sle(report.totals.unallocated_employer_cost_sle)} · ${report.totals.unallocated_headcount || 0} staff`} />
         </section>
       )}
 
@@ -235,7 +235,7 @@ export default function ProjectCosting() {
                 <tr key={project.id} className="border-b border-[#F1EEE6]">
                   <td className="py-2 font-mono">{project.code}</td>
                   <td>{project.name}</td><td>{project.funder || "—"}</td>
-                  <td>{project.start_period}{project.end_period ? \` to \${project.end_period}\` : " onward"}</td>
+                  <td>{project.start_period}{project.end_period ? ` to ${project.end_period}` : " onward"}</td>
                   <td><Status status={project.status} /></td>
                   <td className="text-right">
                     <button type="button" disabled={saving} onClick={() => toggleProject(project)}
@@ -260,7 +260,7 @@ export default function ProjectCosting() {
                 <span><span className="font-mono text-xs text-[#686D76]">{project.code}</span> · {project.name}</span>
                 <input type="number" min="0" step="0.01" value={budgetDraft[project.id] ?? ""}
                   onChange={(event) => setBudgetDraft({ ...budgetDraft, [project.id]: event.target.value })}
-                  aria-label={\`Budget for \${project.name} in SLE\`}
+                  aria-label={`Budget for ${project.name} in SLE`}
                   className="rounded-md border border-[#D9D6CC] px-3 py-2 text-right font-mono text-sm" />
               </label>
             ))}
@@ -282,7 +282,7 @@ export default function ProjectCosting() {
                   <select value={row.employee_id} onChange={(event) => setAllocationDraft(allocationDraft.map((item, i) => i === index ? { ...item, employee_id: event.target.value } : item))}
                     className="mt-1 block w-full rounded-md border border-[#D9D6CC] bg-white px-2 py-2 text-sm normal-case tracking-normal">
                     <option value="">Select employee</option>
-                    {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.employee_number ? \` · \${employee.employee_number}\` : ""}</option>)}
+                    {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}{employee.employee_number ? ` · ${employee.employee_number}` : ""}</option>)}
                   </select>
                 </label>
                 <label className="text-[10px] uppercase tracking-wider text-[#686D76]">
@@ -316,7 +316,7 @@ export default function ProjectCosting() {
 
       <section className="rounded-lg border border-[#E2DFD6] bg-white p-4 md:p-6">
         <SectionHeading title="Budget versus actual" subtitle={report?.actuals_available
-          ? \`Payroll run \${report.payroll_run_id} · actuals are from the completed run\`
+          ? `Payroll run ${report.payroll_run_id} · actuals are from the completed run`
           : "No completed payroll run exists for this period yet."} />
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
@@ -369,9 +369,9 @@ function SectionHeading({ title, subtitle, status, revision }) {
 }
 
 function Status({ status, revision }) {
-  return <span className={\`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] uppercase tracking-wider \${status === "approved" || status === "active" ? "bg-[#E4F7E7] text-[#0A4A1E]" : "bg-[#F1EEE6] text-[#686D76]"}\`}>
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] uppercase tracking-wider ${status === "approved" || status === "active" ? "bg-[#E4F7E7] text-[#0A4A1E]" : "bg-[#F1EEE6] text-[#686D76]"}`}>
     {status === "approved" && <CheckCircle2 className="h-3 w-3" />}
-    {status}{revision ? \` · v\${revision}\` : ""}
+    {status}{revision ? ` · v${revision}` : ""}
   </span>;
 }
 
@@ -386,7 +386,7 @@ function Input({ label, value, onChange, required, type = "text" }) {
 
 function ActionButton({ children, onClick, disabled, secondary = false }) {
   return <button type="button" onClick={onClick} disabled={disabled}
-    className={\`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50 \${secondary ? "border border-[#D9D6CC] bg-white text-[#26547C]" : "bg-[#0A4A1E] text-white"}\`}>
+    className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50 ${secondary ? "border border-[#D9D6CC] bg-white text-[#26547C]" : "bg-[#0A4A1E] text-white"}`}>
     {children}
   </button>;
 }
