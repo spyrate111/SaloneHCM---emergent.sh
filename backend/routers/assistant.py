@@ -135,7 +135,7 @@ async def assistant_chat(request: Request, body: AssistantMessageIn, user: dict 
 @router.get("/history/{sid}")
 async def assistant_history(sid: str, user: dict = Depends(get_current_user)):
     return await db.assistant_messages.find(
-        {"session_id": sid, **tenant_filter(user)},
+        {"session_id": sid, "user_id": user["id"], **tenant_filter(user)},
         {"_id": 0},
     ).sort("ts", 1).to_list(200)
 
