@@ -105,6 +105,23 @@ export default function MobileMoneyBatchActions({ run }) {
     }
   };
 
+  const cancelBatch = async () => {
+    if (!batch || !window.confirm("Cancel this batch before approval? Its payout assignments will be released.")) return;
+    setBusy("cancel");
+    try {
+      await api.delete("/payroll/mobile-money/batches/" + batch.id);
+      setBatches((current) => current.filter((item) => item.id !== batch.id));
+      setSelectedBatchId(null);
+      setBatch(null);
+      setEdits({});
+      toast.success("Unapproved payment batch cancelled");
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || "Could not cancel payment batch");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const exportBatch = async () => {
     if (!batch) return;
     setBusy("export");
@@ -191,7 +208,7 @@ export default function MobileMoneyBatchActions({ run }) {
 
             <div className="mt-5 rounded-lg border border-[#E2DFD6] bg-[#F7F6F2] p-4">
               <h3 className="font-medium text-sm">Prepare a batch for this payroll run</h3>
-              <p className="text-xs text-[#686D76] mt-1">Only employees assigned to the selected provider are included. Prepare the other provider separately; employees paid by bank are excluded.</p>
+              <p className="text-xs text-[#686D76] mt-1">Only employees assigned to the selected provider are included. Prepare wallet batches before exporting the bank file; an existing bank export blocks a wallet batch for those employees.</p>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end mt-3">
                 <label className="text-xs text-[#525860]">
                   Provider
@@ -273,6 +290,16 @@ export default function MobileMoneyBatchActions({ run }) {
                     )}
                     {batch.status === "pending_approval" && batch.created_by === user?.email && (
                       <span className="text-xs text-[#8B6A14]">Awaiting approval from another manager.</span>
+                    )}
+                    {batch.status === "pending_approval" && batch.created_by === user?.email && (
+                      <button
+                        data-testid={"mobile-money-cancel-" + batch.id}
+                        onClick={cancelBatch}
+                        disabled={busy !== ""}
+                        className="inline-flex items-center gap-1.5 border border-[#B84F2F] text-[#B84F2F] hover:bg-[#FBE9DF] px-3 py-2 rounded-md text-xs disabled:opacity-50"
+                      >
+                        {busy === "cancel" ? "Cancelling…" : "Cancel draft"}
+                      </button>
                     )}
                     {batch.failed_count > 0 && (
                       <button
