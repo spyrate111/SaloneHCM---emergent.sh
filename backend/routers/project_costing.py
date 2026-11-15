@@ -141,13 +141,16 @@ async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depend
     )
     if not project:
         raise HTTPException(404, "Project not found")
-    updates = body.dict(exclude_unset=True)
+    updates = {key: value for key, value in body.dict(exclude_unset=True).items()
+               if value is not None}
     if not updates:
         return project
     if "status" in updates and updates["status"] not in ("active", "closed"):
         raise HTTPException(422, "status must be active or closed")
     if "code" in updates:
         updates["code"] = updates["code"].strip().upper()
+        if not updates["code"]:
+            raise HTTPException(422, "project code is required")
         other = await db.project_costing_projects.find_one(
             {"company_id": user["company_id"], "code": updates["code"], "id": {"$ne": project_id}}
         )
@@ -155,6 +158,8 @@ async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depend
             raise HTTPException(409, "A project with this code already exists")
     if "name" in updates:
         updates["name"] = updates["name"].strip()
+        if not updates["name"]:
+            raise HTTPException(422, "project name is required")
     if "funder" in updates and updates["funder"] is not None:
         updates["funder"] = updates["funder"].strip()
     updates["updated_at"] = iso(now_utc())
