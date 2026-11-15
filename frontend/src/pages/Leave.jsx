@@ -22,7 +22,7 @@ export default function Leave() {
     load();
     if (canManage) api.get("/employees").then((r) => setEmps(r.data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, load]);
+  }, [user?.id, canManage, load]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -40,7 +40,7 @@ export default function Leave() {
     if (canManage) params.employee_id = employee_id;
     api.get("/leave/coverage-preview", { params })
       .then((r) => setCoverage(r.data)).catch(() => setCoverage(null));
-  }, [open, form, user]);
+  }, [open, form, canManage, user?.id]);
 
   // Annual leave balance for the selected employee (self for non-admins)
   const [balance, setBalance] = useState(null);
@@ -50,7 +50,7 @@ export default function Leave() {
     const params = canManage ? { employee_id: form.employee_id } : {};
     api.get("/leave/balance", { params })
       .then((r) => setBalance(r.data)).catch(() => setBalance(null));
-  }, [open, form.employee_id, user]);
+  }, [open, form.employee_id, canManage, user?.id]);
   const reqDays = form.start_date && form.end_date && form.start_date <= form.end_date
     ? Math.floor((new Date(form.end_date) - new Date(form.start_date)) / 86400000) + 1 : 0;
   const afterLeft = balance ? balance.remaining - (form.leave_type === "annual" ? reqDays : 0) : null;
