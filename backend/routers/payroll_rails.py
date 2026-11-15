@@ -334,7 +334,7 @@ async def get_cutoff_config(user: dict = Depends(require_roles("payroll"))):
 
 
 @cutoff_router.put("/config")
-async def set_cutoff_config(body: CutoffConfig, user: dict = Depends(require_roles("payroll"))):
+async def set_cutoff_config(body: CutoffConfig, user: dict = Depends(require_admin)):
     await db.companies.update_one(
         {"id": user["company_id"]},
         {"$set": {
