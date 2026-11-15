@@ -58,6 +58,7 @@ def test_nassit_workpaper_matches_published_fields_and_totals():
     assert rows["5"]["B5"] == "Bank transfer"
     assert rows["7"]["B7"] == "Member Name (as on SS card)"
     assert rows["7"]["C7"] == "SS Number"
+    assert rows["7"]["D7"] == "Contribution Base (Le)"
     assert rows["7"]["E7"] == "Employer 10% (Le)"
     assert rows["7"]["F7"] == "Employee 5% (Le)"
     assert rows["7"]["G7"] == "Total 15% (Le)"
