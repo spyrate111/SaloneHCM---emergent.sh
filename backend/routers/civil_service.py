@@ -718,11 +718,21 @@ async def submit_for_mof_approval(run_id: str, body: MoFActionIn, user: dict = D
     return {"ok": True, "mof_status": "submitted"}
 
 
+async def _require_multi_signature_mof_flow(user: dict) -> None:
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "features": 1})
+    if "mof_approval" in (company or {}).get("features", []):
+        raise HTTPException(
+            409,
+            "This company requires the multi-signature MoF workflow; use the MoF signatures panel.",
+        )
+
+
 @router.post("/runs/{run_id}/mof-approve")
 async def mof_approve_run(run_id: str, body: MoFActionIn, user: dict = Depends(require_roles("hr"))):
     """Only users tagged with role-flag `mof_approver` (or superadmin) can approve."""
     if user["role"] != "superadmin" and not user.get("mof_approver"):
         raise HTTPException(403, "Only MoF approvers can approve runs")
+    await _require_multi_signature_mof_flow(user)
     tf = tenant_filter(user)
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
@@ -746,6 +756,7 @@ async def mof_approve_run(run_id: str, body: MoFActionIn, user: dict = Depends(r
 async def mof_reject_run(run_id: str, body: MoFActionIn, user: dict = Depends(require_roles("hr"))):
     if user["role"] != "superadmin" and not user.get("mof_approver"):
         raise HTTPException(403, "Only MoF approvers can reject runs")
+    await _require_multi_signature_mof_flow(user)
     tf = tenant_filter(user)
     run = await db.payroll_runs.find_one({"id": run_id, **tf}, {"_id": 0})
     if not run:
