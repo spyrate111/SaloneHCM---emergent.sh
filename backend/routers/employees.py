@@ -2,12 +2,26 @@
 import uuid
 from fastapi import APIRouter, HTTPException, Depends
 from core import db, get_current_user, require_admin, audit, now_utc, iso, tenant_filter, with_tenant, can_role
-from models import EmployeeIn
+from models import EmployeeIn, EmployeeMobileMoneyDetailsIn
 from routers.payroll_rails import assert_not_cutoff_locked
 
 from core import require_roles
 
 router = APIRouter(prefix="/employees", tags=["employees"])
+
+def _visible_employee(employee: dict, user: dict) -> dict:
+    """Hide wallet destinations from roles without HR/payroll need."""
+    if (
+        employee
+        and employee.get("id") != user.get("employee_id")
+        and not can_role(user, "hr", "payroll")
+    ):
+        employee.pop("orange_money_number", None)
+        employee.pop("afrimoney_number", None)
+        employee.pop("mobile_money_provider", None)
+    return employee
+
+
 
 
 @router.get("")
@@ -16,15 +30,18 @@ async def list_employees(user: dict = Depends(get_current_user)):
     Employee: own record only."""
     tf = tenant_filter(user)
     if can_role(user, "hr", "payroll", "auditor"):
-        return await db.employees.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
+        rows = await db.employees.find(tf, {"_id": 0}).sort("created_at", -1).to_list(2000)
+        return [_visible_employee(row, user) for row in rows]
     my_eid = user.get("employee_id")
     if not my_eid:
         return []
     if user.get("role") == "manager":
-        return await db.employees.find(
+        rows = await db.employees.find(
             {**tf, "$or": [{"id": my_eid}, {"manager_id": my_eid}]},
             {"_id": 0}).sort("created_at", -1).to_list(2000)
-    return await db.employees.find({**tf, "id": my_eid}, {"_id": 0}).to_list(1)
+        return [_visible_employee(row, user) for row in rows]
+    rows = await db.employees.find({**tf, "id": my_eid}, {"_id": 0}).to_list(1)
+    return [_visible_employee(row, user) for row in rows]
 
 
 @router.post("")
@@ -49,7 +66,7 @@ async def get_employee(eid: str, user: dict = Depends(get_current_user)):
         is_report = user.get("role") == "manager" and e.get("manager_id") == my_eid
         if not (is_own or is_report):
             raise HTTPException(403, "You may only view your own record")
-    return e
+    return _visible_employee(e, user)
 
 
 @router.put("/{eid}")
@@ -65,15 +82,54 @@ async def update_employee(eid: str, body: EmployeeIn, user: dict = Depends(requi
             await assert_not_cutoff_locked(
                 user, "changing an employee's salary" if salary_change else "changing employment status",
             )
+    updates = body.model_dump()
+    # Preserve payout details when older clients omit the newer optional fields.
+    for field in ("orange_money_number", "afrimoney_number", "mobile_money_provider"):
+        if field not in body.model_fields_set:
+            updates.pop(field, None)
     res = await db.employees.update_one(
         {"id": eid, **tenant_filter(user)},
-        {"$set": body.model_dump()},
+        {"$set": updates},
     )
     if not res.matched_count:
         raise HTTPException(404, "Not found")
     e = await db.employees.find_one({"id": eid}, {"_id": 0})
     await audit("update", f"employees/{eid}", user, {"name": f'{body.first_name} {body.last_name}'})
     return e
+
+
+@router.patch("/{eid}/mobile-money-details")
+async def update_mobile_money_details(
+    eid: str,
+    body: EmployeeMobileMoneyDetailsIn,
+    user: dict = Depends(require_roles("hr")),
+):
+    employee = await db.employees.find_one(
+        {"id": eid, **tenant_filter(user)}, {"_id": 0, "id": 1, "mobile_money_provider": 1},
+    )
+    if not employee:
+        raise HTTPException(404, "Not found")
+    await assert_not_cutoff_locked(user, "changing an employee's mobile-money destination")
+    details = body.model_dump()
+    if "mobile_money_provider" not in body.model_fields_set:
+        details.pop("mobile_money_provider", None)
+    await db.employees.update_one(
+        {"id": eid, **tenant_filter(user)},
+        {"$set": details},
+    )
+    await audit(
+        "employee_mobile_money_details_updated",
+        f"employees/{eid}",
+        user,
+        {
+            "orange_money_number_updated": bool(details.get("orange_money_number")),
+            "afrimoney_number_updated": bool(details.get("afrimoney_number")),
+            "mobile_money_provider": details.get("mobile_money_provider"),
+        },
+    )
+    return await db.employees.find_one(
+        {"id": eid, **tenant_filter(user)}, {"_id": 0},
+    )
 
 
 @router.delete("/{eid}")

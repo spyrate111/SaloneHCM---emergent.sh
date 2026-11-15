@@ -10,6 +10,7 @@ import { VarianceButton } from "../components/Variance";
 import { MoFSignaturesButton } from "../components/MoFSignatures";
 import PayslipScanPanel from "../components/PayslipScanPanel";
 import MoFConfigCard from "../components/MoFConfigCard";
+import MobileMoneyBatchActions from "../components/MobileMoneyBatchActions";
 import { Calculator, Play, Check, FileText, Download, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -280,6 +281,7 @@ export default function Payroll() {
                         </button>
                       </>
                     )}
+                    {["admin", "superadmin", "payroll"].includes(user?.role) && <MobileMoneyBatchActions run={r} />}
                     <button data-testid={`bank-${r.id}`} onClick={() => downloadBank(r.id, r.period)} className={`inline-flex items-center gap-1 text-xs bg-white border border-[#E2DFD6] hover:bg-[#F7F6F2] text-[#26547C] px-2.5 py-1.5 rounded ${has("ifmis_integration") ? "hidden" : ""}`}>
                       <Download className="w-3.5 h-3.5" /> Bank file
                     </button>

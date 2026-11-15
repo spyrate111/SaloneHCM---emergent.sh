@@ -16,6 +16,8 @@ from sms import send_payslip_batch, is_configured as sms_is_configured
 from core import require_roles
 
 from core import can_role
+from pymongo.errors import DuplicateKeyError
+from routers.mobile_money import PROVIDERS, _assignment_id, ensure_latest_payroll_run
 
 router = APIRouter(prefix="/payroll", tags=["payroll"])
 
@@ -172,29 +174,94 @@ async def payslip_pdf(rid: str, eid: str, user: dict = Depends(get_current_user)
 
 @router.get("/runs/{rid}/bank-file")
 async def bank_file(rid: str, user: dict = Depends(require_roles("payroll"))):
-    """NRC clearing CSV — bank_name, account_no, beneficiary, amount, reference."""
-    r = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
-    if not r:
+    """Download a generic bank workpaper and reserve the bank payout channel."""
+    run = await db.payroll_runs.find_one({"id": rid, **tenant_filter(user)}, {"_id": 0})
+    if not run:
         raise HTTPException(404, "Run not found")
-    emps = await db.employees.find(tenant_filter(user), {"_id": 0}).to_list(2000)
-    emp_map = {e["id"]: e for e in emps}
+    await ensure_latest_payroll_run(rid, run.get("period", ""), user)
+
+    scope = tenant_filter(user)
+    employees = await db.employees.find(scope, {"_id": 0}).to_list(2000)
+    employee_map = {employee["id"]: employee for employee in employees}
+    assignments = await db.mobile_money_assignments.find(
+        {"run_id": rid, **scope}, {"_id": 0},
+    ).to_list(2000)
+    assignment_by_employee = {item["employee_id"]: item for item in assignments}
+
     buf = io.StringIO()
     writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
     writer.writerow(["bank_name", "account_no", "beneficiary", "amount_sle", "reference"])
-    for s in r["slips"]:
-        e = emp_map.get(s["employee_id"], {})
+    bank_rows = 0
+    wallet_excluded = 0
+    for slip in run.get("slips", []):
+        amount = float(slip.get("net", 0) or 0)
+        if amount <= 0:
+            continue
+        employee_id = slip["employee_id"]
+        assignment = assignment_by_employee.get(employee_id)
+        if assignment and assignment.get("provider") in PROVIDERS:
+            wallet_excluded += 1
+            continue
+        if (
+            assignment
+            and assignment.get("provider") == "bank"
+            and assignment.get("bank_format", "generic") != "generic"
+        ):
+            raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
+        if assignment is None:
+            assignment_key = _assignment_id(user["company_id"], rid, employee_id)
+            reservation = {
+                "_id": assignment_key,
+                "company_id": user["company_id"],
+                "run_id": rid,
+                "employee_id": employee_id,
+                "batch_id": f"bank-file:{rid}",
+                "provider": "bank",
+                "bank_format": "generic",
+                "created_at": iso(now_utc()),
+            }
+            try:
+                await db.mobile_money_assignments.insert_one(reservation)
+                assignment_by_employee[employee_id] = reservation
+            except DuplicateKeyError:
+                assignment = await db.mobile_money_assignments.find_one(
+                    {"_id": assignment_key, **scope}, {"_id": 0},
+                )
+                if assignment is None:
+                    raise HTTPException(409, "The payout assignment changed. Refresh and export again.")
+                assignment_by_employee[employee_id] = assignment
+                if assignment.get("provider") in PROVIDERS:
+                    wallet_excluded += 1
+                    continue
+                if (
+                    assignment.get("provider") == "bank"
+                    and assignment.get("bank_format", "generic") != "generic"
+                ):
+                    raise HTTPException(409, "This payroll run already has a bank file reserved in another format.")
+        employee = employee_map.get(employee_id, {})
         writer.writerow([
-            e.get("bank_name", "Sierra Leone Commercial Bank"),
-            e.get("bank_account", "0000000000"),
-            s["employee_name"],
-            f"{s['net']:.2f}",
-            f"PAYROLL-{r['period']}",
+            employee.get("bank_name", "Sierra Leone Commercial Bank"),
+            employee.get("bank_account", "0000000000"),
+            slip.get("employee_name", ""),
+            f"{amount:.2f}",
+            f"PAYROLL-{run['period']}",
         ])
-    await audit("export_bank_file", f"payroll_runs/{rid}", user,
-                {"period": r["period"], "rows": len(r["slips"])})
+        bank_rows += 1
+
+    await audit(
+        "export_bank_file",
+        f"payroll_runs/{rid}",
+        user,
+        {"period": run["period"], "rows": bank_rows, "wallet_excluded": wallet_excluded},
+    )
     return StreamingResponse(
-        io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="bank-file-{r["period"]}.csv"'},
+        io.BytesIO(buf.getvalue().encode()),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="bank-file-{run["period"]}.csv"',
+            "Cache-Control": "private, no-store",
+            "X-Mobile-Money-Excluded": str(wallet_excluded),
+        },
     )
 
 
