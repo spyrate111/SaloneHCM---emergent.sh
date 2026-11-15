@@ -230,7 +230,7 @@ async def punch(body: PunchIn, user: dict = Depends(get_current_user)):
             t_out = datetime.fromisoformat(doc["clocked_at"])
             hours = max(0.0, (t_out - t_in).total_seconds() / 3600.0)
             await db.attendance.update_one(
-                {"id": first_in["id"]},
+                {"id": first_in["id"], **tenant_filter(user)},
                 {"$set": {"hours": round(hours, 2),
                           "paired_out_id": doc["id"],
                           "paired_out_at": doc["clocked_at"]}},
